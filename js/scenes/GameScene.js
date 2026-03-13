@@ -63,6 +63,8 @@ var GameScene = new Phaser.Class({
     this.restartKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
 
     this.scene.launch('HUDScene');
+    MMA.UI.bindMobilePauseButton(this);
+    MMA.UI.setPauseButtonVisible(true);
     MMA.UI.setActionButtonLabels(false);
     this.hideGameOverRestartUI();
     this.registry.set('playerStats', Object.assign({}, this.player.stats));
@@ -152,11 +154,13 @@ var GameScene = new Phaser.Class({
         this.gameOverAt = time;
         this.showGameOverRestartUI();
       }
+      MMA.UI.setPauseButtonVisible(false);
       if (Phaser.Input.Keyboard.JustDown(this.restartKey) || time - this.gameOverAt > 3000) {
         this.scene.restart();
       }
       return;
     }
+    MMA.UI.setPauseButtonVisible(!this.paused && !this.roomTransitioning && !this.gameOver);
     if (this.paused || this.roomTransitioning) return;
 
     if (this.groundState.active) {
@@ -208,5 +212,6 @@ var GameScene = new Phaser.Class({
     this.playerHpGfx.fillRect(this.player.x - bw / 2, this.player.y - DT / 2 - 8, bw * pct, 5);
 
     MMA.UI.updateHUDRegistry(this);
+    MMA.UI.updateSpecialButton(this);
   }
 });

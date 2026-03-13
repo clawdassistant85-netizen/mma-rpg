@@ -44,18 +44,39 @@ var UnlockScene = new Phaser.Class({
       align: 'center'
     }).setOrigin(0.5);
 
-    // Auto close after 3 seconds
-    this.time.delayedCall(3000, function() {
-      // Stop UnlockScene and resume GameScene
+    this.add.text(centerX, centerY + 130, 'TAP or press ENTER to continue', {
+      fontSize: '20px',
+      color: '#cccccc'
+    }).setOrigin(0.5);
+
+    this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    var dismiss = function() {
       self.scene.stop('UnlockScene');
-      // Ensure GameScene is resumed
       var gameScene = self.scene.get('GameScene');
       if (gameScene) {
         gameScene.scene.resume();
-        // Unpause physics if it was paused
         gameScene.physics.resume();
         gameScene.paused = false;
       }
+    };
+    this.input.on('pointerdown', dismiss);
+
+    // Auto close after 3 seconds
+    this.time.delayedCall(3000, function() {
+      // Stop UnlockScene and resume GameScene
+      dismiss();
     });
+  },
+
+  update: function() {
+    if (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+      this.scene.stop('UnlockScene');
+      var gameScene = this.scene.get('GameScene');
+      if (gameScene) {
+        gameScene.scene.resume();
+        gameScene.physics.resume();
+        gameScene.paused = false;
+      }
+    }
   }
 });

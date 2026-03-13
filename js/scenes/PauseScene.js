@@ -159,8 +159,17 @@ var PauseScene = new Phaser.Class({
       }).setDepth(10);
     });
 
+
+    var closeBtn = this.add.text(W / 2, PANEL_Y + PANEL_H - 44, 'CLOSE', {
+      fontSize: '16px',
+      color: '#ffffff',
+      backgroundColor: '#444444',
+      padding: { left: 14, right: 14, top: 6, bottom: 6 }
+    }).setOrigin(0.5, 1).setDepth(12).setInteractive({ useHandCursor: true });
+    closeBtn.on('pointerdown', function(){ self.closePause(); });
+
     // ── Footer
-    this.add.text(W / 2, PANEL_Y + PANEL_H - 18, 'Press  I  or  ESC  to return to fight', {
+    this.add.text(W / 2, PANEL_Y + PANEL_H - 18, 'TAP CLOSE or press I / ESC to return', {
       fontSize: '13px',
       color: '#666666',
       stroke: '#000000',
@@ -170,6 +179,12 @@ var PauseScene = new Phaser.Class({
     // ── Close keys
     this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.iKey   = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I);
+
+    this.input.on('pointerdown', function(pointer){
+      if (pointer.y < PANEL_Y || pointer.y > PANEL_Y + PANEL_H || pointer.x < PANEL_X || pointer.x > PANEL_X + PANEL_W) {
+        self.closePause();
+      }
+    });
   },
 
   update: function() {

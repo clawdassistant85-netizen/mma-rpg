@@ -119,6 +119,25 @@
       color: rgba(255,255,255,0.5);
     }
 
+    #mobile-pause-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      border: 0;
+      background: rgba(20,20,20,0.72);
+      color: #fff;
+      font: 700 22px/42px system-ui, sans-serif;
+      text-align: center;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+      z-index: 35;
+      pointer-events: auto;
+      display: none;
+    }
+    #mobile-pause-btn:active { transform: scale(0.95); }
+
     #ground-overlay {
       position: absolute;
       inset: 0;
@@ -195,6 +214,7 @@
     <!-- UI layer (mobile touch controls) -->
     <div id="ui-layer" aria-hidden="true">
       <div id="ground-overlay"><div class="ground-text">GROUND GAME</div><div id="ground-timer"><div id="ground-timer-fill"></div></div></div>
+      <button id="mobile-pause-btn" type="button" aria-label="Pause menu">⚙️</button>
       <div id="ground-banner">TAKEDOWN!</div>
       <button id="dom-restart-btn" type="button">RESTART (ENTER)</button>
       <div id="dpad" class="touch-control" aria-label="D-pad">
@@ -214,16 +234,16 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=10"></script>
-  <script src="js/sprites.js?v=10"></script>
-  <script src="js/combat.js?v=10"></script>
-  <script src="js/enemies.js?v=10"></script>
-  <script src="js/zones.js?v=1"></script>
-  <script src="js/player.js?v=10"></script>
-  <script src="js/items.js?v=2"></script>
-  <script src="js/vfx.js?v=1"></script>
-  <script src="js/ui.js?v=10"></script>
-  <script src="js/progression.js?v=3"></script>
+  <script src="js/config.js?v=11"></script>
+  <script src="js/sprites.js?v=11"></script>
+  <script src="js/combat.js?v=11"></script>
+  <script src="js/enemies.js?v=11"></script>
+  <script src="js/zones.js?v=11"></script>
+  <script src="js/player.js?v=11"></script>
+  <script src="js/items.js?v=11"></script>
+  <script src="js/vfx.js?v=11"></script>
+  <script src="js/ui.js?v=11"></script>
+  <script src="js/progression.js?v=11"></script>
   <script>
   // Unlock WebAudio on first user interaction (mobile tap/click)
   function unlockAudio(){
@@ -414,16 +434,16 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=3"></script>
-  <script src="js/saveSystem.js?v=3"></script>
-  <script src="js/narrator.js?v=4"></script>
-  <script src="js/scenes/TitleScene.js?v=3"></script>
-  <script src="js/scenes/BootScene.js?v=10"></script>
-  <script src="js/scenes/GameScene.js?v=10"></script>
-  <script src="js/scenes/HUDScene.js?v=3"></script>
-  <script src="js/scenes/PauseScene.js?v=3"></script>
-  <script src="js/scenes/UnlockScene.js?v=3"></script>
-  <script src="js/scenes/VictoryScene.js?v=3"></script>
-  <script src="js/main.js?v=5"></script>
+<script src="js/sounds.js?v=11"></script>
+  <script src="js/saveSystem.js?v=11"></script>
+  <script src="js/narrator.js?v=11"></script>
+  <script src="js/scenes/TitleScene.js?v=11"></script>
+  <script src="js/scenes/BootScene.js?v=11"></script>
+  <script src="js/scenes/GameScene.js?v=11"></script>
+  <script src="js/scenes/HUDScene.js?v=11"></script>
+  <script src="js/scenes/PauseScene.js?v=11"></script>
+  <script src="js/scenes/UnlockScene.js?v=11"></script>
+  <script src="js/scenes/VictoryScene.js?v=11"></script>
+  <script src="js/main.js?v=11"></script>
 </body>
 </html>

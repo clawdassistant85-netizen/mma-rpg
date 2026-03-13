@@ -17,6 +17,12 @@ window.MMA.Combat = {
   ENEMY_STAMINA_MIN: 30,
   STUN_CHAIN_HITS: 5,
   STUN_DURATION_MS: 1000,
+  TAUNT_STAMINA_COST: 6,
+  TAUNT_COOLDOWN_MS: 1200,
+  TAUNT_DEBUFF_MULTIPLIER: 1.15,
+  TAUNT_DEBUFF_DURATION_MS: 3000,
+  TAUNT_FOCUS_GAIN: 20,
+  FOCUS_MAX: 100,
   TAKEDOWN_BASE_CHANCE: {
     grappler: 0.8,
     balanced: 0.5,
@@ -273,6 +279,64 @@ window.MMA.Combat = {
     armbar:{ name:'Armbar', type:'sub', damage:30, staminaCost:22, cooldown:1800, unlockLevel:99, unlockType:'enemy', fromEnemy:'bjjBlackBelt' },
     triangleChoke:{ name:'Triangle Choke', type:'sub', damage:28, staminaCost:20, cooldown:1700, unlockLevel:99, unlockType:'enemy', fromEnemy:'bjjBlackBelt' }
   },
+  ensureFocusState: function(scene) {
+    scene.player.focusState = scene.player.focusState || { meter: 0 };
+    return scene.player.focusState;
+  },
+  gainFocus: function(scene, amount) {
+    var focus = this.ensureFocusState(scene);
+    var prev = focus.meter;
+    focus.meter = Math.min(this.FOCUS_MAX, focus.meter + Math.max(0, amount || 0));
+    if (focus.meter !== prev) {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 72, 'FOCUS +' + (focus.meter - prev), '#66e6ff');
+    }
+    if (focus.meter >= this.FOCUS_MAX && prev < this.FOCUS_MAX) {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 90, 'FOCUS MAX!', '#33ccff');
+    }
+    return focus;
+  },
+  applyTauntDebuffIfActive: function(scene, enemy, damage) {
+    if (!enemy) return damage;
+    enemy.combatState = enemy.combatState || {};
+    if (scene.time.now < (enemy.combatState.tauntDebuffUntil || 0)) {
+      return Math.round(damage * this.TAUNT_DEBUFF_MULTIPLIER);
+    }
+    return damage;
+  },
+  executeTaunt: function(scene) {
+    if (scene.groundState && scene.groundState.active) return;
+    if (scene.gameOver || scene.paused || scene.roomTransitioning) return;
+    var cd = scene.player.cooldowns;
+    if (!cd.taunt) cd.taunt = 0;
+    if (cd.taunt > 0 || scene.player.stats.stamina < this.TAUNT_STAMINA_COST) return;
+
+    var enemies = scene.enemyGroup.getChildren();
+    var best = null;
+    var bestDist = Infinity;
+    var maxDist = CONFIG.DISPLAY_TILE * 2.4;
+    for (var i = 0; i < enemies.length; i++) {
+      var enemy = enemies[i];
+      if (!enemy.active || enemy.state === 'dead') continue;
+      var dist = Phaser.Math.Distance.Between(scene.player.x, scene.player.y, enemy.x, enemy.y);
+      if (dist <= maxDist && dist < bestDist) {
+        best = enemy;
+        bestDist = dist;
+      }
+    }
+
+    scene.player.stats.stamina -= this.TAUNT_STAMINA_COST;
+    cd.taunt = this.TAUNT_COOLDOWN_MS;
+
+    if (!best) {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'TAUNT WHIFFED', '#aaaaaa');
+      return;
+    }
+
+    best.combatState = best.combatState || {};
+    best.combatState.tauntDebuffUntil = scene.time.now + this.TAUNT_DEBUFF_DURATION_MS;
+    this.gainFocus(scene, this.TAUNT_FOCUS_GAIN);
+    MMA.UI.showDamageText(scene, best.x, best.y - 54, 'TAUNTED! DEF -15%', '#ff99cc');
+  },
   executeAttack: function(scene, moveKey) {
     if (scene.groundState && scene.groundState.active) return this.executeGroundMove(scene, moveKey);
     if (scene.player.unlockedMoves.indexOf(moveKey) === -1) return MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'LOCKED', '#888888');
@@ -310,7 +374,7 @@ window.MMA.Combat = {
         var comboResult = this.applyComboBonus(scene, moveKey, rolled.damage, true);
         var pressureResult = this.applyPressureBreakIfReady(scene, comboResult.damage, enemy);
         var staminaBreakDamage = this.applyStaminaBreakIfActive(scene, enemy, pressureResult.damage);
-        var dmg = staminaBreakDamage.damage;
+        var dmg = this.applyTauntDebuffIfActive(scene, enemy, staminaBreakDamage.damage);
         var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;

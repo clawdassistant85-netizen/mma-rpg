@@ -47,7 +47,7 @@ var VictoryScene = new Phaser.Class({
     }).setOrigin(0.5);
 
     // Instruction
-    this.instr = this.add.text(centerX, centerY + 140, 'Press ENTER to return to title', {
+    this.instr = this.add.text(centerX, centerY + 140, 'TAP or press ENTER to return to title', {
       fontFamily: 'Arial, sans-serif',
       fontSize: '24px',
       color: '#dddddd'
@@ -62,18 +62,20 @@ var VictoryScene = new Phaser.Class({
 
     // Input
     this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    this.input.on('pointerdown', this.returnToTitle, this);
   },
 
   update: function () {
     if (Phaser.Input.Keyboard.JustDown(this.enterKey)) {
-      // Clear save so the next run starts fresh
-      if (typeof clearSaveGame === 'function') {
-        clearSaveGame();
-      }
-
-      // Stop VictoryScene and go back to TitleScene
-      this.scene.stop('VictoryScene');
-      this.scene.start('TitleScene');
+      this.returnToTitle();
     }
+  },
+
+  returnToTitle: function() {
+    if (typeof clearSaveGame === 'function') {
+      clearSaveGame();
+    }
+    this.scene.stop('VictoryScene');
+    this.scene.start('TitleScene');
   }
 });

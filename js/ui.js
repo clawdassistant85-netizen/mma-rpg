@@ -539,8 +539,11 @@ window.MMA.UI = {
     lrLines.forEach(function(line, i) {
       con.add(scene.add.text(c1x + 5, ly + 15 + i * 14, line, { fontSize: '12px', color: '#ffaa44' }).setDepth(10));
     });
-    con.add(scene.add.text(cw/2, ch-15, 'Press I or ESC to close', { fontSize: '12px', color: '#666666' }).setOrigin(0.5).setDepth(10));
+    con.add(scene.add.text(cw/2, ch-15, 'Tap card or press I/ESC to close', { fontSize: '12px', color: '#666666' }).setOrigin(0.5).setDepth(10));
     con.close = function() { scene.tweens.add({ targets: con, alpha: 0, scaleX: 0.9, scaleY: 0.9, duration: 150, onComplete: function(){ con.destroy(); } }); };
+    con.setSize(cw, ch);
+    con.setInteractive(new Phaser.Geom.Rectangle(0, 0, cw, ch), Phaser.Geom.Rectangle.Contains);
+    con.on('pointerdown', function() { con.close(); });
     con.setAlpha(0); con.setScale(0.9);
     scene.tweens.add({ targets: con, alpha: 1, scaleX: 1, scaleY: 1, duration: 200, ease: 'Back.easeOut' });
     return con;
@@ -767,9 +770,17 @@ window.MMA.UI = {
     hudToggle.on('pointerdown', function() { self.settings.showHud = !self.settings.showHud; self.showSettingsMenu(scene); });
     con.add(hudToggle);
     
-    con.add(scene.add.text(cw / 2, ch - 25, 'Press ESC to close', { fontSize: '11px', color: '#666666' }).setOrigin(0.5));
+    var closeBtn = scene.add.text(cw / 2, ch - 48, 'CLOSE', {
+      fontSize: '13px',
+      color: '#ffffff',
+      backgroundColor: '#335577',
+      padding: { left: 12, right: 12, top: 5, bottom: 5 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    con.add(closeBtn);
+    con.add(scene.add.text(cw / 2, ch - 25, 'Tap CLOSE or press ESC', { fontSize: '11px', color: '#666666' }).setOrigin(0.5));
     
     con.close = function() { scene.tweens.add({ targets: con, alpha: 0, scaleX: 0.9, scaleY: 0.9, duration: 150, onComplete: function(){ con.destroy(); } }); };
+    closeBtn.on('pointerdown', function() { con.close(); });
     con.setAlpha(0);
     con.setScale(0.9);
     scene.tweens.add({ targets: con, alpha: 1, scaleX: 1, scaleY: 1, duration: 200, ease: 'Back.easeOut' });
@@ -834,7 +845,7 @@ window.MMA.UI = {
     });
     this.updateGroundHUD(scene);
   },
-  setActionButtonLabels: function(groundActive) {
+  setActionButtonLabels: function(groundActive, scene) {
     var labels = groundActive ? {
       jab: 'G&P',
       heavy: 'Elbow',
@@ -850,6 +861,64 @@ window.MMA.UI = {
       var btn = document.querySelector('.action-btn[data-action="' + action + '"]');
       if (btn) btn.textContent = labels[action];
     });
+    this.updateSpecialButton(scene || null, !!groundActive);
+  },
+  getBestSpecialMoveKey: function(scene) {
+    if (!scene || !scene.player || !scene.player.unlockedMoves || !window.MMA || !MMA.Combat || !MMA.Combat.MOVE_ROSTER) return null;
+    var roster = MMA.Combat.MOVE_ROSTER;
+    var unlocked = scene.player.unlockedMoves;
+    var skip = { jab:true, cross:true, takedown:true };
+    if (unlocked.indexOf('spinningBackFist') !== -1) return 'spinningBackFist';
+    var bestKey = null;
+    var bestDamage = -1;
+    for (var i = 0; i < unlocked.length; i++) {
+      var key = unlocked[i];
+      var m = roster[key];
+      if (!m || skip[key]) continue;
+      var dmg = typeof m.damage === 'number' ? m.damage : 0;
+      if (dmg > bestDamage) {
+        bestDamage = dmg;
+        bestKey = key;
+      }
+    }
+    return bestKey;
+  },
+  updateSpecialButton: function(scene, forceGround) {
+    var btn = document.querySelector('.action-btn[data-action="special"]');
+    if (!btn) return;
+    var onGround = !!forceGround || !!(scene && scene.groundState && scene.groundState.active);
+    if (onGround) {
+      btn.style.display = '';
+      btn.textContent = 'Stand Up';
+      return;
+    }
+    var best = this.getBestSpecialMoveKey(scene);
+    if (!best) {
+      btn.style.display = 'none';
+      return;
+    }
+    btn.style.display = '';
+    var move = MMA.Combat.MOVE_ROSTER[best];
+    btn.textContent = (move && move.name) ? move.name : 'Special';
+  },
+  bindMobilePauseButton: function(scene) {
+    var btn = document.getElementById('mobile-pause-btn');
+    if (!btn || btn._mmaBound) return;
+    btn._mmaBound = true;
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (!scene || scene.gameOver || scene.roomTransitioning || scene.paused || scene.scene.isActive('PauseScene')) return;
+      scene.registry.set('unlockedMoves', scene.player.unlockedMoves.slice());
+      scene.registry.set('playerStats', Object.assign({}, scene.player.stats));
+      scene.physics.pause();
+      scene.paused = true;
+      scene.scene.launch('PauseScene');
+    });
+  },
+  setPauseButtonVisible: function(show) {
+    var btn = document.getElementById('mobile-pause-btn');
+    if (!btn) return;
+    btn.style.display = show ? 'block' : 'none';
   },
   showGroundBanner: function(text) {
     var el = document.getElementById('ground-banner');
@@ -875,6 +944,7 @@ window.MMA.UI = {
     var dpad = document.getElementById("dpad");
     var cluster = document.getElementById("action-cluster");
     var startBtn = document.getElementById("dom-start-btn");
+    var pauseBtn = document.getElementById("mobile-pause-btn");
     if (!dpad || !cluster) return;
     var minDim = Math.min(window.innerWidth, window.innerHeight);
     var maxDim = Math.max(window.innerWidth, window.innerHeight);
@@ -903,5 +973,6 @@ window.MMA.UI = {
     if (grapple) { grapple.style.left = sidePad + "px"; grapple.style.top = midY + "px"; }
     if (special) { special.style.left = hOffset + "px"; special.style.bottom = topPad + "px"; }
     if (startBtn) { startBtn.style.bottom = landscape ? "6%" : "9%"; var fs = Math.min(20, Math.floor(minDim * 0.04)); startBtn.style.fontSize = fs + "px"; startBtn.style.padding = (fs * 0.8) + "px " + (fs * 1.7) + "px"; }
+    if (pauseBtn) { var pSize = Math.max(34, Math.floor(minDim * 0.07)); pauseBtn.style.width = pSize + "px"; pauseBtn.style.height = pSize + "px"; pauseBtn.style.lineHeight = pSize + "px"; pauseBtn.style.fontSize = Math.max(16, Math.floor(pSize * 0.52)) + "px"; }
   }
 };

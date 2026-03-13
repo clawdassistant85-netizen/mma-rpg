@@ -5,6 +5,7 @@ window.TitleScene = new Phaser.Class({
   },
 
   create: function () {
+    var self = this;
     var centerX = this.cameras.main.width / 2;
     var centerY = this.cameras.main.height / 2;
 
@@ -72,12 +73,9 @@ window.TitleScene = new Phaser.Class({
     }).setOrigin(0.5, 0);
 
     // Input: ENTER or tap to start game
-    this.input.on('pointerdown', () => {
-      if (!this.hasSave) {
-        this.scene.start('BootScene');
-      } else if (this.hasSave && this.pressText.text.startsWith('CONTINUE')) {
-        // ignore tap, wait for Y/N
-      }
+    this.input.on('pointerdown', function(pointer){
+      if (self.hasSave && self.choiceButtonsVisible) return;
+      if (!self.hasSave) self.scene.start('BootScene');
     });
     this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
     // Continue prompt keys
@@ -93,7 +91,42 @@ window.TitleScene = new Phaser.Class({
     }
 
     if (this.hasSave) {
-      this.pressText.setText('CONTINUE? (Y/N)');
+      this.pressText.setText('CONTINUE? TAP A BUTTON OR PRESS Y/N');
+    }
+
+    this.choiceButtonsVisible = false;
+    this.choiceButtons = [];
+    if (this.hasSave) {
+      var btnY = centerY + 52;
+      var yesBtn = this.add.text(centerX - 78, btnY, 'YES', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '22px',
+        color: '#ffffff',
+        backgroundColor: '#2f7d32',
+        padding: { left: 14, right: 14, top: 8, bottom: 8 }
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      var noBtn = this.add.text(centerX + 78, btnY, 'NO', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '22px',
+        color: '#ffffff',
+        backgroundColor: '#8b2f2f',
+        padding: { left: 18, right: 18, top: 8, bottom: 8 }
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      yesBtn.on('pointerdown', function(){ self.scene.start('BootScene'); });
+      noBtn.on('pointerdown', function(){
+        if (typeof clearSaveGame === 'function') clearSaveGame();
+        else if (typeof window !== 'undefined' && window.localStorage) {
+          try { window.localStorage.removeItem('mma-rpg-save'); } catch (e) {}
+        }
+        self.hasSave = false;
+        self.choiceButtonsVisible = false;
+        self.choiceButtons.forEach(function(btn){ if (btn && btn.destroy) btn.destroy(); });
+        self.choiceButtons = [];
+        self.pressText.setText('TAP OR PRESS ENTER TO START');
+        self.scene.start('BootScene');
+      });
+      this.choiceButtonsVisible = true;
+      this.choiceButtons = [yesBtn, noBtn];
     }
   },
 
@@ -119,7 +152,7 @@ window.TitleScene = new Phaser.Class({
           try { window.localStorage.removeItem('mma-rpg-save'); } catch (e) {}
         }
         this.hasSave = false;
-        this.pressText.setText('PRESS ENTER TO START');
+        this.pressText.setText('TAP OR PRESS ENTER TO START');
         this.scene.start('BootScene');
         return;
       }
