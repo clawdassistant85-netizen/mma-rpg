@@ -1,4 +1,4 @@
-var TitleScene = new Phaser.Class({
+window.TitleScene = new Phaser.Class({
   Extends: Phaser.Scene,
   initialize: function TitleScene() {
     Phaser.Scene.call(this, { key: 'TitleScene' });
