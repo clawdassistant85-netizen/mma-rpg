@@ -1,0 +1,67 @@
+/* Overlay and menu styling for MMA RPG */
+/* Action buttons */
+#action-cluster {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  width: 120px; /* enough for layout */
+  height: 120px;
+  pointer-events: auto;
+}
+.action-btn {
+  position: absolute;
+  width: 60px;
+  height: 40px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #444, #222);
+  color: #fff;
+  font: 600 14px/40px monospace;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  border: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+/* Diamond layout */
+#action-cluster .action-btn[data-action="jab"] { left: 30px; top: 0; }
+#action-cluster .action-btn[data-action="heavy"] { left: 0; top: 40px; }
+#action-cluster .action-btn[data-action="grapple"] { left: 60px; top: 40px; }
+#action-cluster .action-btn[data-action="special"] { left: 30px; top: 80px; }
+@media (pointer: fine) {
+  #action-cluster { display: none; }
+}
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.menu-box {
+  background: #1a1a2e;
+  border: 2px solid #e83030;
+  padding: 20px;
+  color: #fff;
+  font-family: monospace;
+}
+.menu-title {
+  font-size: 24px;
+  color: #e8c830;
+  margin-bottom: 15px;
+}
+.menu-item {
+  font-size: 16px;
+  padding: 8px;
+  cursor: pointer;
+}
+.menu-item:hover {
+  background: #e83030;
+  color: #000;
+}
+/* Minimal supportive rule */
+* { box-sizing: border-box; }

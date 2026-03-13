@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>MMA RPG</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; touch-action: none; }
+
+    /* Shell so UI overlays can anchor to the same centered area */
+    #game-shell { position: relative; display: inline-block; max-width: 100vw; max-height: 100vh; }
+    #game-container { max-width: 100vw; max-height: 100vh; }
+    #game-container canvas { display: block; max-width: 100vw; max-height: 100vh; width: 100%; height: auto; -webkit-tap-highlight-color: transparent; }
+
+    /* UI layer (DOM) */
+    #ui-layer { position: absolute; inset: 0; pointer-events: none; }
+
+    /* D-pad (bottom-left) */
+    #dpad { position: absolute; left: 18px; bottom: 18px; width: 100px; height: 100px; pointer-events: auto; touch-action: none; }
+    #dpad .dpad-base {
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      background: rgba(140,140,140,0.25);
+      border: 2px solid rgba(220,220,220,0.25);
+      backdrop-filter: blur(1px);
+      transform: scale(1);
+      transition: transform 80ms ease;
+    }
+    #dpad .dpad-btn {
+      position: absolute;
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      border: 0;
+      background: rgba(120,120,120,0.55);
+      color: rgba(255,255,255,0.92);
+      font: 700 18px/38px monospace;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      transform: translateZ(0) scale(1);
+      transition: transform 80ms ease, background 80ms ease;
+    }
+    #dpad .dpad-btn:active { transform: translateZ(0) scale(0.92); background: rgba(160,160,160,0.65); }
+    /* Programmatic pressed state (touchmove across pad) */
+    #dpad .dpad-btn.active { transform: translateZ(0) scale(0.92); background: rgba(160,160,160,0.65); }
+    #dpad.active .dpad-base { transform: scale(0.98); transition: transform 80ms ease; }
+
+    #dpad .dpad-up { left: 31px; top: 6px; }
+    #dpad .dpad-down { left: 31px; bottom: 6px; }
+    #dpad .dpad-left { left: 6px; top: 31px; }
+    #dpad .dpad-right { right: 6px; top: 31px; }
+
+    /* Action buttons (bottom-right diamond layout) */
+    #action-cluster {
+      position: absolute;
+      right: 18px;
+      bottom: 24px;
+      width: 150px;
+      height: 130px;
+      pointer-events: auto;
+      touch-action: none;
+    }
+    #action-cluster .action-btn {
+      position: absolute;
+      width: 60px;
+      height: 40px;
+      border-radius: 12px;
+      border: 0;
+      background-image: linear-gradient(145deg, rgba(255,255,255,0.18), rgba(40,40,40,0.9));
+      box-shadow: 0 4px 10px rgba(0,0,0,0.45);
+      color: rgba(255,255,255,0.94);
+      font: 700 13px/40px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      text-align: center;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      user-select: none;
+      -webkit-user-select: none;
+      transform: translateZ(0) scale(1);
+      transition: transform 80ms ease, box-shadow 80ms ease, background-image 120ms ease;
+    }
+    #action-cluster .action-btn:active,
+    #action-cluster .action-btn.active {
+      transform: translateZ(0) scale(0.94);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.55);
+      background-image: linear-gradient(145deg, rgba(255,255,255,0.30), rgba(20,20,20,0.95));
+    }
+    /* Diamond positions: Jab (top), Heavy (right), Grapple (left), Special (bottom) */
+    #action-cluster .action-btn[data-action="jab"] {
+      left: 45px;
+      top: 6px;
+    }
+    #action-cluster .action-btn[data-action="heavy"] {
+      right: 6px;
+      top: 45px;
+    }
+    #action-cluster .action-btn[data-action="grapple"] {
+      left: 6px;
+      top: 45px;
+    }
+    #action-cluster .action-btn[data-action="special"] {
+      left: 45px;
+      bottom: 6px;
+    }
+    /* Cooldown overlay */
+    #action-cluster .action-btn .cooldown-overlay {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.65);
+      border-radius: 12px;
+      pointer-events: none;
+      transition: height 50ms linear;
+    }
+    #action-cluster .action-btn.on-cooldown {
+      background-image: linear-gradient(145deg, rgba(100,100,100,0.4), rgba(30,30,30,0.95));
+      color: rgba(255,255,255,0.5);
+    }
+
+    @media (orientation: landscape) {
+      #dpad { left: 10px; bottom: 10px; width: 88px; height: 88px; }
+      #action-cluster { right: 10px; bottom: 10px; width: 132px; height: 112px; }
+    }
+
+    @media (pointer: fine) {
+      /* Hide touch controls on desktop */
+      #dpad { display: none; }
+      #action-cluster { display: none; }
+    }
+  </style>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="game-shell">
+    <div id="game-container"></div>
+    <!-- UI layer (mobile touch controls) -->
+    <div id="ui-layer" aria-hidden="true">
+      <div id="dpad" class="touch-control" aria-label="D-pad">
+        <div class="dpad-base"></div>
+        <button class="dpad-btn dpad-up" data-dir="up" aria-label="Up">▲</button>
+        <button class="dpad-btn dpad-down" data-dir="down" aria-label="Down">▼</button>
+        <button class="dpad-btn dpad-left" data-dir="left" aria-label="Left">◀</button>
+        <button class="dpad-btn dpad-right" data-dir="right" aria-label="Right">▶</button>
+      </div>
+      <!-- Action buttons cluster -->
+      <div id="action-cluster" class="touch-control" aria-label="Action Buttons">
+        <button class="action-btn" data-action="jab" aria-label="Jab">Jab</button>
+        <button class="action-btn" data-action="heavy" aria-label="Heavy">Heavy</button>
+        <button class="action-btn" data-action="grapple" aria-label="Grapple">Grapple</button>
+        <button class="action-btn" data-action="special" aria-label="Special">Special</button>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <script src="js/config.js?v=5"></script>
+  <script src="js/sprites.js?v=2"></script>
+  <script src="js/combat.js?v=2"></script>
+  <script src="js/enemies.js?v=6"></script>
+  <script src="js/zones.js?v=1"></script>
+  <script src="js/player.js?v=2"></script>
+  <script src="js/items.js?v=2"></script>
+  <script src="js/vfx.js?v=1"></script>
+  <script src="js/ui.js?v=1"></script>
+  <script src="js/progression.js?v=3"></script>
+  <script>
+  // Unlock WebAudio on first user interaction (mobile tap/click)
+  function unlockAudio(){
+    try{
+      if (window.MMA_AUDIO && typeof window.MMA_AUDIO.unlock === 'function') {
+        // Preferred path: delegate to shared audio manager (creates/resumes
+        // a single AudioContext that the rest of the game uses)
+        window.MMA_AUDIO.unlock();
+      } else {
+        // Fallback: create a throwaway context just to satisfy autoplay
+        var Ctor = window.AudioContext || window.webkitAudioContext;
+        if (Ctor) {
+          var ctx = new Ctor();
+          if (ctx.state === 'suspended') {
+            ctx.resume();
+          }
+          ctx.close();
+        }
+      }
+    } catch (e) {
+      console.warn('Audio unlock failed', e);
+    }
+    // Remove listeners after first activation
+    document.removeEventListener('touchstart', unlockAudio);
+    document.removeEventListener('click', unlockAudio);
+  }
+  document.addEventListener('touchstart', unlockAudio, {once:true});
+  document.addEventListener('click', unlockAudio, {once:true});
+  // Start game on first tap (mobile) after audio unlock
+  document.addEventListener('touchstart', function(){
+    var btn = document.getElementById('dom-start-btn');
+    if (btn) btn.click();
+  }, {once:true});
+</script>
+
+<script>
+  // Global touch state (read by Phaser scenes)
+  window.MMA_TOUCH = window.MMA_TOUCH || { up:false, down:false, left:false, right:false };
+
+  (function setupDpad(){
+    var dpad = document.getElementById('dpad');
+    if (!dpad) return;
+
+    var buttons = {
+      up: dpad.querySelector('.dpad-up'),
+      down: dpad.querySelector('.dpad-down'),
+      left: dpad.querySelector('.dpad-left'),
+      right: dpad.querySelector('.dpad-right')
+    };
+
+    // Ensure global touch state exists
+    window.MMA_TOUCH = window.MMA_TOUCH || { up:false, down:false, left:false, right:false };
+
+    function clearAll(){
+      window.MMA_TOUCH.up = window.MMA_TOUCH.down = window.MMA_TOUCH.left = window.MMA_TOUCH.right = false;
+      Object.keys(buttons).forEach(function(k){ if (buttons[k]) buttons[k].classList.remove('active'); });
+      dpad.classList.remove('active');
+    }
+
+    function setSingle(dir){
+      clearAll();
+      if (dir && window.MMA_TOUCH.hasOwnProperty(dir)) {
+        window.MMA_TOUCH[dir] = true;
+        if (buttons[dir]) buttons[dir].classList.add('active');
+        dpad.classList.add('active');
+      }
+    }
+
+    function dirFromClientXY(clientX, clientY){
+      var r = dpad.getBoundingClientRect();
+      var cx = r.left + r.width/2;
+      var cy = r.top + r.height/2;
+      var dx = clientX - cx;
+      var dy = clientY - cy;
+      var adx = Math.abs(dx);
+      var ady = Math.abs(dy);
+      // Deadzone near center
+      if (Math.sqrt(dx*dx + dy*dy) < 14) return null;
+      if (adx > ady) return dx < 0 ? 'left' : 'right';
+      return dy < 0 ? 'up' : 'down';
+    }
+
+    // Track a single active touch so swipes/dragging across the pad work.
+    var activeTouchId = null;
+
+    function onTouchStart(e){
+      if (!e.changedTouches || !e.changedTouches.length) return;
+      var t = e.changedTouches[0];
+      activeTouchId = t.identifier;
+      var dir = dirFromClientXY(t.clientX, t.clientY);
+      setSingle(dir);
+      e.preventDefault();
+    }
+
+    function onTouchMove(e){
+      if (activeTouchId === null || !e.touches) return;
+      for (var i=0; i<e.touches.length; i++) {
+        var t = e.touches[i];
+        if (t.identifier === activeTouchId) {
+          var dir = dirFromClientXY(t.clientX, t.clientY);
+          setSingle(dir);
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+
+    function onTouchEnd(e){
+      if (activeTouchId === null) return;
+      if (!e.changedTouches) { clearAll(); activeTouchId = null; return; }
+      for (var i=0; i<e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === activeTouchId) {
+          clearAll();
+          activeTouchId = null;
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+
+    dpad.addEventListener('touchstart', onTouchStart, {passive:false});
+    dpad.addEventListener('touchmove', onTouchMove, {passive:false});
+    dpad.addEventListener('touchend', onTouchEnd, {passive:false});
+    dpad.addEventListener('touchcancel', function(){ clearAll(); activeTouchId = null; });
+
+    // Mouse fallback (desktop testing): click/drag within the pad.
+    var mouseDown = false;
+    dpad.addEventListener('mousedown', function(e){
+      mouseDown = true;
+      setSingle(dirFromClientXY(e.clientX, e.clientY));
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', function(e){
+      if (!mouseDown) return;
+      setSingle(dirFromClientXY(e.clientX, e.clientY));
+    });
+    window.addEventListener('mouseup', function(){
+      mouseDown = false;
+      clearAll();
+    });
+
+    // Safety: if focus leaves, stop movement
+    window.addEventListener('blur', function(){
+      clearAll();
+      activeTouchId = null;
+      mouseDown = false;
+    });
+  })();
+
+  // Action buttons handling
+  (function setupActions(){
+    var cluster = document.getElementById('action-cluster');
+    if (!cluster) return;
+    if (!window.MMA_ACTION) window.MMA_ACTION = { jab:false, heavy:false, grapple:false, special:false };
+    function setAction(action, on){
+      window.MMA_ACTION[action] = !!on;
+    }
+    function bind(btn){
+      var act = btn.getAttribute('data-action');
+      btn.addEventListener('touchstart', function(e){
+        e.preventDefault();
+        setAction(act, true);
+        btn.style.transform = 'translateZ(0) scale(0.92)';
+      }, {passive:false});
+      btn.addEventListener('touchend', function(e){
+        e.preventDefault();
+        setAction(act, false);
+        btn.style.transform = '';
+      }, {passive:false});
+      btn.addEventListener('touchcancel', function(){
+        setAction(act, false);
+        btn.style.transform = '';
+      });
+      btn.addEventListener('mousedown', function(e){
+        e.preventDefault();
+        setAction(act, true);
+        btn.style.transform = 'translateZ(0) scale(0.92)';
+      });
+      window.addEventListener('mouseup', function(){
+        setAction(act, false);
+        btn.style.transform = '';
+      });
+    }
+    Array.prototype.slice.call(cluster.querySelectorAll('.action-btn')).forEach(bind);
+    window.addEventListener('blur', function(){
+      window.MMA_ACTION.jab = window.MMA_ACTION.heavy = window.MMA_ACTION.grapple = window.MMA_ACTION.special = false;
+    });
+  })();
+</script>
+
+<script src="js/sounds.js?v=3"></script>
+  <script src="js/saveSystem.js?v=3"></script>
+  <script src="js/narrator.js?v=4"></script>
+  <script src="js/scenes/TitleScene.js?v=3"></script>
+  <script src="js/scenes/BootScene.js?v=5"></script>
+  <script src="js/scenes/GameScene.js?v=5"></script>
+  <script src="js/scenes/HUDScene.js?v=3"></script>
+  <script src="js/scenes/PauseScene.js?v=3"></script>
+  <script src="js/scenes/UnlockScene.js?v=3"></script>
+  <script src="js/scenes/VictoryScene.js?v=3"></script>
+  <script src="js/main.js?v=5"></script>
+</body>
+</html>

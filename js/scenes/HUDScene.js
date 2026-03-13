@@ -1,0 +1,41 @@
+var HUDScene = new Phaser.Class({
+  Extends: Phaser.Scene,
+  initialize: function HUDScene() {
+    Phaser.Scene.call(this, { key: 'HUDScene' });
+  },
+  create: function() {
+    // Background bar backing
+    this.add.rectangle(110, 16, 204, 14, 0x333333).setOrigin(0.5);
+    this.add.rectangle(110, 34, 204, 14, 0x333333).setOrigin(0.5);
+    // HP bar
+    this.hpBar = this.add.rectangle(9, 9, 200, 12, 0xe83030).setOrigin(0);
+    this.add.text(8, 8, 'HP', { fontSize:'10px', color:'#ffffff' }).setDepth(10);
+    // Stamina bar
+    this.staBar = this.add.rectangle(9, 27, 200, 12, 0x30a8e8).setOrigin(0);
+    this.add.text(8, 26, 'STA', { fontSize:'10px', color:'#ffffff' }).setDepth(10);
+    // XP / Level text
+    this.xpText = this.add.text(CONFIG.CANVAS_W - 8, 8, 'LVL 1 | XP 0/100', {
+      fontSize: '13px', color: '#e8c830'
+    }).setOrigin(1, 0);
+    // Controls hint
+    this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H - 20,
+      'WASD: Move | J: Jab | K: Cross | L: Take | U: Hook | I: LowKick | O: Uppercut | P: Body',
+      { fontSize:'9px', color:'#888888' }).setOrigin(0.5, 1);
+    this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H - 8,
+      'SPACE: Head Kick | G: Guillotine',
+      { fontSize:'9px', color:'#888888' }).setOrigin(0.5, 1);
+    // Message text (center screen)
+    this.msgText = this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H/2, '', {
+      fontSize:'32px', color:'#ffffff', stroke:'#000000', strokeThickness:4
+    }).setOrigin(0.5).setDepth(20);
+  },
+  update: function() {
+    var stats = this.registry.get('playerStats');
+    if (!stats) return;
+    this.hpBar.width  = Math.max(0, (stats.hp  / stats.maxHp)  * 200);
+    this.staBar.width = Math.max(0, (stats.stamina / stats.maxStamina) * 200);
+    this.xpText.setText('LVL ' + stats.level + ' | XP ' + stats.xp + '/' + (stats.level * 100));
+    var msg = this.registry.get('gameMessage') || '';
+    this.msgText.setText(msg);
+  }
+});
