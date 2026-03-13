@@ -57,21 +57,21 @@
       position: absolute;
       right: 18px;
       bottom: 24px;
-      width: 150px;
-      height: 130px;
+      width: 176px;
+      height: 154px;
       pointer-events: auto;
       touch-action: none;
     }
     #action-cluster .action-btn {
       position: absolute;
-      width: 60px;
-      height: 40px;
+      width: 72px;
+      height: 46px;
       border-radius: 12px;
       border: 0;
       background-image: linear-gradient(145deg, rgba(255,255,255,0.18), rgba(40,40,40,0.9));
       box-shadow: 0 4px 10px rgba(0,0,0,0.45);
       color: rgba(255,255,255,0.94);
-      font: 700 13px/40px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font: 700 12px/46px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       text-align: center;
       letter-spacing: 0.03em;
       text-transform: uppercase;
@@ -88,20 +88,20 @@
     }
     /* Diamond positions: Jab (top), Heavy (right), Grapple (left), Special (bottom) */
     #action-cluster .action-btn[data-action="jab"] {
-      left: 45px;
-      top: 6px;
+      left: 52px;
+      top: 4px;
     }
     #action-cluster .action-btn[data-action="heavy"] {
-      right: 6px;
-      top: 45px;
+      right: 2px;
+      top: 54px;
     }
     #action-cluster .action-btn[data-action="grapple"] {
-      left: 6px;
-      top: 45px;
+      left: 2px;
+      top: 54px;
     }
     #action-cluster .action-btn[data-action="special"] {
-      left: 45px;
-      bottom: 6px;
+      left: 52px;
+      bottom: 4px;
     }
     /* Cooldown overlay */
     #action-cluster .action-btn .cooldown-overlay {
@@ -119,9 +119,66 @@
       color: rgba(255,255,255,0.5);
     }
 
+    #ground-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: none;
+      pointer-events: none;
+    }
+    #ground-overlay .ground-text {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #f3d36b;
+      font: 800 24px/1.2 system-ui, sans-serif;
+      letter-spacing: 0.08em;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+    }
+    #ground-timer {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 50px;
+      width: 220px;
+      height: 10px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    #ground-timer-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #ffad33, #ff3d3d); }
+    #ground-banner {
+      position: absolute;
+      left: 50%;
+      top: 42%;
+      transform: translate(-50%, -50%) scale(0.95);
+      color: #ffffff;
+      font: 900 42px/1 system-ui, sans-serif;
+      opacity: 0;
+      pointer-events: none;
+      text-shadow: 0 4px 12px rgba(0,0,0,0.9);
+      transition: all 180ms ease;
+    }
+    #ground-banner.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    #dom-restart-btn {
+      position: absolute;
+      left: 50%;
+      bottom: 15%;
+      transform: translateX(-50%);
+      z-index: 40;
+      display: none;
+      pointer-events: auto;
+      padding: 12px 22px;
+      border-radius: 10px;
+      border: 0;
+      background: #ffd447;
+      font-weight: 800;
+    }
+
     @media (orientation: landscape) {
       #dpad { left: 10px; bottom: 10px; width: 88px; height: 88px; }
-      #action-cluster { right: 10px; bottom: 10px; width: 132px; height: 112px; }
+      #action-cluster { right: 10px; bottom: 10px; width: 152px; height: 128px; }
     }
 
     @media (pointer: fine) {
@@ -137,6 +194,9 @@
     <div id="game-container"></div>
     <!-- UI layer (mobile touch controls) -->
     <div id="ui-layer" aria-hidden="true">
+      <div id="ground-overlay"><div class="ground-text">GROUND GAME</div><div id="ground-timer"><div id="ground-timer-fill"></div></div></div>
+      <div id="ground-banner">TAKEDOWN!</div>
+      <button id="dom-restart-btn" type="button">RESTART (ENTER)</button>
       <div id="dpad" class="touch-control" aria-label="D-pad">
         <div class="dpad-base"></div>
         <button class="dpad-btn dpad-up" data-dir="up" aria-label="Up">▲</button>
@@ -154,15 +214,15 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=5"></script>
-  <script src="js/sprites.js?v=2"></script>
-  <script src="js/combat.js?v=2"></script>
-  <script src="js/enemies.js?v=6"></script>
+  <script src="js/config.js?v=10"></script>
+  <script src="js/sprites.js?v=10"></script>
+  <script src="js/combat.js?v=10"></script>
+  <script src="js/enemies.js?v=10"></script>
   <script src="js/zones.js?v=1"></script>
-  <script src="js/player.js?v=2"></script>
+  <script src="js/player.js?v=10"></script>
   <script src="js/items.js?v=2"></script>
   <script src="js/vfx.js?v=1"></script>
-  <script src="js/ui.js?v=1"></script>
+  <script src="js/ui.js?v=10"></script>
   <script src="js/progression.js?v=3"></script>
   <script>
   // Unlock WebAudio on first user interaction (mobile tap/click)
@@ -358,8 +418,8 @@
   <script src="js/saveSystem.js?v=3"></script>
   <script src="js/narrator.js?v=4"></script>
   <script src="js/scenes/TitleScene.js?v=3"></script>
-  <script src="js/scenes/BootScene.js?v=5"></script>
-  <script src="js/scenes/GameScene.js?v=5"></script>
+  <script src="js/scenes/BootScene.js?v=10"></script>
+  <script src="js/scenes/GameScene.js?v=10"></script>
   <script src="js/scenes/HUDScene.js?v=3"></script>
   <script src="js/scenes/PauseScene.js?v=3"></script>
   <script src="js/scenes/UnlockScene.js?v=3"></script>

@@ -832,6 +832,42 @@ window.MMA.UI = {
       xp: scene.player.stats.xp,
       level: scene.player.stats.level
     });
+    this.updateGroundHUD(scene);
+  },
+  setActionButtonLabels: function(groundActive) {
+    var labels = groundActive ? {
+      jab: 'G&P',
+      heavy: 'Elbow',
+      grapple: 'Submit',
+      special: 'Stand Up'
+    } : {
+      jab: 'Jab',
+      heavy: 'Heavy',
+      grapple: 'Grapple',
+      special: 'Special'
+    };
+    Object.keys(labels).forEach(function(action) {
+      var btn = document.querySelector('.action-btn[data-action="' + action + '"]');
+      if (btn) btn.textContent = labels[action];
+    });
+  },
+  showGroundBanner: function(text) {
+    var el = document.getElementById('ground-banner');
+    if (!el) return;
+    el.textContent = text || 'GROUND GAME';
+    el.classList.add('active');
+    setTimeout(function() { el.classList.remove('active'); }, 900);
+  },
+  updateGroundHUD: function(scene) {
+    var overlay = document.getElementById('ground-overlay');
+    var timerFill = document.getElementById('ground-timer-fill');
+    if (!overlay || !timerFill) return;
+    var active = !!(scene.groundState && scene.groundState.active);
+    overlay.style.display = active ? 'block' : 'none';
+    if (active) {
+      var pct = Math.max(0, Math.min(1, scene.groundState.timer / 10000));
+      timerFill.style.width = (pct * 100) + '%';
+    }
   },
   handleResponsiveLayout: function() {
     if (window.phaserGame && window.phaserGame.scale) window.phaserGame.scale.refresh();
@@ -858,11 +894,14 @@ window.MMA.UI = {
     cluster.style.width = clusterWidth + "px"; cluster.style.height = clusterHeight + "px"; cluster.style.right = landscape ? "2vw" : "2.5vw"; cluster.style.bottom = landscape ? "1vh" : "2.5vh";
     cluster.querySelectorAll(".action-btn").forEach(function(btn){ btn.style.width = actionBtnWidth + "px"; btn.style.height = actionBtnHeight + "px"; btn.style.fontSize = actionBtnFont + "px"; btn.style.lineHeight = actionBtnHeight + "px"; });
     var jab = cluster.querySelector("[data-action=\"jab\"]"); var heavy = cluster.querySelector("[data-action=\"heavy\"]"); var grapple = cluster.querySelector("[data-action=\"grapple\"]"); var special = cluster.querySelector("[data-action=\"special\"]");
-    var cx = clusterWidth / 2, cy = clusterHeight / 2, hOffset = (clusterWidth - actionBtnWidth) / 2, vOffset = (clusterHeight - actionBtnHeight) / 2;
-    if (jab) { jab.style.left = hOffset + "px"; jab.style.top = vOffset * 0.3 + "px"; }
-    if (heavy) { heavy.style.right = vOffset * 0.3 + "px"; heavy.style.top = cy - actionBtnHeight / 2 + "px"; }
-    if (grapple) { grapple.style.left = vOffset * 0.3 + "px"; grapple.style.top = cy - actionBtnHeight / 2 + "px"; }
-    if (special) { special.style.left = hOffset + "px"; special.style.bottom = vOffset * 0.3 + "px"; }
+    var hOffset = (clusterWidth - actionBtnWidth) / 2;
+    var topPad = 4;
+    var sidePad = 2;
+    var midY = Math.round((clusterHeight - actionBtnHeight) / 2);
+    if (jab) { jab.style.left = hOffset + "px"; jab.style.top = topPad + "px"; }
+    if (heavy) { heavy.style.right = sidePad + "px"; heavy.style.top = midY + "px"; }
+    if (grapple) { grapple.style.left = sidePad + "px"; grapple.style.top = midY + "px"; }
+    if (special) { special.style.left = hOffset + "px"; special.style.bottom = topPad + "px"; }
     if (startBtn) { startBtn.style.bottom = landscape ? "6%" : "9%"; var fs = Math.min(20, Math.floor(minDim * 0.04)); startBtn.style.fontSize = fs + "px"; startBtn.style.padding = (fs * 0.8) + "px " + (fs * 1.7) + "px"; }
   }
 };

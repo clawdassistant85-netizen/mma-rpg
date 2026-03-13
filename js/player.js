@@ -7,9 +7,9 @@ window.MMA.Player = {
     scene.player.body.setSize(26, 38);
     scene.player.body.setOffset(11, 18);
     scene.player.body.setCollideWorldBounds(true);
-    scene.player.stats = { hp:100, maxHp:100, stamina:100, maxStamina:100, xp:0, level:1 };
+    scene.player.stats = { hp:125, maxHp:125, stamina:100, maxStamina:100, xp:0, level:1 };
     scene.player.cooldowns = {};
-    scene.player.unlockedMoves = ['jab', 'cross'];
+    scene.player.unlockedMoves = ['jab', 'cross', 'takedown'];
     if (scene._savedGameData) {
       var st = scene._savedGameData.playerStats, mv = scene._savedGameData.playerUnlockedMoves;
       if (st && typeof st === 'object') { scene.player.stats.hp = st.hp; scene.player.stats.maxHp = st.maxHp; scene.player.stats.stamina = st.stamina; scene.player.stats.maxStamina = st.maxStamina; scene.player.stats.xp = st.xp; scene.player.stats.level = st.level; }
@@ -23,6 +23,10 @@ window.MMA.Player = {
     scene.playerHpGfx = scene.add.graphics().setDepth(5);
   },
   handleMovement: function(scene, time, delta) {
+    if (scene.player.stunnedUntil && scene.time.now < scene.player.stunnedUntil) {
+      scene.player.body.setVelocity(0, 0);
+      return { vx: 0, vy: 0 };
+    }
     var vx = 0, vy = 0;
     var baseSpeed = CONFIG.PLAYER_SPEED + (scene.player.speedBonus || 0);
     // Weather effects: rain makes movement slippery

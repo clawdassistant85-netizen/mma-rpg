@@ -17,6 +17,17 @@ window.MMA.Combat = {
   ENEMY_STAMINA_MIN: 30,
   STUN_CHAIN_HITS: 5,
   STUN_DURATION_MS: 1000,
+  TAKEDOWN_BASE_CHANCE: {
+    grappler: 0.8,
+    balanced: 0.5,
+    striker: 0.3
+  },
+  GROUND_MOVES: {
+    jab: { name: 'Ground & Pound', damage: 22, staminaCost: 8, cooldown: 500 },
+    cross: { name: 'Elbow', damage: 32, staminaCost: 18, cooldown: 900 },
+    takedown: { name: 'Submission Attempt', staminaCost: 22, cooldown: 1200 },
+    special: { name: 'Stand Up', staminaCost: 6, cooldown: 600 }
+  },
   rollDamage: function(baseDamage, critChance, forceCrit) {
     var finalCritChance = typeof critChance === 'number' ? critChance : this.CRIT_CHANCE;
     var crit = !!forceCrit || Math.random() < finalCritChance;
@@ -187,13 +198,66 @@ window.MMA.Combat = {
       staminaBreakActive: true
     };
   },
+  getPlayerGrappleStyle: function(scene) {
+    var cardStyle = MMA.UI && MMA.UI.fighterCard ? MMA.UI.fighterCard.style : null;
+    var style = (scene.player && scene.player.dominantStyle) || (scene.player && scene.player.stats && scene.player.stats.dominantStyle) || cardStyle || 'balanced';
+    style = (style || '').toLowerCase();
+    if (style !== 'grappler' && style !== 'striker') style = 'balanced';
+    return style;
+  },
+  resolveTakedownAttempt: function(scene, enemy) {
+    var style = this.getPlayerGrappleStyle(scene);
+    var baseChance = this.TAKEDOWN_BASE_CHANCE[style] || 0.5;
+    var defense = enemy && enemy.type && typeof enemy.type.groundDefense === 'number' ? enemy.type.groundDefense : 0.2;
+    var chance = Phaser.Math.Clamp(baseChance - (defense * 0.55), 0.1, 0.95);
+    return Math.random() < chance;
+  },
+  executeGroundMove: function(scene, moveKey) {
+    if (!scene.groundState || !scene.groundState.active || scene.gameOver) return;
+    var map = { heavy: 'cross', grapple: 'takedown' };
+    moveKey = map[moveKey] || moveKey;
+    if (moveKey === 'special') return scene.endGroundState('player-standup');
+    var gm = this.GROUND_MOVES[moveKey];
+    if (!gm) return;
+    var cdKey = 'ground_' + moveKey;
+    var s = scene.player.stats;
+    if (!scene.player.cooldowns[cdKey]) scene.player.cooldowns[cdKey] = 0;
+    if (scene.player.cooldowns[cdKey] > 0 || s.stamina < gm.staminaCost) return;
+    s.stamina -= gm.staminaCost;
+    scene.player.cooldowns[cdKey] = gm.cooldown;
+    var enemy = scene.groundState.enemy;
+    if (!enemy || !enemy.active || enemy.state === 'dead') return scene.endGroundState('enemy-dead');
+
+    if (moveKey === 'takedown') {
+      var subChance = Phaser.Math.Clamp(0.2 + ((scene.player.stats.level || 1) * 0.03) - ((enemy.type.groundDefense || 0.2) * 0.2), 0.1, 0.65);
+      if (Math.random() < subChance) {
+        enemy.stats.hp = 0;
+        MMA.UI.showDamageText(scene, enemy.x, enemy.y - 36, 'SUBMISSION!', '#ff66ff');
+        MMA.Enemies.killEnemy(scene, enemy);
+        scene.endGroundState('submission');
+      } else {
+        MMA.UI.showDamageText(scene, enemy.x, enemy.y - 24, 'ESCAPED SUB!', '#ffaa66');
+      }
+      return;
+    }
+
+    var dmg = gm.damage + (scene.player.attackBonus || 0);
+    enemy.stats.hp -= dmg;
+    MMA.UI.recordHitDealt(dmg, false, 1);
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, '-' + dmg, '#ffd54f');
+    MMA.VFX.flashEnemyHit(scene, enemy, 90);
+    if (enemy.stats.hp <= 0) {
+      MMA.Enemies.killEnemy(scene, enemy);
+      scene.endGroundState('enemy-dead');
+    }
+  },
   MOVE_ROSTER: {
     jab:{ name:'Jab', type:'strike', damage:8, staminaCost:5, cooldown:400, unlockLevel:1, unlockType:'start' },
     cross:{ name:'Cross', type:'strike', damage:12, staminaCost:8, cooldown:600, unlockLevel:1, unlockType:'start' },
     hook:{ name:'Hook', type:'strike', damage:15, staminaCost:10, cooldown:800, unlockLevel:2, unlockType:'level' },
     lowKick:{ name:'Low Kick', type:'strike', damage:10, staminaCost:7, cooldown:600, unlockLevel:2, unlockType:'level' },
     uppercut:{ name:'Uppercut', type:'strike', damage:18, staminaCost:12, cooldown:900, unlockLevel:3, unlockType:'level' },
-    takedown:{ name:'Takedown', type:'grapple', damage:5, staminaCost:20, cooldown:1200, unlockLevel:3, unlockType:'level' },
+    takedown:{ name:'Takedown', type:'grapple', damage:5, staminaCost:20, cooldown:1200, unlockLevel:1, unlockType:'start' },
     bodyShot:{ name:'Body Shot', type:'strike', damage:20, staminaCost:14, cooldown:850, unlockLevel:4, unlockType:'level' },
     guardPass:{ name:'Guard Pass', type:'grapple', damage:10, staminaCost:12, cooldown:1000, unlockLevel:4, unlockType:'level' },
     headKick:{ name:'Head Kick', type:'strike', damage:25, staminaCost:18, cooldown:1000, unlockLevel:5, unlockType:'level' },
@@ -210,6 +274,7 @@ window.MMA.Combat = {
     triangleChoke:{ name:'Triangle Choke', type:'sub', damage:28, staminaCost:20, cooldown:1700, unlockLevel:99, unlockType:'enemy', fromEnemy:'bjjBlackBelt' }
   },
   executeAttack: function(scene, moveKey) {
+    if (scene.groundState && scene.groundState.active) return this.executeGroundMove(scene, moveKey);
     if (scene.player.unlockedMoves.indexOf(moveKey) === -1) return MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'LOCKED', '#888888');
     var move = this.MOVE_ROSTER[moveKey]; if (!move) return;
     var s = scene.player.stats, cd = scene.player.cooldowns;
@@ -225,6 +290,18 @@ window.MMA.Combat = {
       var dist = Phaser.Math.Distance.Between(scene.player.x, scene.player.y, enemy.x, enemy.y);
       if (dist <= DT * 1.8) {
         hit = true;
+        if (moveKey === 'takedown') {
+          scene.playTakedownLunge(enemy);
+          if (this.resolveTakedownAttempt(scene, enemy)) {
+            MMA.UI.showDamageText(scene, enemy.x, enemy.y - 36, 'TAKEDOWN!', '#66ccff');
+            scene.enterGroundState(enemy);
+          } else {
+            MMA.UI.showDamageText(scene, enemy.x, enemy.y - 36, 'SPRAWL!', '#ff6666');
+            scene.player.stunnedUntil = scene.time.now + 500;
+            MMA.Player.damage(scene, Math.round(enemy.type.attackDamage * 0.8));
+          }
+          continue;
+        }
         var attackBonus = scene.player.attackBonus || 0;
         var baseDamage = Math.round((move.damage + attackBonus) * 1.2);
         var momentum = this.getMomentumModifiers(scene, baseDamage);
@@ -275,6 +352,7 @@ window.MMA.Combat = {
     scene.time.delayedCall(260, function(){ hitbox.destroy(); });
   },
   executeSpecialMove: function(scene) {
+    if (scene.groundState && scene.groundState.active) return this.executeGroundMove(scene, 'special');
     if (scene.gameOver || scene.paused || scene.roomTransitioning) return;
     var unlocked = scene.player.unlockedMoves, bestMoveKey = null, bestDamage = -1;
     if (unlocked.indexOf('spinningBackFist') !== -1) bestMoveKey = 'spinningBackFist';
@@ -339,6 +417,10 @@ window.MMA.Combat = {
     scene.time.delayedCall(380, function(){ hitbox.destroy(); });
   },
   handleInput: function(scene, delta) {
+    if (scene.player.stunnedUntil && scene.time.now < scene.player.stunnedUntil) {
+      var cdMapStun = scene.player.cooldowns; Object.keys(cdMapStun).forEach(function(k){ if (cdMapStun[k] > 0) cdMapStun[k] = Math.max(0, cdMapStun[k] - delta); });
+      return;
+    }
     if (Phaser.Input.Keyboard.JustDown(scene.jabKey)) this.executeAttack(scene, 'jab');
     if (Phaser.Input.Keyboard.JustDown(scene.crossKey)) this.executeAttack(scene, 'cross');
     if (Phaser.Input.Keyboard.JustDown(scene.takedownKey)) this.executeAttack(scene, 'takedown');
