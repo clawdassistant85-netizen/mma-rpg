@@ -17,6 +17,7 @@ var GameScene = new Phaser.Class({
     this.groundState = { active: false, enemy: null, timer: 0, escapeTick: 0 };
     this.gameOverAt = 0;
     this.rapidFireState = null;
+    this.defeatSceneQueued = false;
   },
 
   create: function() {
@@ -24,6 +25,7 @@ var GameScene = new Phaser.Class({
     this.runStartMs = Date.now();
     this.enemiesDefeated = 0;
     this.gameOverAt = 0;
+    this.defeatSceneQueued = false;
     this.groundState = { active: false, enemy: null, timer: 0, escapeTick: 0 };
     this.rapidFireState = null;
 
@@ -147,13 +149,34 @@ var GameScene = new Phaser.Class({
     var btn = document.getElementById('dom-restart-btn');
     if (btn) {
       btn.style.display = 'inline-block';
+      btn.textContent = 'CONTINUE (ENTER)';
       var self = this;
-      btn.onclick = function() { self.scene.restart(); };
+      btn.onclick = function() { self.startDefeatScene(); };
     }
   },
   hideGameOverRestartUI: function() {
     var btn = document.getElementById('dom-restart-btn');
-    if (btn) btn.style.display = 'none';
+    if (btn) {
+      btn.style.display = 'none';
+      btn.textContent = 'RESTART (ENTER)';
+      btn.onclick = null;
+    }
+  },
+  startDefeatScene: function() {
+    if (this.defeatSceneQueued) return;
+
+    this.defeatSceneQueued = true;
+    this.hideGameOverRestartUI();
+    this.registry.set('enemiesDefeated', this.enemiesDefeated || 0);
+    this.registry.set('playerStats', Object.assign({}, this.player ? this.player.stats : {}));
+    this.registry.set('xpGained', this._mmaRoomXpGained || 0);
+
+    var elapsed = 0;
+    if (this.runStartMs) elapsed = Math.max(0, Math.floor((Date.now() - this.runStartMs) / 1000));
+    else elapsed = Math.max(0, Math.floor((((this.time && this.time.now) || 0)) / 1000));
+    this.registry.set('playTime', elapsed);
+
+    this.scene.start('DefeatScene');
   },
   resumeFromPause: function() {
     this.physics.resume();
@@ -286,7 +309,7 @@ var GameScene = new Phaser.Class({
       }
       MMA.UI.setPauseButtonVisible(false);
       if (Phaser.Input.Keyboard.JustDown(this.restartKey) || time - this.gameOverAt > 3000) {
-        this.scene.restart();
+        this.startDefeatScene();
       }
       return;
     }
