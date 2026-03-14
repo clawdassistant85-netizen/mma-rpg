@@ -3820,6 +3820,10 @@ window.MMA.UI = {
     this.updateGroundHUD(scene);
   },
   setActionButtonLabels: function(groundActive, scene) {
+    // Clear cooldown overlays when switching states
+    document.querySelectorAll('.action-btn .cooldown-overlay').forEach(function(o) { o.remove(); });
+    document.querySelectorAll('.action-btn').forEach(function(b) { b.classList.remove('on-cooldown'); });
+    
     var roster = window.MMA.Combat.MOVE_ROSTER;
     var loadout = ['jab', 'cross', 'takedown', 'hook'];
     var unlocked = [];

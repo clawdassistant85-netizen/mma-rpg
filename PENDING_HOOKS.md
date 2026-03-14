@@ -8,6 +8,78 @@ document it here. The Reviewer agent will integrate these.
 - **Description**: what change is needed
 - **Priority**: P0/P1/P2
 
+### Signature Finisher Repertoire Feature
+- **Module**: Player (js/player.js)
+- **Target file**: js/combat.js, js/ui.js
+- **Description**: Track top 3 most-used finishing moves. Using #1 finisher grants "Signature Mastery" bonus (+20% damage). Requires combat.js to record finishing moves, player.js to track usage stats, ui.js to display current signature finisher.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Tutorial Archive Feature
+- **Module**: Player (js/player.js)
+- **Target file**: js/scenes/GameScene.js, js/combat.js, js/ui.js
+- **Description**: After first boss defeat, record fight as training video for replay. Requires GameScene.js to handle recording, combat.js to capture fight data, player.js to store replays, ui.js for playback UI.
+- **Priority**: P3
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Combo Recipe Book Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/player.js, js/ui.js, js/main.js
+- **Description**: Discover and save custom combo sequences. Landing 5+ unique move combos reveals recipes that can be named/saved. +10% damage when executing saved recipes. Requires combat.js to detect unique combos, player.js to store recipes, ui.js for recipe naming/display, main.js for save/load.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Fight Ghost Replay Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/player.js, js/sprites.js, js/scenes/GameScene.js
+- **Description**: Best previous fight in each room replays as a ghost (60% damage). Player can study ghost to improve. Requires combat.js to record fight data, sprites.js to render ghost fighter, GameScene.js to manage ghost playback, player.js to store best recordings per room.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Style Fusion Chain Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/player.js, js/sprites.js, js/ui.js
+- **Description**: Blend striker and grappler moves mid-combo. After striker attack, immediately input grapple for Fusion Chain (e.g., jab→arm drag = spinning backfist). Fusions deal 1.4x damage with unique animations. Requires Style Gauge 30+ threshold. Needs combat.js fusion detection, sprites.js for fusion animations, player.js for style gauge check, ui.js for fusion unlock notification.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Pre-Fight Betting Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/combat.js, js/items.js, js/ui.js, js/main.js
+- **Description**: Place wagers using in-game currency before entering fight rooms. Higher bets unlock better rewards on win. Multiplier tiers: 100g (1x), 500g (2x), 1000g (3x rare). Requires zones.js to flag bettable rooms, combat.js for outcome tracking, items.js for reward distribution, ui.js for bet UI, main.js for currency persistence.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Crowd Hypeman Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/combat.js, js/ui.js, js/sprites.js
+- **Description**: Specific crowd members in arena zones serve as hypemen. Acknowledge with taunt button pre-fight for temporary buffs. Each hypeman once per zone visit. Requires zones.js to spawn hypemen, sprites.js to render glowing hypemen, combat.js to apply buffs, ui.js for buff selection.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Counter Flow System Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/player.js, js/ui.js
+- **Description**: Successful blocks build Counter Flow meter (max 3). Each stack reduces perfect-block timing by 20ms but increases counter damage +15%. At 3 stacks, next counter triggers "Flow State" — auto perfect counter for 3s. Requires combat.js meter tracking, player.js for timing windows, ui.js for meter display.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Clash Combo Breaker Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/vfx.js, js/sprites.js, js/ui.js
+- **Description**: During attack clashes, both fighters enter "Clash Standoff" — rapid button mash determines winner. Winner deals 2x damage + 1s stun. Loser gets knocked back. Requires combat.js for clash detection and mash logic, vfx.js for standoff visual, sprites.js for lockup poses, ui.js for mash prompt.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
 ## Pending
 
 ### Progress Log — Feature Implementation Logging
