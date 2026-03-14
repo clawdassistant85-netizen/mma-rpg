@@ -60,6 +60,10 @@ window.MMA.Combat = {
   CHAIN_COUNTER_MAX_STACKS: 5,
   CHAIN_COUNTER_DAMAGE_PER_STACK: 0.25,
   COUNTER_ATTACK_WINDOW_MS: 700,
+  GUARD_CRUSH_BLOCKS_REQUIRED: 5,
+  GUARD_CRUSH_WINDOW_MS: 2000,
+  GUARD_CRUSH_RELEASE_MS: 1000,
+  GUARD_CRUSH_CHIP_PER_SECOND: 4,
   WHIFF_SHIFT_MISSES_REQUIRED: 2,
   WHIFF_SHIFT_DAMAGE_MULTIPLIER: 1.25,
   MOMENTUM_SHIFT_HITS_REQUIRED: 3,
@@ -379,6 +383,84 @@ window.MMA.Combat = {
       if (typeof value === 'number' && isFinite(value)) best = Math.max(best, value);
     }
     return best;
+  },
+  isBlocking: function(scene) {
+    if (!scene || !scene.player) return false;
+    if (scene.blockKey && scene.blockKey.isDown) return true;
+    if (scene.guardKey && scene.guardKey.isDown) return true;
+    if (scene.player.isBlocking || scene.player.blocking) return true;
+    if (scene.player.blockState && scene.player.blockState.active) return true;
+    if (scene.movementState && scene.movementState.isBlocking) return true;
+    return false;
+  },
+  ensureGuardCrushState: function(scene) {
+    scene.player.guardCrushState = scene.player.guardCrushState || {
+      blocksInWindow: 0,
+      firstBlockAt: 0,
+      lastSeenBlockAt: 0,
+      active: false,
+      releaseStartedAt: 0,
+      chipCarry: 0
+    };
+    return scene.player.guardCrushState;
+  },
+  refreshGuardCrushState: function(scene) {
+    var state = this.ensureGuardCrushState(scene);
+    var now = scene.time.now;
+    var lastBlockAt = this.getLastBlockTimestamp(scene);
+
+    if (lastBlockAt && lastBlockAt !== state.lastSeenBlockAt) {
+      if (!state.firstBlockAt || now - state.firstBlockAt > this.GUARD_CRUSH_WINDOW_MS) {
+        state.firstBlockAt = lastBlockAt;
+        state.blocksInWindow = 1;
+      } else {
+        state.blocksInWindow += 1;
+      }
+      state.lastSeenBlockAt = lastBlockAt;
+    }
+
+    if (!state.active && state.blocksInWindow >= this.GUARD_CRUSH_BLOCKS_REQUIRED && now - state.firstBlockAt <= this.GUARD_CRUSH_WINDOW_MS) {
+      state.active = true;
+      state.releaseStartedAt = 0;
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 122, 'GUARD CRUSHED!', '#ff7b7b');
+    }
+
+    if (state.active) {
+      if (this.isBlocking(scene)) {
+        state.releaseStartedAt = 0;
+      } else if (!state.releaseStartedAt) {
+        state.releaseStartedAt = now;
+      } else if (now - state.releaseStartedAt >= this.GUARD_CRUSH_RELEASE_MS) {
+        state.active = false;
+        state.blocksInWindow = 0;
+        state.firstBlockAt = 0;
+        state.releaseStartedAt = 0;
+        state.chipCarry = 0;
+        MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 122, 'GUARD RESET', '#9be7ff');
+      }
+    } else if (state.firstBlockAt && now - state.firstBlockAt > this.GUARD_CRUSH_WINDOW_MS) {
+      state.blocksInWindow = 0;
+      state.firstBlockAt = 0;
+    }
+
+    return state;
+  },
+  applyGuardCrushChip: function(scene, delta) {
+    var state = this.refreshGuardCrushState(scene);
+    if (!state.active || !this.isBlocking(scene) || !scene.player || !scene.player.stats) return state;
+
+    var chipPerMs = this.GUARD_CRUSH_CHIP_PER_SECOND / 1000;
+    state.chipCarry += chipPerMs * Math.max(0, delta || 0);
+    var chip = Math.floor(state.chipCarry);
+    if (chip <= 0) return state;
+
+    state.chipCarry -= chip;
+    scene.player.stats.hp = Math.max(0, scene.player.stats.hp - chip);
+    if (chip > 0 && scene.time.now % 250 < 30) {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 104, 'CHIP -' + chip, '#ff9e9e');
+    }
+    if (scene.player.stats.hp <= 0) MMA.Player.damage(scene, 0);
+    return state;
   },
   isCounterAttackWindow: function(scene, enemy) {
     if (!enemy || !enemy.active || enemy.state === 'dead') return false;
@@ -1582,6 +1664,7 @@ window.MMA.Combat = {
   handleInput: function(scene, delta) {
     this.refreshChainCounterState(scene);
     this.refreshMomentumShiftState(scene);
+    this.applyGuardCrushChip(scene, delta);
     if (scene.player.stunnedUntil && scene.time.now < scene.player.stunnedUntil) {
       var attemptedRecoveryTech =
         Phaser.Input.Keyboard.JustDown(scene.jabKey) ||

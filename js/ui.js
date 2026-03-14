@@ -3978,15 +3978,18 @@ window.MMA.UI = {
     var btn = document.getElementById('mobile-pause-btn');
     if (!btn || btn._mmaBound) return;
     btn._mmaBound = true;
-    btn.addEventListener('click', function(e) {
+    function handlePauseTap(e) {
       e.preventDefault();
+      e.stopPropagation();
       if (!scene || scene.gameOver || scene.roomTransitioning || scene.paused || scene.scene.isActive('PauseScene')) return;
       scene.registry.set('unlockedMoves', scene.player.unlockedMoves.slice());
       scene.registry.set('playerStats', Object.assign({}, scene.player.stats));
       scene.physics.pause();
       scene.paused = true;
       scene.scene.launch('PauseScene');
-    });
+    }
+    btn.addEventListener('click', handlePauseTap);
+    btn.addEventListener('touchend', handlePauseTap, {passive: false});
   },
   setPauseButtonVisible: function(show) {
     var btn = document.getElementById('mobile-pause-btn');

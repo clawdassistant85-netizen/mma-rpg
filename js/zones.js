@@ -70,19 +70,39 @@ window.MMA.Zones = {
     // crowdLabel: short description displayed to player
     // weightClass: "light", "middle", "heavy" or "standard" (default)
     oct1:{id:'oct1',zone:3,weatherOptions:['clear','night'],weightClass:'middle',cornerPressure:true,crowdSize:200,baseHype:0.3,maxHype:0.8,crowdLabel:'Rowdy Entrance Crowd',
-      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,crowdHypemen:true,
+      crowdHypemanBuffs:[
+        { id:'damage', label:'+10% damage (3 rooms)' },
+        { id:'hypeGain', label:'+15% hype gain (3 rooms)' },
+        { id:'stamina', label:'+20% stamina regen (3 rooms)' }
+      ],
       doors:{right:{col:15,row:5},up:{col:7,row:0}},connections:{right:'oct2',up:'oct3'},
       spawnPositions:[{col:3,row:4},{col:12,row:4}],enemyPool:['bjjBlackBelt'],name:'Arena Entrance',narratorStyle:'arenaPrelims'},
     oct2:{id:'oct2',zone:3,weatherOptions:['clear','night','wind'],weightClass:'middle',cornerPressure:true,crowdSize:300,baseHype:0.5,maxHype:0.9,crowdLabel:'Boisterous Prelim Crowd',
-      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,crowdHypemen:true,
+      crowdHypemanBuffs:[
+        { id:'damage', label:'+10% damage (3 rooms)' },
+        { id:'hypeGain', label:'+15% hype gain (3 rooms)' },
+        { id:'stamina', label:'+20% stamina regen (3 rooms)' }
+      ],
       doors:{left:{col:0,row:5}},connections:{left:'oct1'},
       spawnPositions:[{col:3,row:3},{col:3,row:8}],enemyPool:['bjjBlackBelt','bjjBlackBelt'],name:'Prelim Cage',narratorStyle:'arenaPrelims'},
     oct3:{id:'oct3',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:500,baseHype:0.7,maxHype:1.0,crowdLabel:'Electric Main Cage Crowd',
-      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,crowdHypemen:true,
+      crowdHypemanBuffs:[
+        { id:'damage', label:'+10% damage (3 rooms)' },
+        { id:'hypeGain', label:'+15% hype gain (3 rooms)' },
+        { id:'stamina', label:'+20% stamina regen (3 rooms)' }
+      ],
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct1',up:'oct4'},
       spawnPositions:[{col:5,row:5},{col:9,row:5}],enemyPool:['bjjBlackBelt'],name:'Main Cage',narratorStyle:'arenaMain'},
     oct4:{id:'oct4',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:800,baseHype:0.9,maxHype:1.0,crowdLabel:'Championship Crowd',
-      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,crowdHypemen:true,
+      crowdHypemanBuffs:[
+        { id:'damage', label:'+10% damage (3 rooms)' },
+        { id:'hypeGain', label:'+15% hype gain (3 rooms)' },
+        { id:'stamina', label:'+20% stamina regen (3 rooms)' }
+      ],
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct3',up:'survival1'},
       spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:'Championship Ring',narratorStyle:'arenaTitle'},
     // Survival Time Attack: 90s endurance room with escalating waves and score focus
@@ -175,7 +195,12 @@ window.MMA.Zones = {
       crowdLabel:'Legendary Dojo Crowd',
       // Ring side power-ups are active in the Dojo as well
       ringPowerups:true,
-      ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,
+      ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,crowdHypemen:true,
+      crowdHypemanBuffs:[
+        { id:'damage', label:'+10% damage (3 rooms)' },
+        { id:'hypeGain', label:'+15% hype gain (3 rooms)' },
+        { id:'stamina', label:'+20% stamina regen (3 rooms)' }
+      ],
       doors:{down:{col:7,row:11}},
       connections:{down:'oct4'},
       spawnPositions:[{col:7,row:5}],
@@ -422,6 +447,22 @@ window.MMA.Zones = {
   computeCrowdDamageBonus: function(hype) {
     var maxBonus = 0.10;
     return Math.min(maxBonus, maxBonus * hype);
+  },
+  // Crowd Hypeman helpers
+  // Certain arena rooms flag specific crowd members as "hypemen" that can
+  // be acknowledged (usually via a pre-fight taunt) to grant temporary
+  // buffs. Zones only define metadata here – combat/UI systems are
+  // responsible for wiring input and buff application.
+  getCrowdHypemanConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.crowdHypemen) return null;
+    return {
+      active: true,
+      // Available buff choices for this room. Each entry is a lightweight
+      // descriptor that downstream systems can interpret as they like
+      // (e.g., 3-room duration crowd buffs).
+      buffs: (room.crowdHypemanBuffs || []).slice()
+    };
   },
   // Crowd Funding System helpers
   // Arena zones with crowdFunding:true can accumulate a between-rooms
@@ -792,6 +833,24 @@ window.MMA.Zones = {
         scene.registry.set('ringPowerupsActive', false);
         scene.registry.set('ringPowerupTypes', []);
         scene.registry.set('ringPowerupCorners', []);
+      }
+      // Crowd Hypeman metadata: highlighted crowd members that can be
+      // acknowledged once per visit for temporary buffs.
+      var hypemanCfg = this.getCrowdHypemanConfig(room.id);
+      if (hypemanCfg && hypemanCfg.active && hypemanCfg.buffs.length) {
+        scene.registry.set('crowdHypemanActive', true);
+        scene.registry.set('crowdHypemanBuffs', hypemanCfg.buffs);
+        // Reset availability on room enter; other systems can flip this flag
+        // once the player has claimed a hypeman buff for the current visit.
+        scene.registry.set('crowdHypemanAvailable', true);
+        scene.time.delayedCall(2350, function(){
+          scene.registry.set('gameMessage', 'Spot the hypemen in the crowd – taunt them before the bell for a temporary boost.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('crowdHypemanActive', false);
+        scene.registry.set('crowdHypemanBuffs', []);
+        scene.registry.set('crowdHypemanAvailable', false);
       }
       // Corner Pressure metadata: arena zones where the ropes change the risk/reward
       var cornerCfg = this.getCornerPressureConfig(room.id);
