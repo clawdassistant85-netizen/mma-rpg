@@ -2233,6 +2233,10 @@ window.MMA.Enemies = {
     // Requires quick camera awareness to defend. Visual: dissolve particle effect followed by reappearance behind player
     trickster:{name:'Trickster',hp:75,maxHp:75,speed:95,attackDamage:14,attackCooldownMax:1100,attackRange:65,chaseRange:270,color:0xff00aa,xpReward:55,teachesMove:null,zone:2,aiPattern:'trickster',groundDefense:0.25,groundEscape:0.2},
 
+    // Showstopper: rare boss variant that "pauses" the player mid-attack
+    // Requires timing adjustment to land hits. Visual: clockwork gears appear briefly around the enemy during pause
+    showstopper:{name:'Showstopper',hp:140,maxHp:140,speed:75,attackDamage:18,attackCooldownMax:1400,attackRange:65,chaseRange:250,color:0xffaa00,xpReward:80,teachesMove:null,zone:3,aiPattern:'showstopper',groundDefense:0.4,groundEscape:0.3},
+
     // Bounty Hunter: mercenary hunter that tracks players with active bounties
     // Spawns based on bounty level, scales with player progress, has unique red glow
     bountyHunter:{name:'Bounty Hunter',hp:110,maxHp:110,speed:98,attackDamage:18,attackCooldownMax:950,attackRange:65,chaseRange:280,color:0xff4444,xpReward:75,teachesMove:null,zone:2,aiPattern:'bountyHunter',groundDefense:0.35,groundEscape:0.25}
@@ -2260,6 +2264,20 @@ window.MMA.Enemies = {
     WARNING_COLOR: '#ff00ff',
     TELEPORT_TEXT: 'BEHIND YOU!',
     TELEPORT_COLOR: '#ff66ff'
+  },
+
+  // Showstopper Enemy: rare boss variant that "pauses" the player for 1 second mid-attack
+  // Requires timing adjustment to land hits. Visual: clockwork gears appear briefly around the enemy during pause
+  SHOWSTOPPER_CONFIG: {
+    PAUSE_DURATION: 1000,           // 1 second player pause
+    PAUSE_CHANCE: 0.15,            // 15% chance per attack to trigger pause
+    MIN_COOLDOWN_MS: 4000,         // Minimum time between pause triggers
+    GEAR_COUNT: 4,                 // Number of clockwork gears to display
+    GEAR_ROTATION_SPEED: 200,       // Rotation speed per gear (ms per degree)
+    WARNING_TEXT: 'FREEZE!',
+    WARNING_COLOR: '#ffaa00',
+    PAUSE_TEXT: 'TIME STOPPED!',
+    PAUSE_COLOR: '#ffcc00'
   },
 
   // Flash KO Blindness: dramatic KO causes camera flash that leaves enemy temporarily blinded
@@ -3030,6 +3048,9 @@ window.MMA.Enemies = {
     // Tutor: lime green
     if (ai === 'tutor') return 0x66ff33;
     
+    // Showstopper: orange-gold (clockwork gears)
+    if (ai === 'showstopper') return 0xffaa00;
+    
     // Default striker/combo/chase: red
     return 0xe83030;
   },
@@ -3582,6 +3603,19 @@ window.MMA.Enemies = {
       }
     }
 
+    // Showstopper: rare boss variant in zone 3+ that pauses player mid-attack
+    // Clockwork gears appear around enemy, time "stops" for 1 second
+    if (z >= 3 && positions && positions.length && pool && pool.length) {
+      var showstopperChance = 0.03 + (z - 3) * 0.01; // 3% in zone3 → up to ~5%
+      if (Math.random() < showstopperChance) {
+        var replaceIdx = Math.floor(Math.random() * pool.length);
+        var currentType = pool[replaceIdx];
+        if (currentType !== 'mmaChamp' && currentType !== 'shadowRival' && currentType !== 'coach' && currentType !== 'tutor' && currentType !== 'glitcher' && currentType !== 'echo' && currentType !== 'enforcer' && currentType !== 'tank') {
+          pool[replaceIdx] = 'showstopper';
+        }
+      }
+    }
+
     // Blood Money Bounty: Bounty Hunter spawn based on player bounty level
     // Bounty hunters appear when player has accumulated bounty from boss defeats
     var bountyLevel = this.getBountyLevel();
@@ -3605,39 +3639,45 @@ window.MMA.Enemies = {
   },
   spawnBoss: function(scene, x, y) { return this.spawnEnemy(scene, 'mmaChamp', x, y); },
   updateEnemies: function(scene, delta) {
-    // Existing enemy update logic ... (kept unchanged)
-    // At the end of the update, refresh dynamic role icons
-    this.updateRoleIcons(scene, delta);
-
     // Pack behavior: enemies gain speed bonus when near allies
-    const PACK_RADIUS = 100; // pixels
-    const SPEED_BONUS = 30; // additional speed when in pack
-    const FLEE_HP_THRESHOLD = 0.2; // 20% HP
-    const FLEE_CHANCE = 0.3; // 30% chance to flee when low HP
-    const FLEE_DURATION = 1500; // ms
-    const FLEE_COOLDOWN = 6000; // ms
-    const ATTACK_TOKEN_RADIUS = 140; // max distance for token eligibility
-    const ATTACK_TOKEN_TTL = 350; // ms token lifetime
+    var PACK_RADIUS = 100; // pixels
+    var SPEED_BONUS = 30; // additional speed when in pack
+    var FLEE_HP_THRESHOLD = 0.2; // 20% HP
+    var FLEE_CHANCE = 0.3; // 30% chance to flee when low HP
+    var FLEE_DURATION = 1500; // ms
+    var FLEE_COOLDOWN = 6000; // ms
+    var ATTACK_TOKEN_RADIUS = 140; // max distance for token eligibility
+    var ATTACK_TOKEN_TTL = 350; // ms token lifetime
 
     var self = this;
 
-    // Comeback Kid: if the player just died, record the archetype that finished them.
-    self.recordComebackLossIfNeeded(scene);
+    // Throttle expensive per-frame systems — accumulate time, only run periodically
+    scene._enemyThrottleAccum = (scene._enemyThrottleAccum || 0) + delta;
+    var runThrottled = scene._enemyThrottleAccum >= 100; // run throttled systems at most 10x/sec
+    if (runThrottled) scene._enemyThrottleAccum = 0;
 
-    // Ring Rust: update shake-off timer
-    self.updateRingRust(scene, delta);
+    if (runThrottled) {
+      // Role icons: text labels, no need to run at 60fps
+      this.updateRoleIcons(scene, delta);
 
-    // Tag Team AI: establish pairs per-room and update who is "active".
-    self._ensureTagTeams(scene);
-    self._updateTagTeams(scene, delta);
-    self.coordination.checkCoordination(scene, delta);
+      // Comeback Kid: if the player just died, record the archetype that finished them.
+      self.recordComebackLossIfNeeded(scene);
 
-    // Gang Up Coordination: check for coordinated 3+ enemy attacks
-    self.checkGangUpCoordination(scene, delta);
+      // Ring Rust: update shake-off timer
+      self.updateRingRust(scene, delta);
 
-    // Swarm Behavior: check for swarm merge
-    self.checkSwarmBehavior(scene, delta);
-    self.updateSwarm(scene, delta);
+      // Tag Team AI: establish pairs per-room and update who is "active".
+      self._ensureTagTeams(scene);
+      self._updateTagTeams(scene, delta);
+      self.coordination.checkCoordination(scene, delta);
+
+      // Gang Up Coordination: check for coordinated 3+ enemy attacks
+      self.checkGangUpCoordination(scene, delta);
+
+      // Swarm Behavior: check for swarm merge
+      self.checkSwarmBehavior(scene, delta);
+      self.updateSwarm(scene, delta);
+    }
 
     // Rival Echo System: update ghost aura position for echo enemies
     scene.enemies.forEach(function(e) {
@@ -3680,6 +3720,7 @@ window.MMA.Enemies = {
     // Mark each enemy with token flag
     scene.enemies.forEach(function(e) { e.hasAttackToken = (scene._enemyAttackToken && e === scene._enemyAttackToken.enemy); });
 
+    var nowMs = Date.now(); // cache once — used in damage trail per enemy
     scene.enemies.forEach(function(e) {
       if (!e.active || e.state === 'dead') return;
 
@@ -3718,7 +3759,7 @@ window.MMA.Enemies = {
           
           // Calculate total damage in trail (damage that hasn't healed)
           var trailHistory = e._damageTrailHistory || [];
-          var now = Date.now();
+          var now = nowMs; // use cached value from outer loop
           var maxHp = e._trailMaxHp || e.stats.maxHp || 60;
           
           // Filter out old entries (older than 3 seconds) and calculate trail width
@@ -5920,6 +5961,164 @@ window.MMA.Enemies.AI = {
       } else {
         // Pursuit: move faster than normal
         enemy.setVelocity((dx/dist) * pursuitSpeed, (dy/dist) * pursuitSpeed);
+      }
+    } else {
+      enemy.setVelocity(0, 0);
+    }
+
+    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
+  },
+
+  // Showstopper AI: rare enemy that "pauses" the player mid-attack for 1 second
+  // Visual: clockwork gears appear briefly around the enemy during pause
+  showstopper: function(enemy, player, scene, dt) {
+    var cfg = window.MMA.Enemies.SHOWSTOPPER_CONFIG;
+    var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+    var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
+    var vengeanceMult = window.MMA.Enemies.getVengeanceDamageMult(enemy);
+
+    // Initialize showstopper state
+    if (enemy._showstopperPaused === undefined) enemy._showstopperPaused = false;
+    if (enemy._showstopperGears === undefined) enemy._showstopperGears = [];
+    if (enemy._pauseCooldown === undefined) enemy._pauseCooldown = 0;
+
+    var now = Date.now();
+
+    // Reduce pause cooldown
+    if (enemy._pauseCooldown > 0) enemy._pauseCooldown -= dt;
+
+    // Handle pause state - player is frozen
+    if (enemy._showstopperPaused) {
+      enemy.setVelocity(0, 0);
+      enemy._pauseTimer -= dt;
+
+      // Rotate gears during pause
+      if (enemy._showstopperGears) {
+        enemy._showstopperGears.forEach(function(gear, idx) {
+          if (gear && gear.active) {
+            gear.angle += (cfg.GEAR_ROTATION_SPEED / 16) * (idx % 2 === 0 ? 1 : -1);
+          }
+        });
+      }
+
+      if (enemy._pauseTimer <= 0) {
+        // Pause ended - restore player
+        enemy._showstopperPaused = false;
+        
+        // Clean up gears
+        if (enemy._showstopperGears) {
+          enemy._showstopperGears.forEach(function(gear) {
+            if (gear && gear.destroy) gear.destroy();
+          });
+          enemy._showstopperGears = [];
+        }
+
+        // Restore player movement
+        if (scene.player && scene.player.setMovable) {
+          scene.player.setMovable(true);
+        }
+        if (scene.player && scene.player.setInteractive) {
+          scene.player.setInteractive(true);
+        }
+        // Remove any pause indicators
+        scene.children.each(function(obj) {
+          if (obj && obj._isPauseIndicator) {
+            obj.destroy();
+          }
+        });
+      }
+      return;
+    }
+
+    // Normal showstopper AI behavior
+    if (dist < enemy.type.chaseRange) {
+      if (dist < enemy.type.attackRange * 1.1) {
+        enemy.setVelocity(0, 0);
+        
+        var isEliteBreaker = window.MMA.Enemies.canEliteBreakCoordination(enemy);
+        if ((enemy.hasAttackToken || enemy.isBoss || isEliteBreaker) && enemy.attackCooldown <= 0) {
+          enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod;
+          
+          var tMult = window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(enemy, scene) : 1;
+          var dmg = Math.round(enemy.type.attackDamage * vulnMult * vengeanceMult * tMult);
+          
+          if (isEliteBreaker) {
+            dmg = Math.round(dmg * window.MMA.Enemies.ELITE_COORDINATION_BREAK.DAMAGE_MULT);
+            window.MMA.Enemies.recordEliteStrike(enemy, scene, true);
+          }
+
+          // Check if we should trigger pause effect
+          var canPause = enemy._pauseCooldown <= 0;
+          var willPause = canPause && Math.random() < cfg.PAUSE_CHANCE;
+          
+          if (willPause) {
+            // Trigger pause effect
+            enemy._showstopperPaused = true;
+            enemy._pauseTimer = cfg.PAUSE_DURATION;
+            enemy._pauseCooldown = cfg.MIN_COOLDOWN_MS;
+            
+            // Freeze player
+            if (scene.player) {
+              if (scene.player.setVelocity) scene.player.setVelocity(0, 0);
+              if (scene.player.setMovable) scene.player.setMovable(false);
+              if (scene.player.setInteractive) scene.player.setInteractive(false);
+            }
+            
+            // Show warning text
+            if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+              MMA.UI.showDamageText(scene, player.x, player.y - 50, cfg.WARNING_TEXT, cfg.WARNING_COLOR);
+              scene.time.delayedCall(400, function() {
+                MMA.UI.showDamageText(scene, player.x, player.y - 35, cfg.PAUSE_TEXT, cfg.PAUSE_COLOR);
+              });
+            }
+            
+            // Create clockwork gears visual around enemy
+            if (scene && scene.add) {
+              for (var i = 0; i < cfg.GEAR_COUNT; i++) {
+                var angle = (Math.PI * 2 / cfg.GEAR_COUNT) * i;
+                var gearX = enemy.x + Math.cos(angle) * 35;
+                var gearY = enemy.y + Math.sin(angle) * 35;
+                
+                var gear = scene.add.circle(gearX, gearY, 12, 0xffaa00, 0.8);
+                gear._isPauseIndicator = true;
+                
+                // Add gear teeth effect (small rectangles)
+                for (var t = 0; t < 8; t++) {
+                  var toothAngle = (Math.PI * 2 / 8) * t + angle;
+                  var toothX = gearX + Math.cos(toothAngle) * 15;
+                  var toothY = gearY + Math.sin(toothAngle) * 15;
+                  var tooth = scene.add.circle(toothX, toothY, 4, 0xff8800, 0.6);
+                  tooth._isPauseIndicator = true;
+                }
+                
+                enemy._showstopperGears.push(gear);
+              }
+              
+              // Add central gear
+              var centerGear = scene.add.circle(enemy.x, enemy.y, 20, 0xffcc00, 0.9);
+              centerGear._isPauseIndicator = true;
+              enemy._showstopperGears.push(centerGear);
+            }
+            
+            // Screen flash effect
+            if (scene.cameras && scene.cameras.main) {
+              scene.cameras.main.flash(150, 255, 200, 100);
+            }
+            
+            // Don't deal damage while paused - the pause IS the attack effect
+            return;
+          }
+          
+          // Normal attack without pause
+          // Body Language Read: brief telegraph
+          if (!window.MMA.Enemies.startTelegraphAttack(enemy, player, scene, dmg, 80, 'CLOCKWORK STRIKE', '#ffaa00', 'SHOULDER DIP')) {
+            window.MMA.Enemies.damagePlayer(enemy, scene, dmg);
+          }
+        }
+      } else {
+        enemy.setVelocity((dx/dist) * enemy.type.speed * speedMod, (dy/dist) * enemy.type.speed * speedMod);
       }
     } else {
       enemy.setVelocity(0, 0);
