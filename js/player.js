@@ -192,7 +192,7 @@ window.MMA.Player = {
   checkOutfitUnlocks: function(scene, newLevel) {
     var unlocked = MMA.Outfits.checkLevelUnlocks(newLevel);
     if (unlocked.length > 0) {
-      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'NEW OUTFED OUTFIT UNLOCKED!', '#ffd700');
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'NEW OUTFIT UNLOCKED!', '#ffd700');
     }
     return unlocked;
   },
