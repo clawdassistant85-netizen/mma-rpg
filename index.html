@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>MMA RPG</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230b0b0b'/%3E%3Ctext x='50%25' y='56%25' text-anchor='middle' font-size='34' font-family='Arial,sans-serif' fill='%23ffd447'%3EM%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/style.css?v=27">
+  <link rel="stylesheet" href="css/style.css?v=30">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -140,15 +140,15 @@
       border-radius: 12px;
       border: 0;
       display: none;
-      z-index: 100;
+      z-index: 200;
       background: rgba(20,20,20,0.72);
       color: #fff;
       font: 700 22px/42px system-ui, sans-serif;
       text-align: center;
       box-shadow: 0 3px 10px rgba(0,0,0,0.4);
-      z-index: 35;
       pointer-events: auto;
-      display: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
     #mobile-pause-btn:active { transform: scale(0.95); }
 
@@ -331,17 +331,17 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=29"></script>
-  <script src="js/sprites.js?v=29"></script>
-  <script src="js/combat.js?v=29"></script>
-  <script src="js/enemies.js?v=29"></script>
-  <script src="js/zones.js?v=29"></script>
-  <script src="js/player.js?v=29"></script>
-  <script src="js/items.js?v=29"></script>
-  <script src="js/outfits.js?v=29"></script>
-  <script src="js/vfx.js?v=29"></script>
-  <script src="js/ui.js?v=29"></script>
-  <script src="js/progression.js?v=29"></script>
+  <script src="js/config.js?v=30"></script>
+  <script src="js/sprites.js?v=30"></script>
+  <script src="js/combat.js?v=30"></script>
+  <script src="js/enemies.js?v=30"></script>
+  <script src="js/zones.js?v=30"></script>
+  <script src="js/player.js?v=30"></script>
+  <script src="js/items.js?v=30"></script>
+  <script src="js/outfits.js?v=30"></script>
+  <script src="js/vfx.js?v=30"></script>
+  <script src="js/ui.js?v=30"></script>
+  <script src="js/progression.js?v=30"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -589,17 +589,17 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=29"></script>
-  <script src="js/saveSystem.js?v=29"></script>
-  <script src="js/narrator.js?v=29"></script>
-  <script src="js/scenes/TitleScene.js?v=29"></script>
-  <script src="js/scenes/BootScene.js?v=29"></script>
-  <script src="js/scenes/GameScene.js?v=29"></script>
-  <script src="js/scenes/HUDScene.js?v=29"></script>
-  <script src="js/scenes/PauseScene.js?v=29"></script>
-  <script src="js/scenes/OutfitScene.js?v=29"></script>
-  <script src="js/scenes/UnlockScene.js?v=29"></script>
-  <script src="js/scenes/VictoryScene.js?v=29"></script>
-  <script src="js/main.js?v=29"></script>
+<script src="js/sounds.js?v=30"></script>
+  <script src="js/saveSystem.js?v=30"></script>
+  <script src="js/narrator.js?v=30"></script>
+  <script src="js/scenes/TitleScene.js?v=30"></script>
+  <script src="js/scenes/BootScene.js?v=30"></script>
+  <script src="js/scenes/GameScene.js?v=30"></script>
+  <script src="js/scenes/HUDScene.js?v=30"></script>
+  <script src="js/scenes/PauseScene.js?v=30"></script>
+  <script src="js/scenes/OutfitScene.js?v=30"></script>
+  <script src="js/scenes/UnlockScene.js?v=30"></script>
+  <script src="js/scenes/VictoryScene.js?v=30"></script>
+  <script src="js/main.js?v=30"></script>
 </body>
 </html>
