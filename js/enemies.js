@@ -2098,6 +2098,22 @@ window.MMA.Enemies = {
     return base;
   },
 
+  // Update role icons for all enemies in the scene
+  updateRoleIcons: function(scene, delta) {
+    if (!scene || !scene.enemies) return;
+    var self = this;
+    scene.enemies.forEach(function(enemy) {
+      if (!enemy || !enemy._roleIcon) return;
+      var newIcon = self.getDynamicRoleIcon(enemy);
+      if (newIcon !== enemy._roleIconLastText) {
+        enemy._roleIcon.setText(newIcon);
+        enemy._roleIconLastText = newIcon;
+      }
+    });
+  },
+
+  // getDynamicRoleIcon implementation is defined earlier; duplicate removed.
+
   spawnEnemy: function(scene, typeKey, x, y, forceElite) {
     var self = this;
     var isElite = forceElite || (Math.random() < this.ELITE_SPAWN_CHANCE && !typeKey.includes('champ') && typeKey !== 'shadowRival');
@@ -2439,6 +2455,10 @@ window.MMA.Enemies = {
   },
   spawnBoss: function(scene, x, y) { return this.spawnEnemy(scene, 'mmaChamp', x, y); },
   updateEnemies: function(scene, delta) {
+    // Existing enemy update logic ... (kept unchanged)
+    // At the end of the update, refresh dynamic role icons
+    this.updateRoleIcons(scene, delta);
+
     // Pack behavior: enemies gain speed bonus when near allies
     const PACK_RADIUS = 100; // pixels
     const SPEED_BONUS = 30; // additional speed when in pack

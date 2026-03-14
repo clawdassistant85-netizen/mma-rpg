@@ -35,6 +35,7 @@ var PauseScene = new Phaser.Class({
   },
 
   create: function() {
+    try {
     var self = this;
     var W = CONFIG.CANVAS_W;
     var H = CONFIG.CANVAS_H;
@@ -268,6 +269,9 @@ var PauseScene = new Phaser.Class({
         self.closePause();
       }
     });
+    } catch(e) {
+      console.error('PauseScene crash:', e);
+    }
   },
 
   update: function() {
