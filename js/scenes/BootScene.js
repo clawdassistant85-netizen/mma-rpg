@@ -49,42 +49,45 @@ var BootScene = new Phaser.Class({
   },
   _bootStep_idleHook: function() {
     this.registerIdleAnimations();
-    this.installIdleAnimationHook();
-    this.installVisualVariantHook();
-    this.installEquipmentVisualHook();
-    this.installDamageStateHook();
+    // Visual-only prototype hooks disabled — each one chains into preUpdate/update
+    // on EVERY sprite every frame, causing freeze on slower devices.
+    // Re-enable individually once per-sprite throttling is in place.
+    // this.installIdleAnimationHook();
+    // this.installVisualVariantHook();
+    // this.installEquipmentVisualHook();
+    // this.installDamageStateHook();
     this._updateLoadBar('Idle Animations');
   },
   _bootStep_variantHooks: function() {
-    this.installLimbDamageHook();
-    this.installPortraitHook();
-    this.installReactionFaceHook();
-    this.installTechniqueTattooHook();
+    // this.installLimbDamageHook();
+    // this.installPortraitHook();
+    // this.installReactionFaceHook();
+    // this.installTechniqueTattooHook();
     this._updateLoadBar('Variant Hooks');
   },
   _bootStep_portraitHooks: function() {
-    this.installStyleAuraHook();
+    // this.installStyleAuraHook();
     this._updateLoadBar('Style Aura');
   },
   _bootStep_auraHooks: function() {
-    this.installBossChromaAuraHook();
+    // this.installBossChromaAuraHook(); // heaviest — patches preUpdate, 15+ prop checks per sprite per frame
     this._updateLoadBar('Boss Aura');
   },
   _bootStep_combatHooks: function() {
-    this.installImpactSweatHook();
-    this.installComboFireTrailHook();
-    this.installArenaFootworkTrailHook();
-    this.installShadowDoubleHook();
-    this.installShadowDoubleDamageHook();
+    // this.installImpactSweatHook();
+    // this.installComboFireTrailHook();
+    // this.installArenaFootworkTrailHook();
+    // this.installShadowDoubleHook();
+    // this.installShadowDoubleDamageHook();
     this._updateLoadBar('Combat Hooks');
   },
   _bootStep_vfxHooks: function() {
-    this.installSignatureSilhouetteHook();
-    this.installMuscleTensionHook();
-    this.installExertionCueHook();
-    this.installLastChancePulseHook();
-    this.installFightIqAuraReadHook();
-    this.installEnemyFearTrembleHook();
+    // this.installSignatureSilhouetteHook();
+    // this.installMuscleTensionHook();
+    // this.installExertionCueHook();
+    // this.installLastChancePulseHook();
+    // this.installFightIqAuraReadHook();
+    // this.installEnemyFearTrembleHook();
     this._updateLoadBar('VFX Hooks');
   },
   _bootStep_launchGame: function() {
