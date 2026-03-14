@@ -26,8 +26,8 @@
     /* UI layer (DOM) */
     #ui-layer { position: absolute; inset: 0; pointer-events: none; }
 
-    /* D-pad (bottom-left) */
-    #dpad { position: absolute; left: 18px; bottom: 18px; width: 100px; height: 100px; pointer-events: auto; touch-action: none; display: none; }
+    /* D-pad (bottom-left) — positioned relative to viewport, not canvas */
+    #dpad { position: fixed; left: 18px; bottom: 18px; width: 100px; height: 100px; pointer-events: auto; touch-action: none; display: none; z-index: 100; }
     #dpad .dpad-base {
       position: absolute; inset: 0;
       border-radius: 50%;
@@ -64,7 +64,7 @@
 
     /* Action buttons (bottom-right diamond layout) */
     #action-cluster {
-      position: absolute;
+      position: fixed;
       right: 18px;
       bottom: 24px;
       width: 176px;
@@ -72,6 +72,7 @@
       pointer-events: auto;
       touch-action: none;
       display: none;
+      z-index: 100;
     }
     #action-cluster .action-btn {
       position: absolute;
@@ -131,7 +132,7 @@
     }
 
     #mobile-pause-btn {
-      position: absolute;
+      position: fixed;
       top: 12px;
       right: 12px;
       width: 42px;
@@ -139,6 +140,7 @@
       border-radius: 12px;
       border: 0;
       display: none;
+      z-index: 100;
       background: rgba(20,20,20,0.72);
       color: #fff;
       font: 700 22px/42px system-ui, sans-serif;
@@ -283,7 +285,7 @@
 
     @media (orientation: landscape) {
       #dpad { left: 10px; bottom: 10px; width: 88px; height: 88px; }
-      #action-cluster { right: 10px; bottom: 10px; width: 152px; height: 128px; }
+      #action-cluster { right: 10px; bottom: 10px; width: 176px; height: 154px; }
     }
 
     @media (pointer: fine) {
@@ -318,7 +320,7 @@
         <button class="dpad-btn dpad-right" data-dir="right" aria-label="Right">▶</button>
       </div>
       <!-- Stand-up button (appears during ground game) -->
-      <button id="standup-btn" type="button" aria-label="Stand Up" style="position:absolute; left:130px; bottom:40px; width:60px; height:36px; border-radius:10px; border:0; background:rgba(100,100,200,0.7); color:#fff; font:bold 12px system-ui; pointer-events:auto; touch-action:none; display:none; z-index:50;">STAND</button>
+      <button id="standup-btn" type="button" aria-label="Stand Up" style="position:fixed; left:130px; bottom:40px; width:60px; height:36px; border-radius:10px; border:0; background:rgba(100,100,200,0.7); color:#fff; font:bold 12px system-ui; pointer-events:auto; touch-action:none; display:none; z-index:100;">STAND</button>
       <!-- Action buttons cluster -->
       <div id="action-cluster" class="touch-control" aria-label="Action Buttons">
         <button class="action-btn" data-action="jab" aria-label="Jab">Jab</button>
@@ -329,17 +331,17 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=23"></script>
-  <script src="js/sprites.js?v=23"></script>
-  <script src="js/combat.js?v=23"></script>
-  <script src="js/enemies.js?v=23"></script>
-  <script src="js/zones.js?v=23"></script>
-  <script src="js/player.js?v=23"></script>
-  <script src="js/items.js?v=23"></script>
-  <script src="js/outfits.js?v=23"></script>
-  <script src="js/vfx.js?v=23"></script>
-  <script src="js/ui.js?v=23"></script>
-  <script src="js/progression.js?v=23"></script>
+  <script src="js/config.js?v=25"></script>
+  <script src="js/sprites.js?v=25"></script>
+  <script src="js/combat.js?v=25"></script>
+  <script src="js/enemies.js?v=25"></script>
+  <script src="js/zones.js?v=25"></script>
+  <script src="js/player.js?v=25"></script>
+  <script src="js/items.js?v=25"></script>
+  <script src="js/outfits.js?v=25"></script>
+  <script src="js/vfx.js?v=25"></script>
+  <script src="js/ui.js?v=25"></script>
+  <script src="js/progression.js?v=25"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -587,17 +589,17 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=23"></script>
-  <script src="js/saveSystem.js?v=23"></script>
-  <script src="js/narrator.js?v=23"></script>
-  <script src="js/scenes/TitleScene.js?v=23"></script>
-  <script src="js/scenes/BootScene.js?v=23"></script>
-  <script src="js/scenes/GameScene.js?v=23"></script>
-  <script src="js/scenes/HUDScene.js?v=23"></script>
-  <script src="js/scenes/PauseScene.js?v=23"></script>
-  <script src="js/scenes/OutfitScene.js?v=23"></script>
-  <script src="js/scenes/UnlockScene.js?v=23"></script>
-  <script src="js/scenes/VictoryScene.js?v=23"></script>
-  <script src="js/main.js?v=23"></script>
+<script src="js/sounds.js?v=25"></script>
+  <script src="js/saveSystem.js?v=25"></script>
+  <script src="js/narrator.js?v=25"></script>
+  <script src="js/scenes/TitleScene.js?v=25"></script>
+  <script src="js/scenes/BootScene.js?v=25"></script>
+  <script src="js/scenes/GameScene.js?v=25"></script>
+  <script src="js/scenes/HUDScene.js?v=25"></script>
+  <script src="js/scenes/PauseScene.js?v=25"></script>
+  <script src="js/scenes/OutfitScene.js?v=25"></script>
+  <script src="js/scenes/UnlockScene.js?v=25"></script>
+  <script src="js/scenes/VictoryScene.js?v=25"></script>
+  <script src="js/main.js?v=25"></script>
 </body>
 </html>

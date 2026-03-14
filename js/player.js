@@ -34,7 +34,7 @@ window.MMA.Player = {
     scene.player.dodgeChance = 0;
     scene.player.staminaRegenBonus = 0;
     scene.player.cooldowns = {};
-    scene.player.unlockedMoves = ['jab', 'cross', 'takedown'];
+    scene.player.unlockedMoves = ['jab', 'cross', 'takedown', 'hook'];
     if (scene._savedGameData) {
       var st = scene._savedGameData.playerStats, mv = scene._savedGameData.playerUnlockedMoves;
       if (st && typeof st === 'object') { 
