@@ -50,7 +50,8 @@ function loadGame() {
       },
       playerUnlockedMoves: Array.isArray(data.playerUnlockedMoves) ? data.playerUnlockedMoves.slice() : [],
       currentZone: typeof data.currentZone === 'number' ? data.currentZone : 1,
-      currentRoomId: data.currentRoomId || 'room1'
+      currentRoomId: data.currentRoomId || 'room1',
+      outfitData: data.outfitData || null
     };
   } catch (e) {
     return null;

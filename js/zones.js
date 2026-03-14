@@ -24,19 +24,19 @@ window.MMA.Zones = {
     oct1:{id:'oct1',zone:3,weatherOptions:['clear','night'],weightClass:'middle',cornerPressure:true,crowdSize:200,baseHype:0.3,maxHype:0.8,crowdLabel:'Rowdy Entrance Crowd',
       ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
       doors:{right:{col:15,row:5},up:{col:7,row:0}},connections:{right:'oct2',up:'oct3'},
-      spawnPositions:[{col:3,row:4},{col:12,row:4}],enemyPool:['bjjBlackBelt'],name:'Arena Entrance'},
+      spawnPositions:[{col:3,row:4},{col:12,row:4}],enemyPool:['bjjBlackBelt'],name:'Arena Entrance',narratorStyle:'arenaPrelims'},
     oct2:{id:'oct2',zone:3,weatherOptions:['clear','night','wind'],weightClass:'middle',cornerPressure:true,crowdSize:300,baseHype:0.5,maxHype:0.9,crowdLabel:'Boisterous Prelim Crowd',
       ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
       doors:{left:{col:0,row:5}},connections:{left:'oct1'},
-      spawnPositions:[{col:3,row:3},{col:3,row:8}],enemyPool:['bjjBlackBelt','bjjBlackBelt'],name:'Prelim Cage'},
+      spawnPositions:[{col:3,row:3},{col:3,row:8}],enemyPool:['bjjBlackBelt','bjjBlackBelt'],name:'Prelim Cage',narratorStyle:'arenaPrelims'},
     oct3:{id:'oct3',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:500,baseHype:0.7,maxHype:1.0,crowdLabel:'Electric Main Cage Crowd',
       ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct1',up:'oct4'},
-      spawnPositions:[{col:5,row:5},{col:9,row:5}],enemyPool:['bjjBlackBelt'],name:'Main Cage'},
+      spawnPositions:[{col:5,row:5},{col:9,row:5}],enemyPool:['bjjBlackBelt'],name:'Main Cage',narratorStyle:'arenaMain'},
     oct4:{id:'oct4',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:800,baseHype:0.9,maxHype:1.0,crowdLabel:'Championship Crowd',
       ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct3',up:'survival1'},
-      spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:'Championship Ring'},
+      spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:'Championship Ring',narratorStyle:'arenaTitle'},
     // Survival Time Attack: 90s endurance room with escalating waves and score focus
     survival1:{
       id:'survival1',
@@ -55,6 +55,7 @@ window.MMA.Zones = {
       spawnPositions:[{col:4,row:5},{col:11,row:5}],
       enemyPool:['bjjBlackBelt','mmaChamp'],
       name:'Survival Time Attack Cage',
+      narratorStyle:'arenaSurvival',
       survivalMode:true,
       survivalDurationSeconds:90,
       survivalScoreMultiplier:1.5
@@ -82,6 +83,7 @@ window.MMA.Zones = {
       spawnPositions:[{col:7,row:5}],
       enemyPool:['mmaChamp'],
       name:"Champion's Dojo",
+      narratorStyle:'dojoLegend',
       dojoMode:'championsDojo'
     }
   },
@@ -126,6 +128,102 @@ window.MMA.Zones = {
       };
     }
     return null;
+  },
+  // Zone Narrator profiles: used by combat/UI systems to route commentary events.
+  // This keeps per-zone voice and hype tuning in one place.
+  getNarratorProfile: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room) return null;
+    var zone = room.zone || 1;
+    // Only arena-style zones currently use live commentary
+    if (zone !== 3 && zone !== 4) return null;
+    var style = room.narratorStyle || 'arenaPrelims';
+    var profile = {
+      id: style,
+      // base chance that a notable event produces a line (0-1)
+      baseCommentChance: 0.35,
+      // additional chance per 5-hit combo bucket
+      comboCommentStep: 0.15,
+      // how much hype a single line should add in arena zones
+      hypePerComment: 0.05,
+      // clamp so commentary cannot completely override design-time hype
+      maxExtraHype: 0.25
+    };
+    // Slight flavor differences by style
+    if (style === 'arenaMain') {
+      profile.baseCommentChance = 0.45;
+      profile.hypePerComment = 0.06;
+    } else if (style === 'arenaTitle') {
+      profile.baseCommentChance = 0.55;
+      profile.hypePerComment = 0.08;
+    } else if (style === 'arenaSurvival') {
+      profile.baseCommentChance = 0.40;
+      profile.hypePerComment = 0.05;
+    } else if (style === 'dojoLegend') {
+      profile.baseCommentChance = 0.50;
+      profile.hypePerComment = 0.07;
+    }
+    return profile;
+  },
+  // Internal helper: pick a commentary line based on event type and payload.
+  _pickNarratorLine: function(style, eventType, payload) {
+    var combo = payload && payload.comboCount ? payload.comboCount : 0;
+    if (eventType === 'combo') {
+      if (combo >= 15) {
+        return "He's putting on a clinic out there – " + combo + "+ hit combo!";
+      } else if (combo >= 10) {
+        return "Huge sequence – " + combo + " clean shots in a row!";
+      } else if (combo >= 5) {
+        return "Beautiful combination work, mixing levels nicely.";
+      }
+      return 'Sharp hands – staying just a step ahead in these exchanges.';
+    } else if (eventType === 'comeback') {
+      return 'What a comeback – he was hurt and now he is turning the whole fight around!';
+    } else if (eventType === 'finish') {
+      return 'That is it! What a finish – the crowd is on their feet!';
+    } else if (eventType === 'hurt') {
+      return 'He is wobbled – those shots are really starting to add up.';
+    }
+    // fallback
+    return 'High-level chess in there – every move has a purpose.';
+  },
+  // Apply a commentary event: combat systems can call this with notable moments.
+  // This function is side-effectful: it may raise crowd hype and update HUD text.
+  handleNarratorEvent: function(scene, eventType, payload) {
+    if (!scene || !scene.registry || !scene.currentRoomId) return;
+    var profile = this.getNarratorProfile(scene.currentRoomId);
+    if (!profile) return;
+    // Decide whether to speak for this event
+    var combo = payload && payload.comboCount ? payload.comboCount : 0;
+    var comboBuckets = Math.floor(combo / 5);
+    var chance = profile.baseCommentChance + comboBuckets * profile.comboCommentStep;
+    if (chance > 0.85) chance = 0.85;
+    if (Math.random() > chance) return;
+    var line = this._pickNarratorLine(profile.id, eventType, payload || {});
+    // Hype + damage bonus tuning
+    var crowdActive = scene.registry.get('crowdActive');
+    if (crowdActive) {
+      var currentHype = scene.registry.get('crowdHype') || 0;
+      var baseHype = scene.registry.get('crowdBaseHype') || 0;
+      var maxHype = scene.registry.get('crowdMaxHype') || 1;
+      var extraHype = currentHype - baseHype;
+      if (extraHype < 0) extraHype = 0;
+      var allowedExtra = profile.maxExtraHype;
+      var delta = profile.hypePerComment;
+      if (extraHype + delta > allowedExtra) {
+        delta = Math.max(0, allowedExtra - extraHype);
+      }
+      if (delta > 0) {
+        var newHype = currentHype + delta;
+        if (newHype > maxHype) newHype = maxHype;
+        scene.registry.set('crowdHype', newHype);
+        var bonus = this.computeCrowdDamageBonus(newHype);
+        scene.registry.set('crowdDamageBonus', bonus);
+      }
+    }
+    // Surface a short-lived commentary line to HUD
+    scene.registry.set('gameMessage', 'Commentary: ' + line);
+    scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
   },
   // Corner Pressure configuration helper
   // Used by combat systems to determine when the player is "backed into the ropes".
@@ -279,6 +377,8 @@ window.MMA.Zones = {
         var bonus = this.computeCrowdDamageBonus(hype);
         scene.registry.set('crowdActive', true);
         scene.registry.set('crowdHype', hype);
+        scene.registry.set('crowdBaseHype', hype);
+        scene.registry.set('crowdMaxHype', crowd.maxHype || 1);
         scene.registry.set('crowdMaxBonus', 0.10);
         scene.registry.set('crowdDamageBonus', bonus);
         scene.registry.set('crowdLabel', crowd.crowdLabel);
@@ -292,6 +392,8 @@ window.MMA.Zones = {
         // No crowd info – disable crowd effects
         scene.registry.set('crowdActive', false);
         scene.registry.set('crowdHype', 0);
+        scene.registry.set('crowdBaseHype', 0);
+        scene.registry.set('crowdMaxHype', 0);
         scene.registry.set('crowdMaxBonus', 0);
         scene.registry.set('crowdDamageBonus', 0);
         scene.registry.set('crowdLabel', '');

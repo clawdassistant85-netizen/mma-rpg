@@ -35,6 +35,18 @@ window.MMA.Player = {
     }
     // Apply outfit modifiers
     this.applyOutfitModifiers(scene);
+    
+    // Set player texture based on equipped outfit
+    var outfit = MMA.Outfits.getEquippedOutfit();
+    if (outfit) {
+      var outfitKey = outfit.visualKey || 'streetClothes';
+      var outfitTexture = 'player_' + outfitKey;
+      // Check if outfit texture exists, otherwise use default
+      if (scene.textures.exists(outfitTexture)) {
+        scene.player.setTexture(outfitTexture);
+      }
+      scene.player._mmaOutfitKey = outfitKey;
+    }
     scene.player.state = 'idle';
     scene.player.hitFlash = 0;
     scene.player.justLeveled = false;
@@ -123,9 +135,15 @@ window.MMA.Player = {
     var outfitKey = outfit.visualKey || 'streetClothes';
     scene.player._mmaOutfitKey = outfitKey;
     
-    // Regenerate player texture if the scene has the function
-    if (scene.regeneratePlayerTexture) {
-      scene.regeneratePlayerTexture(outfitKey);
+    // Change player texture to match outfit
+    var outfitTexture = 'player_' + outfitKey;
+    if (scene.textures.exists(outfitTexture)) {
+      scene.player.setTexture(outfitTexture);
+      // Restart idle animation with new texture
+      var animKey = outfitTexture + '_idle';
+      if (scene.anims.exists(animKey)) {
+        scene.player.play(animKey, true);
+      }
     }
   },
   // Equip a new outfit and update stats

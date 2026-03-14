@@ -318,7 +318,11 @@ window.MMA.Sprites = {
     textureDamageSet('player', playerColors, { armShift:1, bodyW:6, hasHeadband:true });
     
     // Generate outfit variant textures for the player
-    this.generateOutfitTextures(this, playerColors);
+    try {
+      this.generateOutfitTextures(self, playerColors);
+    } catch (e) {
+      console.error('Error generating outfit textures:', e);
+    }
     
     textureDamageSet('enemy_thug', thugColors, { armShift:0, bodyW:5, hasWeapon:true });
     textureDamageSet('enemy_brawler', brawlerColors, { armShift:1, bodyW:8, bigFists:true, hasWeapon:true });

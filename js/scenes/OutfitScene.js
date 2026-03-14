@@ -163,29 +163,32 @@ var OutfitScene = new Phaser.Class({
     if (mods.endurance !== 0) statLines.push('END: ' + (mods.endurance > 0 ? '+' : '') + mods.endurance);
     
     var statsText = statLines.join('\n');
-    this.add.text(6, 30, statsText, {
+    var statsObj = this.add.text(6, 30, statsText, {
       fontSize: '11px',
       color: statColor,
       stroke: '#000000',
       strokeThickness: 1,
       lineSpacing: -2
-    }).setDepth(10).setContainer(container);
+    }).setDepth(10);
+    container.add(statsObj);
     
     // Unlock condition or equipped badge
     if (isEquipped) {
-      this.add.text(w / 2, h - 12, 'EQUIPPED', {
+      var eqText = this.add.text(w / 2, h - 12, 'EQUIPPED', {
         fontSize: '10px',
         color: '#44ff44',
         stroke: '#000000',
         strokeThickness: 2
-      }).setOrigin(0.5, 1).setContainer(container);
+      }).setOrigin(0.5, 1);
+      container.add(eqText);
     } else if (!isUnlocked) {
-      this.add.text(w / 2, h - 12, outfit.unlockCondition, {
+      var lockText = this.add.text(w / 2, h - 12, outfit.unlockCondition, {
         fontSize: '9px',
         color: '#ff6666',
         stroke: '#000000',
         strokeThickness: 2
-      }).setOrigin(0.5, 1).setContainer(container);
+      }).setOrigin(0.5, 1);
+      container.add(lockText);
     }
     
     // Make interactive if unlocked

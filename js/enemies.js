@@ -55,16 +55,26 @@ window.MMA.Enemies = {
     if (!scene._playerAttackHistory) {
       scene._playerAttackHistory = [];
     }
+    // Also track raw move keys for enemies that "mirror" the player.
+    if (!scene._playerAttackMoveKeys) {
+      scene._playerAttackMoveKeys = [];
+    }
   },
 
   // Record player attack move type
   recordPlayerAttack: function(scene, moveKey) {
     this.initAdaptiveTracking(scene);
     var moveType = this.ADAPTIVE_TACTICS.MOVE_TYPE_GROUPS[moveKey] || 'unknown';
-    
+
     scene._playerAttackHistory.push(moveType);
     if (scene._playerAttackHistory.length > this.ADAPTIVE_TACTICS.TRACK_COUNT) {
       scene._playerAttackHistory.shift();
+    }
+
+    // Mirror-tracking: keep raw keys too (same window size)
+    scene._playerAttackMoveKeys.push(moveKey);
+    if (scene._playerAttackMoveKeys.length > this.ADAPTIVE_TACTICS.TRACK_COUNT) {
+      scene._playerAttackMoveKeys.shift();
     }
   },
 
@@ -370,7 +380,11 @@ window.MMA.Enemies = {
     bully:{name:'Bully',hp:95,maxHp:95,speed:82,attackDamage:15,attackCooldownMax:1150,attackRange:60,chaseRange:260,color:0xff8800,xpReward:55,teachesMove:null,zone:2,aiPattern:'bully',groundDefense:0.35,groundEscape:0.25},
 
     // Gimmick Specialist: Regenerator (slow heal over time; punishes passive play)
-    regenerator:{name:'Regenerator',hp:85,maxHp:85,speed:78,attackDamage:12,attackCooldownMax:1250,attackRange:60,chaseRange:240,color:0x22ff66,xpReward:60,teachesMove:null,zone:2,aiPattern:'regen',groundDefense:0.35,groundEscape:0.25}
+    regenerator:{name:'Regenerator',hp:85,maxHp:85,speed:78,attackDamage:12,attackCooldownMax:1250,attackRange:60,chaseRange:240,color:0x22ff66,xpReward:60,teachesMove:null,zone:2,aiPattern:'regen',groundDefense:0.35,groundEscape:0.25},
+
+    // Tutor Enemy: trainer-type that teaches a technique upon victory.
+    // Also "mirrors" the player's recent attacks (best-effort) to force adaptation.
+    tutor:{name:'Tutor',hp:95,maxHp:95,speed:84,attackDamage:14,attackCooldownMax:1150,attackRange:65,chaseRange:260,color:0x66ff33,xpReward:70,teachesMove:null,zone:2,aiPattern:'tutor',groundDefense:0.45,groundEscape:0.35}
   },
   // Pack damage multiplier helper
   getPackDamageMultiplier: function(enemy, scene) {
@@ -648,6 +662,19 @@ window.MMA.Enemies = {
     e.body.setSize(24, 36); e.body.setOffset(12, 18); e.stats = { hp: type.hp, maxHp: type.maxHp }; e.type = type; e.typeKey = typeKey; e.baseSpeed = type.speed; // store base speed
     e.state = 'idle'; e.attackCooldown = 0; e.staggerTimer = 0;
     e.isBoss = (typeKey === 'mmaChamp'); e.phaseTwo = false;
+
+    // Tutor Enemy: snapshot player's recent move keys so it can "mirror" your habits.
+    if (typeKey === 'tutor') {
+      try {
+        self.initAdaptiveTracking(scene);
+        var keys = (scene && scene._playerAttackMoveKeys) ? scene._playerAttackMoveKeys.slice() : [];
+        e.learnedMoves = keys.slice(Math.max(0, keys.length - 3));
+        e.learnedMoveIdx = 0;
+      } catch (err) {
+        e.learnedMoves = [];
+        e.learnedMoveIdx = 0;
+      }
+    }
     
     // Elite glow effect
     if (eliteType && eliteType.colorGlow) {
@@ -756,6 +783,18 @@ window.MMA.Enemies = {
         var currentType = pool[replaceIdx];
         if (currentType !== 'mmaChamp' && currentType !== 'shadowRival' && currentType !== 'coach') {
           pool[replaceIdx] = 'regenerator';
+        }
+      }
+    }
+
+    // Tutor Enemy: rare spawn in zone 2+ (replaces a non-boss spawn)
+    if (z >= 2 && positions && positions.length && pool && pool.length) {
+      var tutorChance = 0.05 + (z - 2) * 0.01; // 5% in zone2 → up to 7%
+      if (Math.random() < tutorChance) {
+        var replaceIdx = Math.floor(Math.random() * pool.length);
+        var currentType = pool[replaceIdx];
+        if (currentType !== 'mmaChamp' && currentType !== 'shadowRival' && currentType !== 'coach') {
+          pool[replaceIdx] = 'tutor';
         }
       }
     }
@@ -1122,6 +1161,36 @@ window.MMA.Enemies = {
       scene.registry.set('gameMessage', 'SHADOW: "This isn\'t over."');
       scene.time.delayedCall(1800, function(){ scene.registry.set('gameMessage', ''); });
     }
+
+    // Tutor Enemy: always teaches one random technique you don't already know (if available).
+    if (enemy.typeKey === 'tutor') {
+      try {
+        var roster = (MMA && MMA.Combat && MMA.Combat.MOVE_ROSTER) ? MMA.Combat.MOVE_ROSTER : null;
+        var known = (scene.player && scene.player.unlockedMoves) ? scene.player.unlockedMoves : [];
+        if (roster && known) {
+          var candidates = Object.keys(roster).filter(function(k){ return known.indexOf(k) === -1; });
+          if (candidates.length) {
+            var teachKey = candidates[Math.floor(Math.random() * candidates.length)];
+            var moveInfo = roster[teachKey];
+            if (teachKey && moveInfo) {
+              scene.player.unlockedMoves.push(teachKey);
+              scene.registry.set('unlockedMoves', scene.player.unlockedMoves.slice());
+              scene.registry.set('gameMessage', 'TUTOR TAUGHT: ' + (moveInfo.name || teachKey));
+              scene.time.delayedCall(2200, function(){ scene.registry.set('gameMessage', ''); });
+              if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+                MMA.UI.showDamageText(scene, enemy.x, enemy.y - 60, 'TECHNIQUE LEARNED!', '#66ff33');
+              }
+              // Reuse existing unlock flow so UI stays consistent.
+              scene.scene.pause();
+              scene.scene.launch('UnlockScene', { moveKey: teachKey });
+            }
+          }
+        }
+      } catch (err) {
+        // Non-fatal: tutoring is a bonus.
+      }
+    }
+
     var enemyTaughtMove = (typeof checkMoveUnlock === 'function') ? checkMoveUnlock(enemy.typeKey, scene.player.stats.level, scene.player.unlockedMoves) : null;
     if (enemyTaughtMove) {
       var moveInfo = MMA.Combat.MOVE_ROSTER[enemyTaughtMove];
@@ -1484,6 +1553,49 @@ window.MMA.Enemies.AI = {
       enemy.setVelocity(0, 0);
     }
     
+    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
+  },
+
+  // Tutor AI: behaves like chase, but when attacking it cycles through the player's last 3 move keys.
+  // This is a best-effort "mirror"; if no learned moves are available it just punches normally.
+  tutor: function(enemy, player, scene, dt) {
+    var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+    var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
+    var vengeanceMult = window.MMA.Enemies.getVengeanceDamageMult(enemy);
+
+    if (dist < enemy.type.chaseRange) {
+      if (dist < enemy.type.attackRange) {
+        enemy.setVelocity(0, 0);
+        if ((enemy.hasAttackToken || enemy.isBoss) && enemy.attackCooldown <= 0) {
+          enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod;
+
+          var moveKey = null;
+          if (enemy.learnedMoves && enemy.learnedMoves.length) {
+            moveKey = enemy.learnedMoves[enemy.learnedMoveIdx % enemy.learnedMoves.length];
+            enemy.learnedMoveIdx = (enemy.learnedMoveIdx || 0) + 1;
+          }
+
+          // Translate move key to a group for light damage tuning + flavor text.
+          var g = (window.MMA.Enemies.ADAPTIVE_TACTICS && window.MMA.Enemies.ADAPTIVE_TACTICS.MOVE_TYPE_GROUPS) ? window.MMA.Enemies.ADAPTIVE_TACTICS.MOVE_TYPE_GROUPS : {};
+          var group = moveKey ? (g[moveKey] || 'unknown') : 'unknown';
+          var groupMult = (group === 'grappler') ? 1.15 : (group === 'kicker') ? 1.10 : 1.0;
+
+          var dmg = Math.round(enemy.type.attackDamage * vulnMult * groupMult * (window.MMA.Enemies.getPackDamageMultiplier ? window.MMA.Enemies.getPackDamageMultiplier(enemy, scene) : 1) * vengeanceMult);
+          MMA.Player.damage(scene, dmg);
+
+          if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+            MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, moveKey ? ('MIRROR: ' + moveKey) : 'TUTOR STRIKE!', '#66ff33');
+          }
+        }
+      } else {
+        enemy.setVelocity((dx / dist) * enemy.type.speed * speedMod, (dy / dist) * enemy.type.speed * speedMod);
+      }
+    } else {
+      enemy.setVelocity(0, 0);
+    }
+
     if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
   }
 };

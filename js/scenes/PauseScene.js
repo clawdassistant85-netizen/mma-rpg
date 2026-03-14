@@ -94,12 +94,27 @@ var PauseScene = new Phaser.Class({
       strokeThickness: 2
     }).setDepth(10);
 
+    // ── Outfit info
+    var outfitY = statsY + 36;
+    var equippedOutfit = null;
+    if (window.MMA && MMA.Outfits) {
+      equippedOutfit = MMA.Outfits.getEquippedOutfit();
+    }
+    if (equippedOutfit) {
+      this.add.text(PANEL_X + 14, outfitY, 'EQUIPPED: ' + equippedOutfit.name, {
+        fontSize: '12px',
+        color: '#9b59b6',
+        stroke: '#000000',
+        strokeThickness: 2
+      }).setDepth(10);
+    }
+
     // ── Second divider
     var div2 = this.add.graphics();
     div2.lineStyle(1, 0x555533, 0.6);
     div2.beginPath();
-    div2.moveTo(PANEL_X + 10, statsY + 36);
-    div2.lineTo(PANEL_X + PANEL_W - 10, statsY + 36);
+    div2.moveTo(PANEL_X + 10, outfitY + 20);
+    div2.lineTo(PANEL_X + PANEL_W - 10, outfitY + 20);
     div2.strokePath();
 
     // ── Moves section

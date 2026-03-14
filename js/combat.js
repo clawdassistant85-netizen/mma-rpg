@@ -41,6 +41,9 @@ window.MMA.Combat = {
   DEADLY_WINDOW_QUICK_MS: 200,
   DEADLY_WINDOW_SLOW_MS: 500,
   DEADLY_WINDOW_MULTIPLIER: 1.5,
+  ADRENALINE_DURATION_MS: 5000,
+  ADRENALINE_DAMAGE_MULTIPLIER: 1.3,
+  ADRENALINE_DEFENSE_IGNORE: 0.5,
   TAKEDOWN_BASE_CHANCE: {
     grappler: 0.8,
     balanced: 0.5,
@@ -188,6 +191,36 @@ window.MMA.Combat = {
       damage: Math.round(damage * this.DEADLY_WINDOW_MULTIPLIER),
       deadlyWindow: true
     };
+  },
+  ensureAdrenalineState: function(scene) {
+    scene.player.adrenalineState = scene.player.adrenalineState || { readyUntil: 0, primed: false };
+    return scene.player.adrenalineState;
+  },
+  triggerAdrenaline: function(scene) {
+    var state = this.ensureAdrenalineState(scene);
+    state.primed = true;
+    state.readyUntil = scene.time.now + this.ADRENALINE_DURATION_MS;
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 108, 'ADRENALINE READY!', '#ff9f43');
+    return state;
+  },
+  isAdrenalinePrimed: function(scene) {
+    var state = this.ensureAdrenalineState(scene);
+    if (!state.primed) return false;
+    if (scene.time.now > state.readyUntil) {
+      state.primed = false;
+      return false;
+    }
+    return true;
+  },
+  consumeAdrenaline: function(scene) {
+    var state = this.ensureAdrenalineState(scene);
+    state.primed = false;
+    state.readyUntil = 0;
+    return state;
+  },
+  getDefenseMultiplierWithAdrenaline: function(adaptiveDefenseMult, adrenalinePrimed) {
+    if (!adrenalinePrimed || adaptiveDefenseMult <= 1) return adaptiveDefenseMult;
+    return 1 + ((adaptiveDefenseMult - 1) * (1 - this.ADRENALINE_DEFENSE_IGNORE));
   },
   ensureStunState: function(scene) {
     scene.player.stunChainState = scene.player.stunChainState || { hits: 0, lastHitAt: 0 };
@@ -549,9 +582,10 @@ window.MMA.Combat = {
     var s = scene.player.stats, cd = scene.player.cooldowns;
     var intuitionState = this.ensureIntuitionState(scene);
     var intuitionPrimed = !!intuitionState.ready;
+    var adrenalinePrimed = this.isAdrenalinePrimed(scene);
     if (!cd[moveKey]) cd[moveKey] = 0;
-    if (cd[moveKey] > 0 || (!intuitionPrimed && s.stamina < move.staminaCost) || scene.gameOver) return;
-    if (!intuitionPrimed) s.stamina -= move.staminaCost;
+    if (cd[moveKey] > 0 || (!intuitionPrimed && !adrenalinePrimed && s.stamina < move.staminaCost) || scene.gameOver) return;
+    if (!intuitionPrimed && !adrenalinePrimed) s.stamina -= move.staminaCost;
     cd[moveKey] = move.cooldown;
     if (window.sfx) { if (moveKey === 'jab' || moveKey === 'cross') window.sfx.punch(); else if (moveKey === 'lowKick' || moveKey === 'headKick') window.sfx.kick(); }
     var DT = CONFIG.DISPLAY_TILE, px = scene.player.x + scene.lastDir.x * DT * 0.5, py = scene.player.y + scene.lastDir.y * DT * 0.5;
@@ -578,7 +612,8 @@ window.MMA.Combat = {
         var attackBonus = scene.player.attackBonus || 0;
         var baseDamage = Math.round((move.damage + attackBonus) * 1.2);
         var intuitionDamage = intuitionPrimed ? Math.round(baseDamage * this.INTUITION_DAMAGE_MULTIPLIER) : baseDamage;
-        var momentum = this.getMomentumModifiers(scene, intuitionDamage);
+        var adrenalineDamage = adrenalinePrimed ? Math.round(intuitionDamage * this.ADRENALINE_DAMAGE_MULTIPLIER) : intuitionDamage;
+        var momentum = this.getMomentumModifiers(scene, adrenalineDamage);
         var momentumDamage = momentum.surgeReady ? Math.round(momentum.damage * this.MOMENTUM_SURGE_DAMAGE_MULTIPLIER) : momentum.damage;
         var rolled = this.rollDamage(momentumDamage, momentum.critChance, momentum.forceCrit || intuitionPrimed);
         var comboResult = this.applyComboBonus(scene, moveKey, rolled.damage, true);
@@ -590,7 +625,8 @@ window.MMA.Combat = {
         var deadlyWindowAdjusted = this.applyDeadlyWindowIfActive(scene, enemy, panicAdjusted.damage);
         var finishHimAdjusted = this.applyFinishHimIfArmed(scene, enemy, deadlyWindowAdjusted.damage);
         var adaptiveDefenseMult = MMA.Enemies.onPlayerAttack(scene, enemy, moveKey);
-        var dmg = Math.round(finishHimAdjusted.damage / adaptiveDefenseMult);
+        var effectiveDefenseMult = this.getDefenseMultiplierWithAdrenaline(adaptiveDefenseMult, adrenalinePrimed);
+        var dmg = Math.round(finishHimAdjusted.damage / effectiveDefenseMult);
         var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
@@ -608,11 +644,20 @@ window.MMA.Combat = {
           scene.time.delayedCall(150, function() { scene.time.timeScale = 1; });
           this.consumeIntuition(scene);
         }
+        if (adrenalinePrimed) {
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 66, 'ADRENALINE RUSH!', '#ff9f43');
+          this.consumeAdrenaline(scene);
+          adrenalinePrimed = false;
+        }
         if (comboResult.comboFinished) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 74, comboResult.comboLabel, '#66ff99');
-        if (adaptiveDefenseMult > 1) MMA.Enemies.showAdaptiveFeedback(scene, enemy);
+        if (effectiveDefenseMult > 1) MMA.Enemies.showAdaptiveFeedback(scene, enemy);
         if (pressureResult.pressureBreak) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 74, 'PRESSURE BREAK!', '#ffb347');
         if (panicAdjusted.panicActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 84, 'PANIC OPENING!', '#ff66cc');
-        if (deadlyWindowAdjusted.deadlyWindow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 102, 'DEADLY WINDOW x1.5', '#ff5c5c');
+        if (deadlyWindowAdjusted.deadlyWindow) {
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 102, 'DEADLY WINDOW x1.5', '#ff5c5c');
+          this.triggerAdrenaline(scene);
+          adrenalinePrimed = this.isAdrenalinePrimed(scene);
+        }
         if (staminaBreakDamage.staminaBreakActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 92, 'STAMINA BREAK x1.5', '#ffd166');
         var staminaState = this.onEnemyStaminaHit(scene, enemy, move);
         if (staminaState.brokeNow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 110, 'STAMINA BROKEN!', '#ff9f1c');
@@ -654,11 +699,12 @@ window.MMA.Combat = {
     var move = this.MOVE_ROSTER[bestMoveKey], cds = scene.player.cooldowns;
     var intuitionState = this.ensureIntuitionState(scene);
     var intuitionPrimed = !!intuitionState.ready;
+    var adrenalinePrimed = this.isAdrenalinePrimed(scene);
     if (!cds[bestMoveKey]) cds[bestMoveKey] = 0;
     if (cds[bestMoveKey] > 0) return;
     var required = Math.ceil(move.staminaCost * 1.5);
-    if (!intuitionPrimed && scene.player.stats.stamina < required) return MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'NOT ENOUGH STAMINA', '#ff4444');
-    if (!intuitionPrimed) scene.player.stats.stamina -= required;
+    if (!intuitionPrimed && !adrenalinePrimed && scene.player.stats.stamina < required) return MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'NOT ENOUGH STAMINA', '#ff4444');
+    if (!intuitionPrimed && !adrenalinePrimed) scene.player.stats.stamina -= required;
     cds[bestMoveKey] = move.cooldown;
     var DT = CONFIG.DISPLAY_TILE, px = scene.player.x + scene.lastDir.x * DT * 0.7, py = scene.player.y + scene.lastDir.y * DT * 0.7;
     var hitbox = scene.add.image(px, py, 'hitbox').setDisplaySize(DT * 1.7, DT * 1.7).setAlpha(0.6);
@@ -672,7 +718,8 @@ window.MMA.Combat = {
         var attackBonus = scene.player.attackBonus || 0;
         var baseDamage = Math.round((move.damage + attackBonus) * 1.2);
         var intuitionDamage = intuitionPrimed ? Math.round(baseDamage * this.INTUITION_DAMAGE_MULTIPLIER) : baseDamage;
-        var momentum = this.getMomentumModifiers(scene, intuitionDamage);
+        var adrenalineDamage = adrenalinePrimed ? Math.round(intuitionDamage * this.ADRENALINE_DAMAGE_MULTIPLIER) : intuitionDamage;
+        var momentum = this.getMomentumModifiers(scene, adrenalineDamage);
         var momentumDamage = momentum.surgeReady ? Math.round(momentum.damage * this.MOMENTUM_SURGE_DAMAGE_MULTIPLIER) : momentum.damage;
         var rolled = this.rollDamage(momentumDamage, momentum.critChance, momentum.forceCrit || intuitionPrimed);
         var pressureResult = this.applyPressureBreakIfReady(scene, rolled.damage, enemy);
@@ -682,7 +729,8 @@ window.MMA.Combat = {
         var deadlyWindowAdjusted = this.applyDeadlyWindowIfActive(scene, enemy, panicAdjusted.damage);
         var finishHimAdjusted = this.applyFinishHimIfArmed(scene, enemy, deadlyWindowAdjusted.damage);
         var adaptiveDefenseMult = MMA.Enemies.onPlayerAttack(scene, enemy, bestMoveKey);
-        var dmg = Math.round(finishHimAdjusted.damage / adaptiveDefenseMult);
+        var effectiveDefenseMult = this.getDefenseMultiplierWithAdrenaline(adaptiveDefenseMult, adrenalinePrimed);
+        var dmg = Math.round(finishHimAdjusted.damage / effectiveDefenseMult);
         var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
@@ -698,10 +746,19 @@ window.MMA.Combat = {
           scene.time.delayedCall(150, function() { scene.time.timeScale = 1; });
           this.consumeIntuition(scene);
         }
-        if (adaptiveDefenseMult > 1) MMA.Enemies.showAdaptiveFeedback(scene, enemy);
+        if (adrenalinePrimed) {
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 76, 'ADRENALINE RUSH!', '#ff9f43');
+          this.consumeAdrenaline(scene);
+          adrenalinePrimed = false;
+        }
+        if (effectiveDefenseMult > 1) MMA.Enemies.showAdaptiveFeedback(scene, enemy);
         if (pressureResult.pressureBreak) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 84, 'PRESSURE BREAK!', '#ffb347');
         if (panicAdjusted.panicActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 94, 'PANIC OPENING!', '#ff66cc');
-        if (deadlyWindowAdjusted.deadlyWindow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 104, 'DEADLY WINDOW x1.5', '#ff5c5c');
+        if (deadlyWindowAdjusted.deadlyWindow) {
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 104, 'DEADLY WINDOW x1.5', '#ff5c5c');
+          this.triggerAdrenaline(scene);
+          adrenalinePrimed = this.isAdrenalinePrimed(scene);
+        }
         if (staminaBreakDamage.staminaBreakActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 84, 'STAMINA BREAK x1.5', '#ffd166');
         var staminaState = this.onEnemyStaminaHit(scene, enemy, move);
         if (staminaState.brokeNow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 102, 'STAMINA BROKEN!', '#ff9f1c');
