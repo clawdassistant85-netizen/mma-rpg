@@ -3777,6 +3777,15 @@ window.MMA.UI = {
     if (!btn) return;
     btn.style.display = show ? 'block' : 'none';
   },
+  showTouchControls: function(show) {
+    // Show/hide d-pad and action buttons (hidden on title screen, shown during gameplay)
+    var isMobile = window.matchMedia && !window.matchMedia('(pointer: fine)').matches;
+    if (!isMobile) return; // Don't show on desktop
+    var dpad = document.getElementById('dpad');
+    var ac = document.getElementById('action-cluster');
+    if (dpad) dpad.style.display = show ? 'block' : 'none';
+    if (ac) ac.style.display = show ? 'block' : 'none';
+  },
   showGroundBanner: function(text) {
     var el = document.getElementById('ground-banner');
     if (!el) return;

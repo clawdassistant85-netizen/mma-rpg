@@ -27,7 +27,7 @@
     #ui-layer { position: absolute; inset: 0; pointer-events: none; }
 
     /* D-pad (bottom-left) */
-    #dpad { position: absolute; left: 18px; bottom: 18px; width: 100px; height: 100px; pointer-events: auto; touch-action: none; }
+    #dpad { position: absolute; left: 18px; bottom: 18px; width: 100px; height: 100px; pointer-events: auto; touch-action: none; display: none; }
     #dpad .dpad-base {
       position: absolute; inset: 0;
       border-radius: 50%;
@@ -71,6 +71,7 @@
       height: 154px;
       pointer-events: auto;
       touch-action: none;
+      display: none;
     }
     #action-cluster .action-btn {
       position: absolute;
@@ -137,6 +138,7 @@
       height: 42px;
       border-radius: 12px;
       border: 0;
+      display: none;
       background: rgba(20,20,20,0.72);
       color: #fff;
       font: 700 22px/42px system-ui, sans-serif;
@@ -327,17 +329,17 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=22"></script>
-  <script src="js/sprites.js?v=22"></script>
-  <script src="js/combat.js?v=22"></script>
-  <script src="js/enemies.js?v=22"></script>
-  <script src="js/zones.js?v=22"></script>
-  <script src="js/player.js?v=22"></script>
-  <script src="js/items.js?v=22"></script>
-  <script src="js/outfits.js?v=22"></script>
-  <script src="js/vfx.js?v=22"></script>
-  <script src="js/ui.js?v=22"></script>
-  <script src="js/progression.js?v=22"></script>
+  <script src="js/config.js?v=23"></script>
+  <script src="js/sprites.js?v=23"></script>
+  <script src="js/combat.js?v=23"></script>
+  <script src="js/enemies.js?v=23"></script>
+  <script src="js/zones.js?v=23"></script>
+  <script src="js/player.js?v=23"></script>
+  <script src="js/items.js?v=23"></script>
+  <script src="js/outfits.js?v=23"></script>
+  <script src="js/vfx.js?v=23"></script>
+  <script src="js/ui.js?v=23"></script>
+  <script src="js/progression.js?v=23"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -585,17 +587,17 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=22"></script>
-  <script src="js/saveSystem.js?v=22"></script>
-  <script src="js/narrator.js?v=22"></script>
-  <script src="js/scenes/TitleScene.js?v=22"></script>
-  <script src="js/scenes/BootScene.js?v=22"></script>
-  <script src="js/scenes/GameScene.js?v=22"></script>
-  <script src="js/scenes/HUDScene.js?v=22"></script>
-  <script src="js/scenes/PauseScene.js?v=22"></script>
-  <script src="js/scenes/OutfitScene.js?v=22"></script>
-  <script src="js/scenes/UnlockScene.js?v=22"></script>
-  <script src="js/scenes/VictoryScene.js?v=22"></script>
-  <script src="js/main.js?v=22"></script>
+<script src="js/sounds.js?v=23"></script>
+  <script src="js/saveSystem.js?v=23"></script>
+  <script src="js/narrator.js?v=23"></script>
+  <script src="js/scenes/TitleScene.js?v=23"></script>
+  <script src="js/scenes/BootScene.js?v=23"></script>
+  <script src="js/scenes/GameScene.js?v=23"></script>
+  <script src="js/scenes/HUDScene.js?v=23"></script>
+  <script src="js/scenes/PauseScene.js?v=23"></script>
+  <script src="js/scenes/OutfitScene.js?v=23"></script>
+  <script src="js/scenes/UnlockScene.js?v=23"></script>
+  <script src="js/scenes/VictoryScene.js?v=23"></script>
+  <script src="js/main.js?v=23"></script>
 </body>
 </html>

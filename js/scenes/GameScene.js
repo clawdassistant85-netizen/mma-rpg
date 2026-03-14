@@ -73,6 +73,7 @@ var GameScene = new Phaser.Class({
     this.scene.launch('HUDScene');
     MMA.UI.bindMobilePauseButton(this);
     MMA.UI.setPauseButtonVisible(true);
+    MMA.UI.showTouchControls(true);
     MMA.UI.setActionButtonLabels(false);
     this.hideGameOverRestartUI();
     this.registry.set('playerStats', Object.assign({}, this.player.stats));
