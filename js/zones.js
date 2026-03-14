@@ -122,6 +122,10 @@ window.MMA.Zones = {
         { id:'hypeGain', label:'+15% hype gain (3 rooms)' },
         { id:'stamina', label:'+20% stamina regen (3 rooms)' }
       ],
+      // Crowd Judge Scoring: three-judge crowd scorecards for decision wins
+      crowdJudgeScoring:true,
+      crowdJudgeCount:3,
+      crowdJudgeWeights:{ damage:0.5, control:0.3, aggression:0.2 },
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct3',up:'survival1'},
       spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:'Championship Ring',narratorStyle:'arenaTitle',
       // Signature Room Theme: gold spotlight with slow-falling confetti
@@ -691,6 +695,30 @@ window.MMA.Zones = {
       }
     };
   },
+  // Crowd Judge Scoring helpers
+  // Championship-style rooms can opt into a lightweight, crowd-flavored
+  // scorecard system that resolves decisions when no KO/submission occurs.
+  // Zones only exposes static weights and thresholds; combat/UI layers own
+  // round tracking and decision logic.
+  getCrowdJudgeScoringConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.crowdJudgeScoring) return null;
+    var judgeCount = room.crowdJudgeCount != null ? room.crowdJudgeCount : 3;
+    var weights = room.crowdJudgeWeights || { damage:0.5, control:0.3, aggression:0.2 };
+    var thresholds = room.crowdJudgeThresholds || {
+      // Minimum total score lead (0-1 scale) needed to avoid a draw.
+      decisionMargin:0.08,
+      // If both fighters are within this margin, treat the round as
+      // extremely close and surface appropriate commentary.
+      razorThinMargin:0.03
+    };
+    return {
+      active:true,
+      judgeCount:judgeCount,
+      weights:weights,
+      thresholds:thresholds
+    };
+  },
   // Crowd Funding System helpers
   // Arena zones with crowdFunding:true can accumulate a between-rooms
   // "donation" pool based on fight performance and current hype. Combat
@@ -1053,6 +1081,26 @@ window.MMA.Zones = {
         scene.registry.set('bettingMinWager', 0);
         scene.registry.set('bettingMaxWager', 0);
         scene.registry.set('bettingPayoutMultipliers', { lowRisk:1.0, mediumRisk:1.0, highRisk:1.0 });
+      }
+      // Crowd Judge Scoring metadata: three crowd "judges" score rounds in
+      // championship-style rooms when no finish occurs. We only surface
+      // static config and a flavor hint – per-round scoring and decision
+      // resolution live in combat/UI systems.
+      var judgeCfg = this.getCrowdJudgeScoringConfig(room.id);
+      if (judgeCfg && judgeCfg.active) {
+        scene.registry.set('crowdJudgeScoringActive', true);
+        scene.registry.set('crowdJudgeCount', judgeCfg.judgeCount);
+        scene.registry.set('crowdJudgeWeights', judgeCfg.weights);
+        scene.registry.set('crowdJudgeThresholds', judgeCfg.thresholds);
+        scene.time.delayedCall(2150, function(){
+          scene.registry.set('gameMessage', 'Crowd Judge Scoring: damage, control, and aggression decide close championship rounds.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('crowdJudgeScoringActive', false);
+        scene.registry.set('crowdJudgeCount', 0);
+        scene.registry.set('crowdJudgeWeights', { damage:0.5, control:0.3, aggression:0.2 });
+        scene.registry.set('crowdJudgeThresholds', { decisionMargin:0.08, razorThinMargin:0.03 });
       }
       // Crowd Funding System metadata: arena-only donation pool based on
       // fight performance and hype. This is intentionally light-touch –
@@ -1458,6 +1506,7 @@ window.MMA.Zones = {
       }); scene.enemies = [];
       // Reset fight stats for new room
       MMA.UI.resetFightStats();
+      MMA.UI.clearMoveInputDisplay();
       var isClientMp = window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient();
       if (window.MMA && MMA.Enemies && !isClientMp) MMA.Enemies.spawnForRoom(scene, newRoomId);
       if (window.saveGame && !isClientMp) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);

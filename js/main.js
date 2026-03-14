@@ -6,6 +6,11 @@ window.onload = function() {
     if (window.MMA.UI.loadFighterDiary) window.MMA.UI.loadFighterDiary();
     if (window.MMA.UI.loadTechniqueMastery) window.MMA.UI.loadTechniqueMastery();
   }
+  
+  // Ring Rust System: record play time on startup
+  if (window.MMA && window.MMA.Player && window.MMA.Player.recordPlayTime) {
+    window.MMA.Player.recordPlayTime();
+  }
 
   var phaserConfig = {
     type: Phaser.AUTO,

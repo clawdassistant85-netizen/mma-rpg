@@ -4,6 +4,9 @@ window.MMA.Combat = {
   COMBO_WINDOW_MS: 1400,
   COMBO_CHAIN: ['jab', 'cross', 'hook'],
   COMBO_FINISHER_MULTIPLIER: 1.8,
+  COMBO_RECIPE_MIN_LENGTH: 5,
+  COMBO_RECIPE_DAMAGE_MULTIPLIER: 1.1,
+  COMBO_RECIPE_MAX_TRACKED_MOVES: 8,
   PRESSURE_PER_HIT: 25,
   PRESSURE_THRESHOLD: 100,
   PRESSURE_BREAK_MULTIPLIER: 2.5,
@@ -159,6 +162,85 @@ window.MMA.Combat = {
       state.lastHitAt = now;
     }
     return { damage: damage, comboFinished: false };
+  },
+  ensureComboRecipeState: function(scene) {
+    scene.player.comboRecipeState = scene.player.comboRecipeState || {
+      recentMoves: [],
+      recipes: {},
+      lastDiscoveryAt: 0,
+      lastAppliedRecipe: ''
+    };
+    return scene.player.comboRecipeState;
+  },
+  resetComboRecipeChain: function(scene) {
+    var state = this.ensureComboRecipeState(scene);
+    state.recentMoves = [];
+    state.lastAppliedRecipe = '';
+    return state;
+  },
+  trackComboRecipeHit: function(scene, moveKey) {
+    var state = this.ensureComboRecipeState(scene);
+    if (!moveKey) return state;
+
+    state.recentMoves.push(moveKey);
+    if (state.recentMoves.length > this.COMBO_RECIPE_MAX_TRACKED_MOVES) {
+      state.recentMoves.shift();
+    }
+
+    if (state.recentMoves.length < this.COMBO_RECIPE_MIN_LENGTH) return state;
+
+    var recipeMoves = state.recentMoves.slice(-this.COMBO_RECIPE_MIN_LENGTH);
+    var unique = {};
+    for (var i = 0; i < recipeMoves.length; i++) unique[recipeMoves[i]] = true;
+    if (Object.keys(unique).length < this.COMBO_RECIPE_MIN_LENGTH) return state;
+
+    var recipeId = recipeMoves.join('>');
+    if (!state.recipes[recipeId]) {
+      state.recipes[recipeId] = {
+        id: recipeId,
+        moves: recipeMoves.slice(),
+        discoveredAt: scene.time.now,
+        uses: 0
+      };
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 146, 'RECIPE DISCOVERED!', '#ffd166');
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 164, recipeMoves.join(' → ').toUpperCase(), '#ffe8a3');
+      state.lastDiscoveryAt = scene.time.now;
+    }
+
+    return state;
+  },
+  applyComboRecipeBonus: function(scene, moveKey, damage) {
+    var state = this.ensureComboRecipeState(scene);
+    var keys = Object.keys(state.recipes || {});
+    if (!keys.length || !moveKey || state.recentMoves.length < this.COMBO_RECIPE_MIN_LENGTH) {
+      state.lastAppliedRecipe = '';
+      return { damage: damage, recipeActive: false, recipeId: '' };
+    }
+
+    for (var i = 0; i < keys.length; i++) {
+      var recipe = state.recipes[keys[i]];
+      if (!recipe || !recipe.moves || recipe.moves.length !== this.COMBO_RECIPE_MIN_LENGTH) continue;
+      var match = true;
+      for (var j = 0; j < recipe.moves.length; j++) {
+        var idx = state.recentMoves.length - recipe.moves.length + j;
+        if (state.recentMoves[idx] !== recipe.moves[j]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        recipe.uses = (recipe.uses || 0) + 1;
+        state.lastAppliedRecipe = recipe.id;
+        return {
+          damage: Math.round(damage * this.COMBO_RECIPE_DAMAGE_MULTIPLIER),
+          recipeActive: true,
+          recipeId: recipe.id
+        };
+      }
+    }
+
+    state.lastAppliedRecipe = '';
+    return { damage: damage, recipeActive: false, recipeId: '' };
   },
   ensurePressureState: function(scene) {
     scene.player.pressureState = scene.player.pressureState || { meter: 0, primed: false };
@@ -1166,6 +1248,7 @@ window.MMA.Combat = {
     if (MMA.Enemies.recordDamageTrail) MMA.Enemies.recordDamageTrail(enemy, dmg);
     MMA.UI.recordHitDealt(dmg, false, 1);
     MMA.UI.recordMoveUsage(moveKey, scene); // Track move for Style DNA
+    MMA.UI.recordInput(moveKey); // Record input for Move Input Display
     MMA.Player.awardStyleXP(scene, moveKey); // Award style XP
     MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, '-' + dmg, '#ffd54f');
     MMA.VFX.flashEnemyHit(scene, enemy, 90);
@@ -1324,6 +1407,7 @@ window.MMA.Combat = {
       MMA.UI.recordHitDealt(dmg, false, 1);
       MMA.Player.awardStyleXP(scene, subKey);
       MMA.UI.recordMoveUsage(subKey, scene);
+      MMA.UI.recordInput(subKey); // Record input for Move Input Display
       MMA.UI.showDamageText(scene, enemy.x, enemy.y - 36, subMove.name + '!', '#ff66ff');
       MMA.UI.showDamageText(scene, enemy.x, enemy.y - 54, 'SUBMISSION!', '#ff00ff');
       if (injuryAdjusted.bonusPct > 0) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 72, 'INJURY +' + Math.round(injuryAdjusted.bonusPct * 100) + '%', '#ffd166');
@@ -1647,8 +1731,10 @@ window.MMA.Combat = {
         var exploitRecovery = this.applyExploitRecoveryIfActive(scene, momentumDamage);
         var whiffShift = this.applyWhiffShiftIfReady(scene, exploitRecovery.damage);
         var rolled = this.rollDamage(whiffShift.damage, momentum.critChance, momentum.forceCrit || intuitionPrimed);
+        this.trackComboRecipeHit(scene, moveKey);
         var comboResult = this.applyComboBonus(scene, moveKey, rolled.damage, true);
-        var pressureResult = this.applyPressureBreakIfReady(scene, comboResult.damage, enemy);
+        var recipeResult = this.applyComboRecipeBonus(scene, moveKey, comboResult.damage);
+        var pressureResult = this.applyPressureBreakIfReady(scene, recipeResult.damage, enemy);
         var staminaBreakDamage = this.applyStaminaBreakIfActive(scene, enemy, pressureResult.damage);
         var tauntDamage = this.applyTauntDebuffIfActive(scene, enemy, staminaBreakDamage.damage);
         var rageAdjustedDamage = this.applyRageDefenseModifierIfActive(scene, enemy, tauntDamage);
@@ -1682,7 +1768,23 @@ window.MMA.Combat = {
         // Track fight stats
         var comboCount = scene.player.comboState ? scene.player.comboState.index : 1;
         MMA.UI.recordHitDealt(dmg, rolled.crit, comboCount);
+        
+        // Ring Rust: track hits to clear debuff
+        if (scene.player.hasRingRust && scene.player.ringRustHitsThisRoom !== undefined) {
+          scene.player.ringRustHitsThisRoom++;
+          if (scene.player.ringRustHitsThisRoom >= 5) {
+            // Clear ring rust!
+            MMA.Player.clearRingRust();
+            scene.player.hasRingRust = false;
+            scene.player.ringRustSpeedDebuff = 0;
+            scene.player.ringRustAccuracyDebuff = 0;
+            MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'RING RUST CLEARED!', '#ffd700');
+            console.log('[Ring Rust] Cleared after 5 hits');
+          }
+        }
+        
         MMA.UI.recordMoveUsage(moveKey, scene); // Track move for Style DNA
+        MMA.UI.recordInput(moveKey); // Record input for Move Input Display
         MMA.Player.awardStyleXP(scene, moveKey); // Award style XP
         MMA.UI.incrementCombo();
         if (window.sfx) window.sfx.hit();
@@ -1700,6 +1802,7 @@ window.MMA.Combat = {
           adrenalinePrimed = false;
         }
         if (comboResult.comboFinished) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 74, comboResult.comboLabel, '#66ff99');
+        if (recipeResult.recipeActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 84, 'RECIPE BONUS x1.1', '#ffe066');
         if (effectiveDefenseMult > 1) MMA.Enemies.showAdaptiveFeedback(scene, enemy);
         if (injuryAdjusted.bonusPct > 0) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 138, 'INJURY +' + Math.round(injuryAdjusted.bonusPct * 100) + '%', '#ffd166');
         if (pressureResult.pressureBreak) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 74, 'PRESSURE BREAK!', '#ffb347');
@@ -1762,6 +1865,7 @@ window.MMA.Combat = {
     }
     if (!hit) {
       this.applyComboBonus(scene, moveKey, 0, false);
+      this.resetComboRecipeChain(scene);
       this.onPressureMiss(scene);
       this.onMomentumMiss(scene);
       this.onStunChainMiss(scene);
@@ -1819,7 +1923,9 @@ window.MMA.Combat = {
         var exploitRecovery = this.applyExploitRecoveryIfActive(scene, momentumDamage);
         var whiffShift = this.applyWhiffShiftIfReady(scene, exploitRecovery.damage);
         var rolled = this.rollDamage(whiffShift.damage, momentum.critChance, momentum.forceCrit || intuitionPrimed);
-        var pressureResult = this.applyPressureBreakIfReady(scene, rolled.damage, enemy);
+        this.trackComboRecipeHit(scene, bestMoveKey);
+        var recipeResult = this.applyComboRecipeBonus(scene, bestMoveKey, rolled.damage);
+        var pressureResult = this.applyPressureBreakIfReady(scene, recipeResult.damage, enemy);
         var staminaBreakDamage = this.applyStaminaBreakIfActive(scene, enemy, pressureResult.damage);
         var rageAdjustedDamage = this.applyRageDefenseModifierIfActive(scene, enemy, staminaBreakDamage.damage);
         var panicAdjusted = this.applyMentalPanicIfActive(scene, enemy, rageAdjustedDamage);
@@ -1856,6 +1962,7 @@ window.MMA.Combat = {
         if (window.sfx) window.sfx.hit();
         MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, '-' + dmg, rolled.crit ? '#ff6b6b' : '#ffd54f');
         if (rolled.crit) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 48, 'CRIT!', '#ff3333');
+        if (recipeResult.recipeActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 58, 'RECIPE BONUS x1.1', '#ffe066');
         if (intuitionPrimed) {
           MMA.UI.showDamageText(scene, enemy.x, enemy.y - 66, 'FLOW COUNTER!', '#9dff9d');
           scene.time.timeScale = 0.35;
@@ -1928,6 +2035,7 @@ window.MMA.Combat = {
       }
     }
     if (!hit) {
+      this.resetComboRecipeChain(scene);
       this.onPressureMiss(scene);
       this.onMomentumMiss(scene);
       this.onStunChainMiss(scene);
@@ -2026,6 +2134,7 @@ window.MMA.Combat = {
 
     MMA.UI.recordHitDealt(dmg, false, 1);
     MMA.UI.recordMoveUsage('cross', scene);
+    MMA.UI.recordInput('cross'); // Record input for Move Input Display
     MMA.UI.showDamageText(scene, best.x, best.y - 34, 'TECH COUNTER! -' + dmg, '#66e6ff');
     MMA.VFX.flashEnemyHit(scene, best, 120);
     MMA.VFX.showImpactSpark(scene, best.x, best.y, true);

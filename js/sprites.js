@@ -911,6 +911,8 @@ window.MMA.Sprites = {
     // textureEnemyAnimationSet calls deferred — textures not yet used in gameplay
     // Re-enable when animation system consumes _windup/_hit/_death keys
 
+    textureTattooSet('player', { strike: 0xff6b6b, grapple: 0x5dade2, special: 0xf7dc6f });
+
     // --- OPTIONAL TEXTURES (portraits, reactions, auras) ---
     // Skipped during makeEssential() for fast mobile boot. Generated lazily via makeOptional().
     if (!MMA.Sprites._skipOptionalTextures) {
@@ -934,7 +936,6 @@ window.MMA.Sprites = {
     texturePortraitSet('npc_trainer', trainerColors, { accent: 0x52d8b0 });
     texturePortraitSet('npc_coach', coachColors, { accent: 0xffd86b });
     textureReactionFaceSet('player', playerColors);
-    textureTattooSet('player', { strike: 0xff6b6b, grapple: 0x5dade2, special: 0xf7dc6f });
     textureReactionFaceSet('enemy_thug', thugColors);
     textureReactionFaceSet('enemy_brawler', brawlerColors);
     textureReactionFaceSet('enemy_boxer', boxerColors);

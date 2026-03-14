@@ -64,7 +64,7 @@ var BootScene = new Phaser.Class({
     // this.installLimbDamageHook();
     // this.installPortraitHook();
     // this.installReactionFaceHook();
-    // this.installTechniqueTattooHook();
+    this.installTechniqueTattooHook();
     this._updateLoadBar('Variant Hooks');
   },
   _bootStep_portraitHooks: function() {
@@ -73,7 +73,9 @@ var BootScene = new Phaser.Class({
     this._updateLoadBar('Style Aura');
   },
   _bootStep_auraHooks: function() {
-    this.installBossChromaAuraHook();
+    // Permanently disabled: this prototype hook regressed earlier and reintroduced
+    // expensive per-sprite per-frame work on slower devices.
+    // this.installBossChromaAuraHook();
     this._updateLoadBar('Boss Aura');
   },
   _bootStep_combatHooks: function() {

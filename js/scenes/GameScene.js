@@ -95,6 +95,12 @@ var GameScene = new Phaser.Class({
     this.syncPauseButtonVisibility(true);
     if (typeof MMA.UI.showTouchControls === 'function') MMA.UI.showTouchControls(true);
     if (typeof MMA.UI.setActionButtonLabels === 'function') MMA.UI.setActionButtonLabels(false);
+    // Initialize move input display based on settings
+    if (MMA.UI.settings && MMA.UI.settings.showInputDisplay) {
+      if (typeof MMA.UI.showMoveInputDisplay === 'function') MMA.UI.showMoveInputDisplay();
+    } else {
+      if (typeof MMA.UI.hideMoveInputDisplay === 'function') MMA.UI.hideMoveInputDisplay();
+    }
     this.hideGameOverRestartUI();
     this.registry.set('playerStats', Object.assign({}, this.player.stats));
     this.registry.set('unlockedMoves', this.player.unlockedMoves.slice());

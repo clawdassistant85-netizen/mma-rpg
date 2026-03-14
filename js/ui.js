@@ -23,6 +23,38 @@ window.MMA.UI = {
     text: null,
     visible: false
   },
+  // Fight Timer Display - countdown timer for timed challenges
+  fightTimer: {
+    active: false,
+    remainingMs: 0,
+    totalMs: 0,
+    intervalId: null,
+    container: null
+  },
+  // Move Input Display - shows last 6 button inputs
+  moveInputDisplay: {
+    inputs: [], // Array of {type, icon, key}
+    maxInputs: 6,
+    container: null,
+    slots: [],
+    visible: false,
+    // Move type categorization for styling
+    moveTypes: {
+      jab: 'strike', cross: 'strike', hook: 'strike', kick: 'strike', uppercut: 'strike', elbow: 'strike', knee: 'strike',
+      takedown: 'grapple', grapple: 'grapple', clinch: 'grapple', submission: 'grapple', throw: 'grapple', slam: 'grapple',
+      dodge: 'dodge', roll: 'dodge', step: 'dodge',
+      block: 'block', parry: 'block',
+      special: 'special', super: 'special'
+    },
+    // Icon mapping for display
+    moveIcons: {
+      jab: '👊', cross: '👊', hook: '👊', kick: '🦵', uppercut: '⬆️', elbow: '💢', knee: '🦵',
+      takedown: '🤼', grapple: '🤼', clinch: '✊', submission: '🔒', throw: '💫', slam: '🔥',
+      dodge: '💨', roll: '🔄', step: '👟',
+      block: '🛡️', parry: '⚡',
+      special: '⭐', super: '🌟'
+    }
+  },
   // Hype meter for crowd engagement
   hypeMeter: {
     value: 0,
@@ -1830,14 +1862,15 @@ window.MMA.UI = {
     soundVolume: 0.8,
     musicVolume: 0.6,
     showHud: true,
-    vibration: true
+    vibration: true,
+    showInputDisplay: true
   },
   showSettingsMenu: function(scene) {
     var self = this;
     var W = scene.cameras.main.width;
     var H = scene.cameras.main.height;
     var cw = Math.min(340, W - 60);
-    var ch = Math.min(420, H - 80);
+    var ch = Math.min(480, H - 80);
     var cx = (W - cw) / 2;
     var cy = (H - ch) / 2;
     var con = scene.add.container(cx, cy);
@@ -1931,6 +1964,32 @@ window.MMA.UI = {
     hudToggle.setInteractive({ useHandCursor: true });
     hudToggle.on('pointerdown', function() { self.settings.showHud = !self.settings.showHud; self.showSettingsMenu(scene); });
     con.add(hudToggle);
+    
+    // Input Display toggle
+    var inputY = startY + rowHeight * 5;
+    con.add(scene.add.text(labelX, inputY, 'Input Display', { fontSize: '14px', color: '#ffffff' }).setOrigin(0, 0.5));
+    var inputToggle = scene.add.container(cw - 60, inputY);
+    var inputBg = scene.add.graphics();
+    var isInputOn = this.settings.showInputDisplay;
+    inputBg.fillStyle(isInputOn ? 0x44ff88 : 0x333333, 1);
+    inputBg.fillRoundedRect(-20, -12, 40, 24, 12);
+    inputToggle.add(inputBg);
+    var inputKnob = scene.add.graphics();
+    inputKnob.fillStyle(0xffffff, 1);
+    inputKnob.fillCircle(isInputOn ? 8 : -8, 0, 8);
+    inputToggle.add(inputKnob);
+    inputToggle.setSize(40, 24);
+    inputToggle.setInteractive({ useHandCursor: true });
+    inputToggle.on('pointerdown', function() { 
+      self.settings.showInputDisplay = !self.settings.showInputDisplay; 
+      if (self.settings.showInputDisplay) {
+        self.showMoveInputDisplay();
+      } else {
+        self.hideMoveInputDisplay();
+      }
+      self.showSettingsMenu(scene); 
+    });
+    con.add(inputToggle);
     
     var closeBtn = scene.add.text(cw / 2, ch - 48, 'CLOSE', {
       fontSize: '13px',
@@ -2258,5 +2317,161 @@ window.MMA.UI = {
     if (special) { special.style.left = hOffset + "px"; special.style.bottom = topPad + "px"; }
     if (startBtn) { startBtn.style.bottom = landscape ? "6%" : "9%"; var fs = Math.min(20, Math.floor(minDim * 0.04)); startBtn.style.fontSize = fs + "px"; startBtn.style.padding = (fs * 0.8) + "px " + (fs * 1.7) + "px"; }
     if (pauseBtn) { var pSize = Math.max(34, Math.floor(minDim * 0.07)); pauseBtn.style.width = pSize + "px"; pauseBtn.style.height = pSize + "px"; pauseBtn.style.lineHeight = pSize + "px"; pauseBtn.style.fontSize = Math.max(16, Math.floor(pSize * 0.52)) + "px"; }
+  },
+  // Move Input Display - record and show last 6 inputs
+  recordInput: function(moveKey) {
+    var display = this.moveInputDisplay;
+    var moveTypes = display.moveTypes;
+    var moveIcons = display.moveIcons;
+    
+    // Determine move type
+    var moveType = moveTypes[moveKey] || 'special';
+    var icon = moveIcons[moveKey] || '❓';
+    
+    // Add new input
+    display.inputs.unshift({ key: moveKey, type: moveType, icon: icon });
+    
+    // Keep only maxInputs
+    if (display.inputs.length > display.maxInputs) {
+      display.inputs.pop();
+    }
+    
+    // Update DOM
+    this._updateMoveInputDisplay();
+  },
+  _updateMoveInputDisplay: function() {
+    var display = this.moveInputDisplay;
+    var container = document.getElementById('move-input-display');
+    if (!container) return;
+    
+    var slots = container.querySelectorAll('.input-slot');
+    if (!slots || slots.length === 0) return;
+    
+    display.inputs.forEach(function(input, idx) {
+      if (idx < slots.length) {
+        var slot = slots[idx];
+        slot.textContent = input.icon;
+        slot.className = 'input-slot ' + input.type + (idx === 0 ? ' latest' : '');
+      }
+    });
+    
+    // Clear remaining slots
+    for (var i = display.inputs.length; i < slots.length; i++) {
+      slots[i].textContent = '';
+      slots[i].className = 'input-slot';
+    }
+  },
+  showMoveInputDisplay: function() {
+    var container = document.getElementById('move-input-display');
+    if (!container) return;
+    container.classList.add('visible');
+    this.moveInputDisplay.visible = true;
+  },
+  hideMoveInputDisplay: function() {
+    var container = document.getElementById('move-input-display');
+    if (!container) return;
+    container.classList.remove('visible');
+    this.moveInputDisplay.visible = false;
+  },
+  clearMoveInputDisplay: function() {
+    this.moveInputDisplay.inputs = [];
+    this._updateMoveInputDisplay();
+  },
+  // Fight Timer - countdown for timed challenges
+  startFightTimer: function(scene, durationMs) {
+    this.fightTimer.remainingMs = durationMs;
+    this.fightTimer.totalMs = durationMs;
+    this.fightTimer.active = true;
+    
+    var container = document.getElementById('fight-timer-display');
+    if (!container) return;
+    
+    container.classList.add('visible');
+    this._updateFightTimerDisplay();
+    
+    // Clear existing interval
+    if (this.fightTimer.intervalId) {
+      clearInterval(this.fightTimer.intervalId);
+    }
+    
+    var self = this;
+    this.fightTimer.intervalId = setInterval(function() {
+      if (!self.fightTimer.active) {
+        clearInterval(self.fightTimer.intervalId);
+        return;
+      }
+      self.fightTimer.remainingMs -= 100;
+      if (self.fightTimer.remainingMs <= 0) {
+        self.fightTimer.remainingMs = 0;
+        self.endFightTimer();
+        // Trigger timer expire event
+        if (scene && scene.events) {
+          scene.events.emit('timerExpired');
+        }
+      }
+      self._updateFightTimerDisplay();
+    }, 100);
+  },
+  _updateFightTimerDisplay: function() {
+    var container = document.getElementById('fight-timer-display');
+    if (!container) return;
+    
+    var ms = this.fightTimer.remainingMs;
+    var totalMs = this.fightTimer.totalMs;
+    var seconds = Math.ceil(ms / 1000);
+    var display = container.querySelector('.timer-value');
+    
+    if (display) {
+      display.textContent = '00:' + (seconds < 10 ? '0' : '') + seconds;
+    }
+    
+    // Update color state based on remaining time
+    var pct = totalMs > 0 ? ms / totalMs : 0;
+    container.classList.remove('warning', 'critical');
+    if (pct <= 0.1) {
+      container.classList.add('critical');
+    } else if (pct <= 0.3) {
+      container.classList.add('warning');
+    }
+  },
+  endFightTimer: function() {
+    this.fightTimer.active = false;
+    var container = document.getElementById('fight-timer-display');
+    if (container) {
+      container.classList.remove('visible', 'warning', 'critical');
+    }
+    if (this.fightTimer.intervalId) {
+      clearInterval(this.fightTimer.intervalId);
+      this.fightTimer.intervalId = null;
+    }
+  },
+  getFightTimerRemaining: function() {
+    return this.fightTimer.remainingMs;
+  },
+  isFightTimerActive: function() {
+    return this.fightTimer.active;
+  },
+  // Get weight class from stats
+  getWeightClass: function(stats) {
+    var speed = stats.speed || 10;
+    var power = stats.power || 10;
+    var total = speed + power;
+    if (total <= 15) return { name: 'Featherweight', bonus: '+Speed', icon: '🪶' };
+    if (total <= 22) return { name: 'Lightweight', bonus: '+Agility', icon: '⚡' };
+    if (total <= 30) return { name: 'Welterweight', bonus: '+Power', icon: '💪' };
+    if (total <= 40) return { name: 'Middleweight', bonus: '+Balance', icon: '🏋️' };
+    return { name: 'Heavyweight', bonus: '+Damage', icon: '👹' };
+  },
+  // Update weight class indicator in DOM
+  updateWeightClassFromDOM: function(stats) {
+    var el = document.getElementById('weight-class-indicator');
+    if (!el) return;
+    var wc = this.getWeightClass(stats);
+    var iconEl = el.querySelector('.wc-icon');
+    var nameEl = el.querySelector('.wc-name');
+    var bonusEl = el.querySelector('.wc-bonus');
+    if (iconEl) iconEl.textContent = wc.icon;
+    if (nameEl) nameEl.textContent = wc.name;
+    if (bonusEl) bonusEl.textContent = wc.bonus;
   }
 };

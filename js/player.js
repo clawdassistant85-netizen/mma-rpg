@@ -1,5 +1,42 @@
 window.MMA = window.MMA || {};
 window.MMA.Player = {
+  // Ring Rust System - track idle time between sessions
+  RING_RUST_KEY: 'mma_rpg_last_played',
+  RING_RUST_DAYS: 3, // Days before ring rust applies
+  RING_RUST_SPEED_DEBUFF: 0.10, // -10% movement speed
+  RING_RUST_ACCURACY_DEBUFF: 0.05, // -5% accuracy
+  
+  // Check and apply ring rust on load
+  checkRingRust: function() {
+    var lastPlayed = localStorage.getItem(this.RING_RUST_KEY);
+    if (!lastPlayed) return { hasRust: false };
+    
+    var lastDate = new Date(parseInt(lastPlayed));
+    var now = new Date();
+    var daysDiff = Math.floor((now - lastPlayed) / (1000 * 60 * 60 * 24));
+    
+    return {
+      hasRust: daysDiff >= this.RING_RUST_DAYS,
+      daysSince: daysDiff
+    };
+  },
+  
+  // Record current play time (call on game start)
+  recordPlayTime: function() {
+    localStorage.setItem(this.RING_RUST_KEY, String(Date.now()));
+  },
+  
+  // Clear ring rust after player lands 5+ hits in first fight
+  clearRingRust: function() {
+    if (localStorage.getItem('mma_rpg_ring_rust_cleared') === 'true') return;
+    localStorage.setItem('mma_rpg_ring_rust_cleared', 'true');
+  },
+  
+  // Check if ring rust has been cleared this session
+  hasRingRustBeenCleared: function() {
+    return localStorage.getItem('mma_rpg_ring_rust_cleared') === 'true';
+  },
+  
   create: function(scene) {
     var DT = CONFIG.DISPLAY_TILE;
     scene.player = scene.physics.add.sprite(8 * DT, 6 * DT, 'player');
@@ -69,6 +106,22 @@ window.MMA.Player = {
     // Apply outfit modifiers
     this.applyOutfitModifiers(scene);
     
+    // Apply Ring Rust debuff if player hasn't played in 3+ days
+    var rustCheck = this.checkRingRust();
+    var rustCleared = this.hasRingRustBeenCleared();
+    scene.player.hasRingRust = rustCheck.hasRust && !rustCleared;
+    if (scene.player.hasRingRust) {
+      // Apply debuffs: -10% speed, -5% accuracy (stored as debuff flags)
+      scene.player.ringRustSpeedDebuff = this.RING_RUST_SPEED_DEBUFF;
+      scene.player.ringRustAccuracyDebuff = this.RING_RUST_ACCURACY_DEBUFF;
+      console.log('[Ring Rust] Active - ' + rustCheck.daysSince + ' days since last play');
+    } else {
+      scene.player.ringRustSpeedDebuff = 0;
+      scene.player.ringRustAccuracyDebuff = 0;
+    }
+    // Track ring rust hits this room (need 5 hits to clear)
+    scene.player.ringRustHitsThisRoom = 0;
+    
     // Set player texture based on equipped outfit
     var outfit = MMA.Outfits.getEquippedOutfit();
     if (outfit) {
@@ -106,6 +159,10 @@ window.MMA.Player = {
     }
     var vx = 0, vy = 0;
     var baseSpeed = CONFIG.PLAYER_SPEED + (scene.player.speedBonus || 0);
+    // Ring Rust debuff: -10% speed if active
+    if (scene.player.ringRustSpeedDebuff) {
+      baseSpeed *= (1 - scene.player.ringRustSpeedDebuff);
+    }
     // Weather effects: rain makes movement slippery
     var weatherSlippery = scene.registry.get('weatherSlippery');
     if (weatherSlippery) {

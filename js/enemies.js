@@ -14,6 +14,19 @@ window.MMA.Enemies = {
     return pack * vengeance * injury * enrage * elite;
   },
   // Mercenary Contracts: boosts enemy stats when active (purchased by player)
+  // Apply selected contract multipliers to enemy stats
+  applyContract: function(enemy, contractLevel) {
+    var contract = this.MERCENARY_CONTRACTS[contractLevel] || this.MERCENARY_CONTRACTS.none;
+    if (enemy && typeof enemy.maxHp === 'number') {
+      enemy.maxHp = Math.round(enemy.maxHp * contract.hpMultiplier);
+    }
+    if (enemy && typeof enemy.attack === 'number') {
+      enemy.attack = Math.round(enemy.attack * contract.attackMultiplier);
+    }
+    // Store xp multiplier for later use (e.g., reward calculation)
+    enemy.xpMultiplier = contract.xpMultiplier || 1;
+    return enemy;
+  },
   MERCENARY_CONTRACTS: {
     // No contract: default behavior
     none: { hpMultiplier: 1, attackMultiplier: 1, xpMultiplier: 1 },
@@ -6060,149 +6073,6 @@ window.MMA.Enemies.AI = {
     if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
   },
 
-  // Drunk Monk AI: unpredictable attack patterns - swings wildly, trips randomly,
-  // occasionally lands devastating accidental hits. Creates unsettling RNG element.
-  drunkMonk: function(enemy, player, scene, dt) {
-    var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
-    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
-    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
-    var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
-    var vengeanceMult = window.MMA.Enemies.getVengeanceDamageMult(enemy);
-
-    // Initialize drunk state tracking
-    if (enemy._drunkState === undefined) {
-      enemy._drunkState = 'wander'; // wander, stumble, attack, trip, recover
-      enemy._drunkTimer = 0;
-      enemy._drunkDirection = Math.random() * Math.PI * 2;
-      enemy._luckyHitChance = 0.08; // 8% chance for devastating lucky hit
-    }
-
-    // State machine for drunk behavior
-    if (enemy._drunkState === 'wander') {
-      enemy.setVelocity(0, 0);
-      enemy._drunkTimer -= dt;
-
-      // Random direction changes while wandering
-      if (Math.random() < 0.02) {
-        enemy._drunkDirection = Math.random() * Math.PI * 2;
-      }
-
-      // Move in random direction, generally toward player but erratically
-      var towardPlayer = Math.atan2(dy, dx);
-      var wanderAngle = towardPlayer + (Math.random() - 0.5) * 1.5; // Wide variance
-      var speed = enemy.type.speed * 0.4 * speedMod;
-
-      enemy.setVelocity(Math.cos(wanderAngle) * speed, Math.sin(wanderAngle) * speed);
-
-      if (enemy._drunkTimer <= 0) {
-        // Randomly transition to next state
-        var rand = Math.random();
-        if (rand < 0.35) {
-          enemy._drunkState = 'stumble';
-          enemy._drunkTimer = 400 + Math.random() * 300;
-          enemy.setVelocity(0, 0);
-          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 40, 'WOAH!', '#aa66aa');
-        } else if (rand < 0.65 && dist < enemy.type.chaseRange) {
-          enemy._drunkState = 'wildSwing';
-          enemy._drunkTimer = 200 + Math.random() * 200;
-          enemy.setVelocity(0, 0);
-        } else if (rand < 0.85 && dist < enemy.type.attackRange) {
-          enemy._drunkState = 'trip';
-          enemy._drunkTimer = 600 + Math.random() * 400;
-          enemy.setVelocity(0, 0);
-          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 40, 'OOPS!', '#aa66aa');
-        } else {
-          enemy._drunkState = 'wander';
-          enemy._drunkTimer = 800 + Math.random() * 600;
-        }
-      }
-    }
-    else if (enemy._drunkState === 'stumble') {
-      // Stumble around unpredictably
-      enemy._drunkTimer -= dt;
-
-      // Rapid direction changes during stumble
-      if (Math.random() < 0.15) {
-        enemy._drunkDirection = Math.random() * Math.PI * 2;
-      }
-
-      var stumbleSpeed = enemy.type.speed * 0.6 * speedMod;
-      enemy.setVelocity(Math.cos(enemy._drunkDirection) * stumbleSpeed, Math.sin(enemy._drunkDirection) * stumbleSpeed);
-
-      if (enemy._drunkTimer <= 0) {
-        enemy._drunkState = 'wander';
-        enemy._drunkTimer = 600 + Math.random() * 800;
-      }
-    }
-    else if (enemy._drunkState === 'wildSwing') {
-      // Wild swinging attack - less accurate but can be devastating
-      enemy._drunkTimer -= dt;
-      enemy.setVelocity(0, 0);
-
-      if (enemy._drunkTimer <= 0 && enemy.attackCooldown <= 0) {
-        enemy.attackCooldown = enemy.type.attackCooldownMax * 1.5 * attackMod;
-
-        // Check for lucky critical hit
-        var isLucky = Math.random() < enemy._luckyHitChance;
-        var damageMult = isLucky ? 2.5 : 0.7; // Lucky = 2.5x, Normal = 0.7x (less accurate)
-        var tMult = window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(enemy, scene) : 1;
-
-        var dmg = Math.round(enemy.type.attackDamage * damageMult * vulnMult * vengeanceMult * tMult);
-        window.MMA.Enemies.damagePlayer(enemy, scene, dmg);
-
-        var hitText = isLucky ? 'LUCKY SHOT!' : 'WILD SWING!';
-        var hitColor = isLucky ? '#ffff00' : '#aa66aa';
-        MMA.UI.showDamageText(scene, player.x, player.y - 30, hitText + ' -' + dmg, hitColor);
-
-        enemy._drunkState = 'recover';
-        enemy._drunkTimer = 500 + Math.random() * 400;
-      }
-    }
-    else if (enemy._drunkState === 'trip') {
-      // Trip and fall - but can land on player for damage
-      enemy._drunkTimer -= dt;
-      enemy.setVelocity(0, 0);
-
-      if (enemy._drunkTimer <= 0 && enemy.attackCooldown <= 0) {
-        enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod;
-
-        // Check if tripped INTO player (lucky fall damage)
-        var distToPlayer = Math.sqrt(Math.pow(player.x - enemy.x, 2) + Math.pow(player.y - enemy.y, 2));
-        var landedOnPlayer = distToPlayer < enemy.type.attackRange * 1.5;
-
-        if (landedOnPlayer) {
-          var isLucky = Math.random() < enemy._luckyHitChance;
-          var damageMult = isLucky ? 3.0 : 1.2;
-          var tMult = window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(enemy, scene) : 1;
-
-          var dmg = Math.round(enemy.type.attackDamage * damageMult * vulnMult * vengeanceMult * tMult);
-          window.MMA.Enemies.damagePlayer(enemy, scene, dmg);
-
-          var hitText = isLucky ? 'CRASH LAND!' : 'OOPS!';
-          var hitColor = isLucky ? '#ff0000' : '#aa66aa';
-          MMA.UI.showDamageText(scene, player.x, player.y - 30, hitText + ' -' + dmg, hitColor);
-        } else {
-          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, 'TRIPPED!', '#aa66aa');
-        }
-
-        enemy._drunkState = 'recover';
-        enemy._drunkTimer = 700 + Math.random() * 500;
-      }
-    }
-    else if (enemy._drunkState === 'recover') {
-      // Recovering from wild action
-      enemy._drunkTimer -= dt;
-      enemy.setVelocity(0, 0);
-
-      if (enemy._drunkTimer <= 0) {
-        enemy._drunkState = 'wander';
-        enemy._drunkTimer = 500 + Math.random() * 700;
-      }
-    }
-
-    // Always reduce attack cooldown
-    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
-  },
 
   // Trickster AI: special enemy that vanishes and reappears behind the player during combat
   // Requires quick camera awareness to defend. Visual: dissolve particle effect followed by reappearance behind player
