@@ -2795,22 +2795,44 @@ window.MMA.Enemies = {
         return Math.sqrt(dx*dx+dy*dy) <= PACK_RADIUS;
       });
       var bonus = closeAllies.length > 0 ? SPEED_BONUS : 0;
-      // Coach support: increase attack speed of nearby allies (+15% per Coach within radius 120)
-      var coachBonus = 0;
-      var COACH_RADIUS = 120;
+      // Coach support: boosts nearby allies' attack speed.
+      // IMPORTANT: attackSpeedMod is a *cooldown multiplier* (lower = faster).
+      // We track and replace coach/enrage multipliers each frame to avoid compounding.
+      var coachCfg = self.COACH_CONFIG || { BOOST_RADIUS: 200, ATTACK_SPEED_BONUS: 0.15 };
+      var coachRadius = coachCfg.BOOST_RADIUS || 200;
+      var perCoach = coachCfg.ATTACK_SPEED_BONUS || 0.15;
+
       var coachCount = allies.filter(function(other){
         if (other.typeKey !== 'coach') return false;
         var dx = other.x - e.x, dy = other.y - e.y;
-        return Math.sqrt(dx*dx+dy*dy) <= COACH_RADIUS;
+        return Math.sqrt(dx*dx+dy*dy) <= coachRadius;
       }).length;
+
+      // Convert "+attack speed" into cooldown multiplier.
+      // Example: 1 coach at +15% attack speed => 0.85 cooldown multiplier.
+      var coachAttackMult = 1;
       if (coachCount > 0) {
-        coachBonus = coachCount * 0.15; // 15% per coach
+        coachAttackMult = Math.max(0.55, 1 - (coachCount * perCoach));
+
+        // Cosmetic: occasional coaching toast on buffed allies (not on the coach itself).
+        if (e.typeKey !== 'coach' && (!e._coachToastAt || (now - e._coachToastAt) > 1800) && typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+          e._coachToastAt = now;
+          MMA.UI.showDamageText(scene, e.x, e.y - 40, 'COACHED!', '#33ffcc');
+        }
       }
-      e.attackSpeedMod = (e.attackSpeedMod || 1) * (1 + coachBonus);
-      // Apply enrage attack speed bonus if active (+30% faster attacks)
-      if (e.enrageAttackBonus) {
-        e.attackSpeedMod = e.attackSpeedMod * (1 - e.enrageAttackBonus); // Reduce cooldown multiplier
-      }
+
+      // Apply coach multiplier without compounding.
+      var prevCoach = (typeof e._coachLastAttackMult === 'number') ? e._coachLastAttackMult : 1;
+      e.attackSpeedMod = (e.attackSpeedMod || 1) / prevCoach;
+      e._coachLastAttackMult = coachAttackMult;
+      e.attackSpeedMod = e.attackSpeedMod * coachAttackMult;
+
+      // Apply enrage attack speed bonus if active (+30% faster attacks) without compounding.
+      var enrageAttackMult = (e.enrageAttackBonus) ? (1 - e.enrageAttackBonus) : 1;
+      var prevEnrage = (typeof e._enrageLastAttackMult === 'number') ? e._enrageLastAttackMult : 1;
+      e.attackSpeedMod = (e.attackSpeedMod || 1) / prevEnrage;
+      e._enrageLastAttackMult = enrageAttackMult;
+      e.attackSpeedMod = e.attackSpeedMod * enrageAttackMult;
       // Apply enrage speed bonus if active (+25% move speed)
       var enrageSpeedBonus = (e.enrageSpeedBonus || 0);
       // Cap speed at double baseSpeed (including enrage bonus)

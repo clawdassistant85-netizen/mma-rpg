@@ -234,6 +234,16 @@
       50% { opacity: 1; }
     }
     
+    /* Screen Flash Overlay - colored flashes for different attack types */
+    #screen-flash-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 27;
+      transition: opacity 50ms ease;
+    }
+    
     /* Weight Class Indicator - DOM-based HUD element */
     #weight-class-indicator {
       position: fixed;
@@ -301,6 +311,7 @@
     <div id="game-container"></div>
     <!-- UI layer (mobile touch controls) -->
     <div id="ui-layer" aria-hidden="true">
+      <div id="screen-flash-overlay"></div>
       <div id="health-pulse-overlay"></div>
       <div id="danger-warning-overlay"></div>
       <div id="weight-class-indicator" title="Weight class affects speed/power">

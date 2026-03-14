@@ -4076,5 +4076,87 @@ window.MMA.UI = {
     if (special) { special.style.left = hOffset + "px"; special.style.right = 'auto'; special.style.bottom = topPad + "px"; special.style.top = 'auto'; }
     if (startBtn) { startBtn.style.bottom = landscape ? "6%" : "9%"; var fs = Math.min(20, Math.floor(minDim * 0.04)); startBtn.style.fontSize = fs + "px"; startBtn.style.padding = (fs * 0.8) + "px " + (fs * 1.7) + "px"; }
     if (pauseBtn) { var pSize = Math.max(34, Math.floor(minDim * 0.07)); pauseBtn.style.width = pSize + "px"; pauseBtn.style.height = pSize + "px"; pauseBtn.style.lineHeight = pSize + "px"; pauseBtn.style.fontSize = Math.max(16, Math.floor(pSize * 0.52)) + "px"; }
-  }
+  },
+  // Screen Flash Color Coding - different colored flashes for different attack types
+  // Provides quick visual communication of damage type to player
+  screenFlash: {
+    overlay: null,
+    active: false,
+    // Flash colors and durations for different attack types
+    flashTypes: {
+      strike: { color: 'rgba(255, 255, 255,', duration: 120, intensity: 0.25 },
+      grapple: { color: 'rgba(68, 136, 255,', duration: 150, intensity: 0.35 },
+      critical: { color: 'rgba(255, 215, 0,', duration: 200, intensity: 0.4 },
+      finishing: { color: 'rgba(255, 0, 0,', duration: 400, intensity: 0.5 },
+      heal: { color: 'rgba(0, 255, 136,', duration: 180, intensity: 0.25 },
+      damage: { color: 'rgba(255, 68, 68,', duration: 100, intensity: 0.2 }
+    }
+  },
+  // Get or create screen flash overlay element
+  getScreenFlashOverlay: function() {
+    if (!this.screenFlash.overlay) {
+      var el = document.getElementById('screen-flash-overlay');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'screen-flash-overlay';
+        el.style.cssText = 'position:absolute;inset:0;pointer-events:none;opacity:0;z-index:27;transition:opacity 50ms ease;';
+        document.getElementById('game-shell').appendChild(el);
+      }
+      this.screenFlash.overlay = el;
+    }
+    return this.screenFlash.overlay;
+  },
+  // Trigger a screen flash based on attack type
+  // type: 'strike' | 'grapple' | 'critical' | 'finishing' | 'heal' | 'damage'
+  triggerScreenFlash: function(scene, type, intensityMultiplier) {
+    var flash = this.screenFlash;
+    var flashConfig = flash.flashTypes[type] || flash.flashTypes.damage;
+    
+    // Apply intensity multiplier (e.g., higher combos = more intense)
+    var intensity = Math.min(0.8, flashConfig.intensity * (intensityMultiplier || 1));
+    var duration = flashConfig.duration;
+    
+    // For finishing moves and high-intensity hits, increase duration
+    if (type === 'finishing' || type === 'critical') {
+      duration = Math.min(600, duration * (intensityMultiplier || 1));
+    }
+    
+    var overlay = this.getScreenFlashOverlay();
+    if (!overlay) return;
+    
+    // Set flash color and show
+    overlay.style.background = flashConfig.color + intensity + ')';
+    overlay.style.opacity = '1';
+    
+    // Fade out
+    var self = this;
+    clearTimeout(this._flashTimeout);
+    this._flashTimeout = setTimeout(function() {
+      overlay.style.transition = 'opacity ' + duration + 'ms ease-out';
+      overlay.style.opacity = '0';
+      
+      // Reset transition after fade
+      setTimeout(function() {
+        overlay.style.transition = 'opacity 50ms ease';
+      }, duration);
+    }, 20);
+    
+    // Play sound if available
+    try {
+      if (window.sfx) {
+        if (type === 'heal') {
+          // Could add heal sound
+        } else if (type === 'finishing') {
+          // Could add KO sound
+        }
+      }
+    } catch(e) {}
+  },
+  // Convenience methods for common flash types
+  flashStrike: function(scene, intensity) { this.triggerScreenFlash(scene, 'strike', intensity); },
+  flashGrapple: function(scene, intensity) { this.triggerScreenFlash(scene, 'grapple', intensity); },
+  flashCritical: function(scene, intensity) { this.triggerScreenFlash(scene, 'critical', intensity); },
+  flashFinishing: function(scene, intensity) { this.triggerScreenFlash(scene, 'finishing', intensity); },
+  flashHeal: function(scene) { this.triggerScreenFlash(scene, 'heal', 1); },
+  flashDamage: function(scene) { this.triggerScreenFlash(scene, 'damage', 1); }
 };

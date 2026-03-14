@@ -108,6 +108,11 @@ window.onload = function() {
   btn.addEventListener('click', startGameFromDom);
   btn.addEventListener('touchstart', startGameFromDom, { passive: false });
 
+  // Auto-start for testing (add ?autostart=1 to URL)
+  if (window.location.search.indexOf('autostart=1') !== -1) {
+    setTimeout(function() { startGameFromDom(); }, 2000);
+  }
+
   // Also listen for Enter key at document level
   function onEnter(e) {
     if (e.key === 'Enter' || e.keyCode === 13) {

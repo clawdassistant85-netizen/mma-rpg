@@ -16,6 +16,54 @@ document it here. The Reviewer agent will integrate these.
 - **Status**: 🔲 Not implemented
 - **Added**: 2026-03-14
 
+### Spirit Animal Companion Feature
+- **Module**: Sprites (js/sprites.js)
+- **Target file**: js/player.js, js/combat.js, js/ui.js, js/scenes/GameScene.js
+- **Description**: Persistent companion (raven/wolf/panther/hawk) follows player, reacts to combat with animations, provides passive buffs. Requires sprites.js to render companion, player.js to store companion type and apply buffs, combat.js for reaction triggers, ui.js for companion selection/upgrade UI, GameScene.js for spawning and lifecycle.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Technique Genealogy System Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/player.js, js/ui.js, js/main.js
+- **Description**: Moves chain together to create "descendant" variants. Frequent combos (5+ uses) evolve into new techniques with combined properties. Requires combat.js to track move sequences and detect genealogy triggers, player.js to store descendant techniques and apply their properties, ui.js for genealogy tree visualization, main.js for persistence.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Crowd Personality Registry Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/combat.js, js/player.js, js/ui.js, js/sprites.js
+- **Description**: Specific crowd members have persistent personalities affecting combat. Hype Man/Skeptic/Old School types react differently to player actions. Requires zones.js to spawn personality crowd, sprites.js to render unique crowd members, combat.js to apply personality effects, player.js to track relationships, ui.js for relationship display.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Signature Gesture System Feature
+- **Module**: Sprites (js/sprites.js)
+- **Target file**: js/combat.js, js/player.js, js/ui.js
+- **Description**: Personal taunts/celebrations evolve through use. 10 uses = Mark II variant, 15 uses = champion variant with particles. Enemies react to signature gestures. Requires sprites.js for gesture animation variants, combat.js to track gesture usage, player.js to store gesture unlocks, ui.js for gesture selection and enemy reaction display.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Weather Adaptation System Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/player.js, js/combat.js, js/ui.js
+- **Description**: Fight in specific weather types to gain affinity bonuses. Rain/gym/clear/night each provide +10% damage and +5% stamina efficiency when fighting in that weather again. Weekly weather rotation and "Weather Mastery" achievement. Requires zones.js to define weather per zone, player.js to track affinities and apply bonuses, combat.js for combat state, ui.js for affinity display.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Signature Home Arena Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/player.js, js/ui.js, js/scenes/GameScene.js, js/combat.js
+- **Description**: After Zone 4 championship, unlock personal arena customization (theme, crowd, features). Home arena grants +5% all stats. Enables Title Defense mode. Requires zones.js to define customizable arena templates, player.js to store customization and apply home-field bonus, ui.js for customization UI, GameScene.js for home arena rendering, combat.js for challenger AI.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
 ### Tutorial Archive Feature
 - **Module**: Player (js/player.js)
 - **Target file**: js/scenes/GameScene.js, js/combat.js, js/ui.js
