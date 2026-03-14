@@ -185,23 +185,22 @@ window.MMA.Enemies = {
 
   // Get scouting info for UI display
   // Opponent Weight Indicator Feature
-  // Define weight class thresholds based on enemy max HP (example values)
+  // NOTE: this is a small helper used by scouting/UI; the in-combat Weight Read system
+  // has its own light/medium/heavy icons and tradeoffs.
   WEIGHT_CLASS: {
-    LIGHT: { maxHp: 200, icon: '🪶' }, // feather icon
-    MEDIUM: { maxHp: 400, icon: '✊' }, // fist icon
-    HEAVY: { maxHp: 800, icon: '🪨' }, // rock icon
-    BOSS: { maxHp: Infinity, icon: '👑' } // crown for bosses
+    LIGHT: { maxHp: 200, icon: '🪶' },  // feather
+    MEDIUM: { maxHp: 400, icon: '🥊' }, // boxing glove
+    HEAVY: { maxHp: 800, icon: '🪨' },  // rock
+    BOSS: { maxHp: Infinity, icon: '👑' } // crown
   },
-  // Determine weight class for an enemy instance
+  // Determine weight class for an enemy instance.
+  // IMPORTANT: do not rely on object iteration order (BOSS has Infinity).
   getWeightClass: function(enemy) {
     var hp = enemy && enemy.maxHp ? enemy.maxHp : 0;
-    var classes = this.WEIGHT_CLASS;
-    for (var key in classes) {
-      if (hp <= classes[key].maxHp) {
-        return { class: key, icon: classes[key].icon };
-      }
-    }
-    return { class: 'UNKNOWN', icon: '?' };
+    if (hp <= this.WEIGHT_CLASS.LIGHT.maxHp) return { class: 'LIGHT', icon: this.WEIGHT_CLASS.LIGHT.icon };
+    if (hp <= this.WEIGHT_CLASS.MEDIUM.maxHp) return { class: 'MEDIUM', icon: this.WEIGHT_CLASS.MEDIUM.icon };
+    if (hp <= this.WEIGHT_CLASS.HEAVY.maxHp) return { class: 'HEAVY', icon: this.WEIGHT_CLASS.HEAVY.icon };
+    return { class: 'BOSS', icon: this.WEIGHT_CLASS.BOSS.icon };
   },
   getScoutInfo: function(typeKey) {
     var level = this.getScoutLevel(typeKey);
