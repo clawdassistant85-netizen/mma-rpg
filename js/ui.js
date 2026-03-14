@@ -2174,6 +2174,210 @@ window.MMA.UI = {
     el.style.borderColor = wc.color;
     el.style.color = wc.color;
   },
+  // Enemy Threat Indicator - shows what type of enemy you're fighting
+  enemyThreatIndicator: {
+    container: null,
+    icon: null,
+    label: null,
+    currentEnemyType: null,
+    currentEnemyName: null
+  },
+  // Enemy type definitions for display
+  enemyTypeDefs: {
+    striker: { icon: '👊', name: 'Striker', color: '#ff4444', desc: 'Fast combos' },
+    grappler: { icon: '🤼', name: 'Grappler', color: '#4488ff', desc: 'Ground game' },
+    kickboxer: { icon: '🦵', name: 'Kickboxer', color: '#ff8800', desc: 'Long range' },
+    wrestler: { icon: '🏋️', name: 'Wrestler', color: '#44ff88', desc: 'Power moves' },
+    elite: { icon: '⭐', name: 'Elite', color: '#ffaa00', desc: 'Stronger variant' },
+    boss: { icon: '👹', name: 'Boss', color: '#ff0044', desc: 'Major threat' },
+    coach: { icon: '🎓', name: 'Coach', color: '#aa44ff', desc: 'Support' },
+    default: { icon: '❓', name: 'Unknown', color: '#888888', desc: 'Unidentified' }
+  },
+  // Show Enemy Threat Indicator in HUD
+  showEnemyThreatIndicator: function(scene) {
+    if (this.enemyThreatIndicator.container) return this.enemyThreatIndicator.container;
+    
+    var rightX = scene.cameras.main.width - 30;
+    var topY = 180;
+    
+    var container = scene.add.container(rightX, topY);
+    container.setDepth(50);
+    
+    // Background pill
+    var bg = scene.add.graphics();
+    bg.fillStyle(0x000000, 0.6);
+    bg.fillRoundedRect(-30, -18, 60, 36, 18);
+    container.add(bg);
+    
+    // Icon (enemy type)
+    var icon = scene.add.text(0, -2, '❓', { 
+      fontSize: '20px' 
+    }).setOrigin(0.5);
+    container.add(icon);
+    
+    // Label below
+    var label = scene.add.text(0, 14, 'ENEMY', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '8px',
+      color: '#888888',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    container.add(label);
+    
+    this.enemyThreatIndicator.container = container;
+    this.enemyThreatIndicator.icon = icon;
+    this.enemyThreatIndicator.label = label;
+    
+    // Initial hide (show when enemy detected)
+    container.setAlpha(0);
+    
+    return container;
+  },
+  // Update enemy threat indicator with current enemy info
+  updateEnemyThreatIndicator: function(scene, enemy) {
+    if (!this.enemyThreatIndicator.container) {
+      this.showEnemyThreatIndicator(scene);
+    }
+    
+    var container = this.enemyThreatIndicator.container;
+    var icon = this.enemyThreatIndicator.icon;
+    var label = this.enemyThreatIndicator.label;
+    
+    // Determine enemy type
+    var enemyType = 'default';
+    var enemyName = 'Unknown';
+    
+    if (enemy) {
+      // Check enemy properties to determine type
+      var type = enemy.enemyType || enemy.type || 'default';
+      var isElite = enemy.isElite || enemy.elite || false;
+      var isBoss = enemy.isBoss || enemy.boss || false;
+      var isCoach = enemy.coach || false;
+      
+      if (isBoss) {
+        enemyType = 'boss';
+        enemyName = enemy.bossName || enemy.name || 'Boss';
+      } else if (isElite) {
+        enemyType = 'elite';
+        enemyName = enemy.name || 'Elite';
+      } else if (isCoach) {
+        enemyType = 'coach';
+        enemyName = 'Coach';
+      } else if (type === 'grappler' || type === 'wrestler') {
+        enemyType = 'grappler';
+        enemyName = enemy.name || 'Grappler';
+      } else if (type === 'kickboxer') {
+        enemyType = 'kickboxer';
+        enemyName = enemy.name || 'Kickboxer';
+      } else if (type === 'striker') {
+        enemyType = 'striker';
+        enemyName = enemy.name || 'Striker';
+      } else {
+        enemyType = 'default';
+        enemyName = enemy.name || 'Enemy';
+      }
+    }
+    
+    // Get type definition
+    var typeDef = this.enemyTypeDefs[enemyType] || this.enemyTypeDefs.default;
+    
+    // Update display
+    icon.setText(typeDef.icon);
+    icon.setColor(typeDef.color);
+    label.setText(typeDef.name.toUpperCase());
+    label.setColor(typeDef.color);
+    
+    // Store current info
+    this.enemyThreatIndicator.currentEnemyType = enemyType;
+    this.enemyThreatIndicator.currentEnemyName = enemyName;
+    
+    // Show container if hidden and we have an enemy
+    if (enemy && container.alpha < 0.5) {
+      container.setAlpha(1);
+      // Pop-in animation
+      scene.tweens.add({
+        targets: container,
+        scaleX: 1.2,
+        scaleY: 1.2,
+        duration: 150,
+        yoyo: true,
+        ease: 'Quad.easeOut'
+      });
+    }
+    
+    // Pulse effect on enemy type change
+    if (enemy && this.enemyThreatIndicator.currentEnemyType !== enemyType) {
+      scene.tweens.add({
+        targets: container,
+        scaleX: 1.3,
+        scaleY: 1.3,
+        duration: 100,
+        yoyo: true,
+        ease: 'Quad.easeOut'
+      });
+    }
+    
+    // Hide if no enemy
+    if (!enemy && container.alpha > 0) {
+      scene.tweens.add({
+        targets: container,
+        alpha: 0,
+        duration: 200
+      });
+    }
+  },
+  // Show tooltip with enemy details on click
+  showEnemyThreatTooltip: function(scene, x, y) {
+    var type = this.enemyThreatIndicator.currentEnemyType;
+    var name = this.enemyThreatIndicator.currentEnemyName;
+    var typeDef = this.enemyTypeDefs[type] || this.enemyTypeDefs.default;
+    
+    var tooltip = scene.add.container(x, y);
+    tooltip.setDepth(100);
+    
+    // Background
+    var bg = scene.add.graphics();
+    bg.fillStyle(0x000000, 0.9);
+    bg.fillRoundedRect(0, 0, 120, 50, 8);
+    bg.lineStyle(2, typeDef.color, 1);
+    bg.strokeRoundedRect(0, 0, 120, 50, 8);
+    tooltip.add(bg);
+    
+    // Icon and name
+    var title = scene.add.text(60, 12, typeDef.icon + ' ' + name, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '12px',
+      color: typeDef.color,
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    tooltip.add(title);
+    
+    // Description
+    var desc = scene.add.text(60, 32, typeDef.desc, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '10px',
+      color: '#aaaaaa'
+    }).setOrigin(0.5);
+    tooltip.add(desc);
+    
+    // Auto-hide after 2 seconds
+    scene.time.delayedCall(2000, function() {
+      tooltip.destroy();
+    });
+    
+    return tooltip;
+  },
+  // Destroy enemy threat indicator
+  destroyEnemyThreatIndicator: function() {
+    if (this.enemyThreatIndicator.container) {
+      this.enemyThreatIndicator.container.destroy();
+      this.enemyThreatIndicator.container = null;
+      this.enemyThreatIndicator.icon = null;
+      this.enemyThreatIndicator.label = null;
+    }
+    this.enemyThreatIndicator.currentEnemyType = null;
+    this.enemyThreatIndicator.currentEnemyName = null;
+  },
   // Stamina warning indicator
   staminaWarning: {
     active: false,
@@ -3851,10 +4055,10 @@ window.MMA.UI = {
     var topPad = 4;
     var sidePad = 2;
     var midY = Math.round((clusterHeight - actionBtnHeight) / 2);
-    if (jab) { jab.style.left = hOffset + "px"; jab.style.top = topPad + "px"; }
-    if (heavy) { heavy.style.right = sidePad + "px"; heavy.style.top = midY + "px"; }
-    if (grapple) { grapple.style.left = sidePad + "px"; grapple.style.top = midY + "px"; }
-    if (special) { special.style.left = hOffset + "px"; special.style.bottom = topPad + "px"; }
+    if (jab) { jab.style.left = hOffset + "px"; jab.style.right = 'auto'; jab.style.top = topPad + "px"; jab.style.bottom = 'auto'; }
+    if (heavy) { heavy.style.right = sidePad + "px"; heavy.style.left = 'auto'; heavy.style.top = midY + "px"; heavy.style.bottom = 'auto'; }
+    if (grapple) { grapple.style.left = sidePad + "px"; grapple.style.right = 'auto'; grapple.style.top = midY + "px"; grapple.style.bottom = 'auto'; }
+    if (special) { special.style.left = hOffset + "px"; special.style.right = 'auto'; special.style.bottom = topPad + "px"; special.style.top = 'auto'; }
     if (startBtn) { startBtn.style.bottom = landscape ? "6%" : "9%"; var fs = Math.min(20, Math.floor(minDim * 0.04)); startBtn.style.fontSize = fs + "px"; startBtn.style.padding = (fs * 0.8) + "px " + (fs * 1.7) + "px"; }
     if (pauseBtn) { var pSize = Math.max(34, Math.floor(minDim * 0.07)); pauseBtn.style.width = pSize + "px"; pauseBtn.style.height = pSize + "px"; pauseBtn.style.lineHeight = pSize + "px"; pauseBtn.style.fontSize = Math.max(16, Math.floor(pSize * 0.52)) + "px"; }
   }
