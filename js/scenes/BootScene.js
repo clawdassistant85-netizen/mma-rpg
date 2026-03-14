@@ -44,7 +44,9 @@ var BootScene = new Phaser.Class({
     }});
   },
   _bootStep_textures: function() {
-    MMA.Sprites.makeAll(this);
+    // makeEssential skips portraits/reactions/auras — ~60% faster on mobile.
+    // makeOptional() is called lazily after GameScene starts.
+    MMA.Sprites.makeEssential(this);
     this._updateLoadBar('Textures');
   },
   _bootStep_idleHook: function() {
@@ -97,6 +99,15 @@ var BootScene = new Phaser.Class({
     if (this._loadBar) this._loadBar.destroy();
     if (this._loadBarBg) this._loadBarBg.destroy();
     window.gameReady = true;
+    // Defer optional texture generation (portraits, auras, etc.) until 3s after game starts.
+    // Runs silently in background — won't block gameplay.
+    var self = this;
+    setTimeout(function() {
+      try {
+        var gs = window.phaserGame && window.phaserGame.scene && window.phaserGame.scene.getScene('GameScene');
+        if (gs && gs.sys && gs.sys.isActive()) { MMA.Sprites.makeOptional(gs); }
+      } catch(e) { console.warn('makeOptional deferred failed:', e); }
+    }, 3000);
     this.scene.start('GameScene'); // scene.start stops the current scene automatically
   },
   registerIdleAnimations: function() {

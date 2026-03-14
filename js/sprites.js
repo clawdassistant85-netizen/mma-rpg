@@ -910,6 +910,10 @@ window.MMA.Sprites = {
     textureDamageSet('npc_coach', coachColors, { armShift:-1, bodyW:7, hasHeadband:true, bigFists:true });
     // textureEnemyAnimationSet calls deferred — textures not yet used in gameplay
     // Re-enable when animation system consumes _windup/_hit/_death keys
+
+    // --- OPTIONAL TEXTURES (portraits, reactions, auras) ---
+    // Skipped during makeEssential() for fast mobile boot. Generated lazily via makeOptional().
+    if (!MMA.Sprites._skipOptionalTextures) {
     texturePortraitSet('player', playerColors, { accent: window.MMA.Sprites.STYLE_AURA_COLORS.striker });
     texturePortraitSet('enemy_thug', thugColors, { accent: 0xff7a7a });
     texturePortraitSet('enemy_brawler', brawlerColors, { accent: 0xffb14d });
@@ -1101,6 +1105,7 @@ window.MMA.Sprites = {
       signature: { core: 'resonance_signature', ring: 'resonance_signature_ring', flare: 'resonance_signature_flare' },
       default: { core: 'resonance_hybrid', ring: 'resonance_hybrid_ring', flare: 'resonance_hybrid_flare' }
     };
+    } // end optional textures block
     texturePickup('item_pickup');
     texturePickup('pickup_health');
     textureSweatParticle('impact_sweat', { fill: 0x9fd4ff, highlight: 0xffffff, alpha: 0.92 });
@@ -1152,6 +1157,36 @@ window.MMA.Sprites = {
     textureHitbox('hitbox');
   },
   
+  // Fast boot: generate only gameplay-essential textures (env, characters, particles).
+  // Portraits, reaction faces, auras, resonance skipped — call makeOptional() later.
+  makeEssential: function(scene) {
+    MMA.Sprites._skipOptionalTextures = true;
+    try { this.makeAll(scene); } finally { MMA.Sprites._skipOptionalTextures = false; }
+    this._essentialScene = scene;
+  },
+  // Generate the optional textures skipped by makeEssential(). Call after game starts.
+  makeOptional: function(scene) {
+    if (MMA.Sprites._optionalDone) return;
+    MMA.Sprites._optionalDone = true;
+    MMA.Sprites._skipOptionalTextures = false;
+    // Re-run makeAll with optional flag cleared — only the guarded block will actually
+    // re-generate textures that don't already exist in the texture manager.
+    // We do this by temporarily wrapping generateTexture to skip existing keys.
+    var mgr = scene && scene.textures;
+    if (!mgr) return;
+    var orig = scene.make && scene.make.graphics ? scene.make.graphics.bind(scene.make) : null;
+    if (!orig) return;
+    // Monkey-patch: skip generateTexture if key already exists
+    var _origGenTex = Phaser.GameObjects.Graphics.prototype.generateTexture;
+    Phaser.GameObjects.Graphics.prototype.generateTexture = function(key, w, h) {
+      if (!mgr.exists(key)) { _origGenTex.call(this, key, w, h); }
+      return this;
+    };
+    try { this.makeAll(scene); } finally {
+      Phaser.GameObjects.Graphics.prototype.generateTexture = _origGenTex;
+    }
+  },
+
   // Generate player outfit variant textures
   generateOutfitTextures: function(self, baseColors) {
     var outfitConfigs = {
