@@ -177,6 +177,7 @@ window.MMA.Sprites = {
     balanced: 0xb26bff
   },
   REACTION_FACE_TEXTURES: {},
+  TATTOO_TEXTURES: {},
   VISUAL_ROLE_ALIASES: {
     trainer: 'npc_trainer',
     coach: 'npc_coach',
@@ -509,6 +510,43 @@ window.MMA.Sprites = {
       textureReactionFace(set.exhausted, colors, 'exhausted');
       window.MMA.Sprites.REACTION_FACE_TEXTURES[baseKey] = set;
     }
+    function textureTattoo(key, config) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var color = (config && config.color) || 0x7dd3fc;
+      var alpha = (config && typeof config.alpha === 'number') ? config.alpha : 0.92;
+      var type = (config && config.type) || 'strike';
+      g.fillStyle(0x000000, 0); g.fillRect(0, 0, 48, 72);
+      g.lineStyle(2, color, alpha);
+      if (type === 'grapple') {
+        g.strokeCircle(15, 31, 4);
+        g.strokeCircle(33, 31, 4);
+        g.lineBetween(19, 31, 29, 31);
+        g.lineBetween(12, 39, 18, 48);
+        g.lineBetween(36, 39, 30, 48);
+      } else if (type === 'special') {
+        g.beginPath(); g.moveTo(24, 18); g.lineTo(29, 29); g.lineTo(41, 31); g.lineTo(32, 39); g.lineTo(34, 52); g.lineTo(24, 45); g.lineTo(14, 52); g.lineTo(16, 39); g.lineTo(7, 31); g.lineTo(19, 29); g.closePath(); g.strokePath();
+        g.lineBetween(24, 18, 24, 52);
+      } else {
+        g.lineBetween(24, 16, 24, 50);
+        g.lineBetween(17, 24, 31, 24);
+        g.lineBetween(15, 36, 33, 36);
+        g.strokeCircle(24, 16, 3);
+      }
+      g.lineStyle(1, color, alpha * 0.55);
+      g.strokeEllipse(24, 34, 24, 36);
+      g.generateTexture(key, 48, 72); g.destroy();
+    }
+    function textureTattooSet(baseKey, palette) {
+      var set = {
+        strike: baseKey + '_tattoo_strike',
+        grapple: baseKey + '_tattoo_grapple',
+        special: baseKey + '_tattoo_special'
+      };
+      textureTattoo(set.strike, { type: 'strike', color: (palette && palette.strike) || 0xff6b6b, alpha: 0.86 });
+      textureTattoo(set.grapple, { type: 'grapple', color: (palette && palette.grapple) || 0x5dade2, alpha: 0.86 });
+      textureTattoo(set.special, { type: 'special', color: (palette && palette.special) || 0xf7dc6f, alpha: 0.9 });
+      window.MMA.Sprites.TATTOO_TEXTURES[baseKey] = set;
+    }
     function texturePickup(key) {
       var g = self.make.graphics({ x:0, y:0, add:false });
       g.fillStyle(0x0f1724, 0.92); g.fillCircle(12, 12, 10);
@@ -823,21 +861,8 @@ window.MMA.Sprites = {
     textureDamageSet('enemy_shadow_boss', shadowBossColors, { armShift:1, bodyW:7, bigFists:true, hasWeapon:true, hasHeadband:true, hasShadowVeil:true });
     textureDamageSet('npc_trainer', trainerColors, { armShift:0, bodyW:6, hasHeadband:true });
     textureDamageSet('npc_coach', coachColors, { armShift:-1, bodyW:7, hasHeadband:true, bigFists:true });
-    textureEnemyAnimationSet('enemy_thug', thugColors, { armShift:0, bodyW:5, hasWeapon:true });
-    textureEnemyAnimationSet('enemy_brawler', brawlerColors, { armShift:1, bodyW:8, bigFists:true, hasWeapon:true });
-    textureEnemyAnimationSet('enemy_boxer', boxerColors, { armShift:1, bodyW:6, bigFists:true });
-    textureEnemyAnimationSet('enemy_karateka', karatekaColors, { armShift:0, bodyW:6, hasHeadband:true });
-    textureEnemyAnimationSet('enemy_streetfighter', streetFighterColors, { armShift:1, bodyW:7, hasHeadband:true, bigFists:true, hasWeapon:true });
-    textureEnemyAnimationSet('enemy_kickboxer', kickboxerColors, { armShift:1, bodyW:6, hasHeadband:true, bigFists:true });
-    textureEnemyAnimationSet('enemy_judoka', judokaColors, { armShift:0, bodyW:6 });
-    textureEnemyAnimationSet('enemy_wrestler', wrestlerColors, { armShift:1, bodyW:7, bigFists:true });
-    textureEnemyAnimationSet('enemy_groundpounder', groundPounderColors, { armShift:1, bodyW:8, bigFists:true });
-    textureEnemyAnimationSet('enemy_striker', strikerColors, { armShift:1, bodyW:6, bigFists:true });
-    textureEnemyAnimationSet('enemy_bjj', bjjColors, { armShift:0, bodyW:6 });
-    textureEnemyAnimationSet('enemy_thug_elite', eliteColors, { armShift:0, bodyW:5, hasWeapon:true, hasHeadband:true });
-    textureEnemyAnimationSet('enemy_brawler_boss', championBossColors, { armShift:1, bodyW:8, bigFists:true, hasWeapon:true, hasHeadband:true, hasCrown:true, hasCape:true });
-    textureEnemyAnimationSet('enemy_shadow_boss', shadowBossColors, { armShift:1, bodyW:7, bigFists:true, hasWeapon:true, hasHeadband:true, hasShadowVeil:true });
-    textureEnemyAnimationSet('npc_coach', coachColors, { armShift:-1, bodyW:7, hasHeadband:true, bigFists:true });
+    // textureEnemyAnimationSet calls deferred — textures not yet used in gameplay
+    // Re-enable when animation system consumes _windup/_hit/_death keys
     texturePortraitSet('player', playerColors, { accent: window.MMA.Sprites.STYLE_AURA_COLORS.striker });
     texturePortraitSet('enemy_thug', thugColors, { accent: 0xff7a7a });
     texturePortraitSet('enemy_brawler', brawlerColors, { accent: 0xffb14d });
@@ -858,6 +883,7 @@ window.MMA.Sprites = {
     texturePortraitSet('npc_trainer', trainerColors, { accent: 0x52d8b0 });
     texturePortraitSet('npc_coach', coachColors, { accent: 0xffd86b });
     textureReactionFaceSet('player', playerColors);
+    textureTattooSet('player', { strike: 0xff6b6b, grapple: 0x5dade2, special: 0xf7dc6f });
     textureReactionFaceSet('enemy_thug', thugColors);
     textureReactionFaceSet('enemy_brawler', brawlerColors);
     textureReactionFaceSet('enemy_boxer', boxerColors);

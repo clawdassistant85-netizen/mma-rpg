@@ -13,6 +13,7 @@ var BootScene = new Phaser.Class({
     this.installLimbDamageHook();
     this.installPortraitHook();
     this.installReactionFaceHook();
+    this.installTechniqueTattooHook();
     this.installStyleAuraHook();
     this.installBossChromaAuraHook();
     this.installImpactSweatHook();
@@ -507,6 +508,135 @@ var BootScene = new Phaser.Class({
     };
 
     Phaser.Physics.Arcade.Sprite.prototype._mmaReactionFaceHookInstalled = true;
+  },
+  installTechniqueTattooHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaTechniqueTattooHookInstalled) return;
+
+    function readMasteryMap(sprite) {
+      if (!sprite) return null;
+      var sources = [
+        sprite.techniqueMastery,
+        sprite.mastery,
+        sprite.stats && sprite.stats.techniqueMastery,
+        sprite.stats && sprite.stats.mastery,
+        sprite.meta && sprite.meta.techniqueMastery,
+        sprite.meta && sprite.meta.mastery
+      ];
+      if (sprite.data && typeof sprite.data.get === 'function') {
+        sources.push(sprite.data.get('techniqueMastery'));
+        sources.push(sprite.data.get('mastery'));
+      }
+      for (var i = 0; i < sources.length; i++) {
+        if (sources[i] && typeof sources[i] === 'object') return sources[i];
+      }
+      try {
+        if (window.localStorage) {
+          var raw = window.localStorage.getItem('mma_rpg_save');
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            if (parsed && parsed.techniqueMastery && typeof parsed.techniqueMastery === 'object') return parsed.techniqueMastery;
+            if (parsed && parsed.player && parsed.player.techniqueMastery && typeof parsed.player.techniqueMastery === 'object') return parsed.player.techniqueMastery;
+            if (parsed && parsed.mastery && typeof parsed.mastery === 'object') return parsed.mastery;
+          }
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    function inferTattooLoadout(sprite) {
+      var mastery = readMasteryMap(sprite);
+      if (!mastery) return [];
+      var loadout = [];
+      Object.keys(mastery).forEach(function(key) {
+        var level = mastery[key];
+        if (typeof level !== 'number' || level < 5) return;
+        var token = String(key || '').toLowerCase();
+        if (token.indexOf('special') !== -1 || token.indexOf('signature') !== -1 || token.indexOf('super') !== -1 || token.indexOf('focus') !== -1 || token.indexOf('chi') !== -1) {
+          if (loadout.indexOf('special') === -1) loadout.push('special');
+          return;
+        }
+        if (token.indexOf('grapple') !== -1 || token.indexOf('throw') !== -1 || token.indexOf('armbar') !== -1 || token.indexOf('triangle') !== -1 || token.indexOf('kimura') !== -1 || token.indexOf('submission') !== -1 || token.indexOf('takedown') !== -1 || token.indexOf('slam') !== -1 || token.indexOf('clinch') !== -1) {
+          if (loadout.indexOf('grapple') === -1) loadout.push('grapple');
+          return;
+        }
+        if (loadout.indexOf('strike') === -1) loadout.push('strike');
+      });
+      return loadout.slice(0, 3);
+    }
+
+    function ensureTattooOverlays(sprite) {
+      if (!sprite || !sprite.scene || !sprite.active) return null;
+      if (sprite._mmaTechniqueTattooOverlays && sprite._mmaTechniqueTattooOverlays.length) return sprite._mmaTechniqueTattooOverlays;
+      var textures = window.MMA && window.MMA.Sprites && window.MMA.Sprites.TATTOO_TEXTURES;
+      var set = textures && textures.player;
+      if (!set) return null;
+      var overlays = ['strike', 'grapple', 'special'].map(function(type) {
+        var img = sprite.scene.add.image(sprite.x, sprite.y, set[type]);
+        img.setBlendMode(Phaser.BlendModes.SCREEN);
+        img.setVisible(false);
+        img.setDepth((sprite.depth || 0) + 3);
+        img._mmaTattooType = type;
+        return img;
+      });
+      sprite._mmaTechniqueTattooOverlays = overlays;
+      return overlays;
+    }
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+
+      var isPlayer = !!(this.scene && this.scene.player === this);
+      if (!this.active || !this.scene || !isPlayer) {
+        if (this._mmaTechniqueTattooOverlays) {
+          this._mmaTechniqueTattooOverlays.forEach(function(overlay) { if (overlay) overlay.setVisible(false); });
+        }
+        return;
+      }
+
+      var loadout = inferTattooLoadout(this);
+      if (!loadout.length) {
+        if (this._mmaTechniqueTattooOverlays) {
+          this._mmaTechniqueTattooOverlays.forEach(function(overlay) { if (overlay) overlay.setVisible(false); });
+        }
+        return;
+      }
+
+      var overlays = ensureTattooOverlays(this);
+      if (!overlays) return;
+      var pulse = 0.74 + Math.abs(Math.sin(time * 0.0065)) * 0.26;
+      for (var i = 0; i < overlays.length; i++) {
+        var overlay = overlays[i];
+        if (!overlay) continue;
+        var enabled = loadout.indexOf(overlay._mmaTattooType) !== -1;
+        overlay.setVisible(enabled);
+        if (!enabled) continue;
+        overlay.setPosition(this.x, this.y - 1);
+        overlay.setDepth((this.depth || 0) + 3 + i);
+        overlay.setScale(this.scaleX || 1, this.scaleY || 1);
+        overlay.setFlipX(!!this.flipX);
+        overlay.setAlpha(0.2 + pulse * 0.22 + i * 0.04);
+        overlay.setAngle((this.flipX ? -1 : 1) * i * 2);
+      }
+      this._mmaTechniqueTattooState = loadout.join(',');
+    };
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      if (this._mmaTechniqueTattooOverlays) {
+        this._mmaTechniqueTattooOverlays.forEach(function(overlay) {
+          if (overlay) overlay.destroy();
+        });
+        this._mmaTechniqueTattooOverlays = null;
+      }
+      return originalDestroy.call(this, fromScene);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype.getTechniqueTattooState = function() {
+      return inferTattooLoadout(this);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaTechniqueTattooHookInstalled = true;
   },
   installStyleAuraHook: function() {
     if (Phaser.Physics.Arcade.Sprite.prototype._mmaStyleAuraHookInstalled) return;
