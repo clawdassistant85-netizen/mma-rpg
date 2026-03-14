@@ -316,6 +316,10 @@ window.MMA.Sprites = {
     var trainerColors = { hair:0x5a3922, skin:0xe0b384, skinDark:0xbd8c64, torso:0x167a5c, torsoLight:0x2aa37f, belt:0x0f3f32, headband:0xf5f0d7, glove:0xe3fff7, legs:0x1b4f42, shoes:0x0b1614, bootDetail:0x15312c, shoeAccent:0x52d8b0, outline:0x0a241f };
     var coachColors = { hair:0xd9d9d9, skin:0xc99567, skinDark:0x9d6c47, torso:0x4d2a91, torsoLight:0x7551c2, belt:0x2b1657, headband:0xffd86b, glove:0xffefba, legs:0x2d2250, shoes:0x0c0815, bootDetail:0x1a1230, shoeAccent:0xcab6ff, outline:0xf0d88d };
     textureDamageSet('player', playerColors, { armShift:1, bodyW:6, hasHeadband:true });
+    
+    // Generate outfit variant textures for the player
+    this.generateOutfitTextures(this, playerColors);
+    
     textureDamageSet('enemy_thug', thugColors, { armShift:0, bodyW:5, hasWeapon:true });
     textureDamageSet('enemy_brawler', brawlerColors, { armShift:1, bodyW:8, bigFists:true, hasWeapon:true });
     textureDamageSet('enemy_thug_elite', eliteColors, { armShift:0, bodyW:5, hasWeapon:true, hasHeadband:true });
@@ -373,5 +377,169 @@ window.MMA.Sprites = {
     texturePickup('item_pickup');
     texturePickup('pickup_health');
     textureHitbox('hitbox');
+  },
+  
+  // Generate player outfit variant textures
+  generateOutfitTextures: function(self, baseColors) {
+    var outfitConfigs = {
+      streetClothes: { torso: 0x2255aa, torsoLight: 0x4466cc },
+      bjjGi: { torso: 0xffffff, torsoLight: 0xeeeeee, belt: 0x000000, hasGiCollar: true },
+      boxingTrunks: { torso: 0xff4444, torsoLight: 0xff6666, legs: 0xff4444 },
+      muayThaiShorts: { torso: 0x4400ff, torsoLight: 0x6600ff, legs: 0x4400ff },
+      streetFighter: { torso: 0xff8800, torsoLight: 0xffaa33, belt: 0xff0000, hasHeadband: true },
+      mkNinja: { torso: 0x222222, torsoLight: 0x444444, legs: 0x111111, glove: 0x8800ff, hasMask: true },
+      wrestlingSinglet: { torso: 0x0033aa, torsoLight: 0x0044cc, legs: 0x0033aa },
+      championsRobe: { torso: 0xffd700, torsoLight: 0xffee66, belt: 0xffd700, legs: 0xaa8800, hasRobe: true }
+    };
+
+    var outfitDamageKeys = {};
+    
+    // Get the textureHuman and textureDamageSet functions from the closure
+    // We need to recreate similar logic for outfits
+    
+    function generateOutfitTexture(key, colors, opts) {
+      var g = self.make.graphics({ x: 0, y: 0, add: false });
+      var s = 3;
+      var armShift = opts.armShift || 1;
+      var bodyW = opts.bodyW || 6;
+      var bodyX = Math.floor((16 - bodyW) / 2);
+      
+      var torsoBob = 0;
+      var leftArmDrop = 0;
+      var rightArmDrop = 0;
+      var headTilt = 0;
+      var bodyLean = 0;
+      var leftLegLift = 0;
+      var rightLegLift = 0;
+      var gloveBob = 0;
+      var hasHeadband = opts.hasHeadband || false;
+      var hasMask = opts.hasMask || false;
+      var hasGiCollar = opts.hasGiCollar || false;
+      var hasRobe = opts.hasRobe || false;
+      
+      function px(x, y, w, h, color) {
+        g.fillStyle(color, 1);
+        g.fillRect(x * s, y * s, w * s, h * s);
+      }
+      
+      // Head
+      px(5 + headTilt, 1 + torsoBob, 6, 5, colors.skin);
+      px(4 + headTilt, 0 + torsoBob, 8, 2, colors.hair);
+      px(4 + headTilt, 2 + torsoBob, 1, 2, colors.hair);
+      px(11 + headTilt, 2 + torsoBob, 1, 2, colors.hair);
+      px(6 + headTilt, 5 + torsoBob, 4, 1, colors.skinDark);
+      
+      // Mask for ninja
+      if (hasMask) {
+        px(5 + headTilt, 3 + torsoBob, 6, 2, 0x111111);
+        px(5 + headTilt, 2 + torsoBob, 2, 1, 0x8800ff);
+        px(9 + headTilt, 2 + torsoBob, 2, 1, 0x8800ff);
+      }
+      
+      // Headband
+      if (hasHeadband) {
+        px(4 + headTilt, 1 + torsoBob, 8, 1, colors.headband || 0xd92b2b);
+        px(4 + headTilt, 2 + torsoBob, 1, 1, colors.headband || 0xd92b2b);
+        px(11 + headTilt, 2 + torsoBob, 1, 1, colors.headband || 0xd92b2b);
+      }
+      
+      // Gi collar
+      if (hasGiCollar) {
+        px(5 + headTilt, 5 + torsoBob, 6, 1, 0xcccccc);
+        px(bodyX + bodyLean, 7 + torsoBob, bodyW, 1, 0xdddddd);
+      }
+      
+      // Torso
+      px(bodyX + bodyLean, 7 + torsoBob, bodyW, 8, colors.torso);
+      px(bodyX + 1 + bodyLean, 8 + torsoBob, bodyW - 2, 1, colors.torsoLight);
+      
+      // Robe overlay
+      if (hasRobe) {
+        px(bodyX - 1 + bodyLean, 7 + torsoBob, 1, 8, colors.torsoLight);
+        px(bodyX + bodyW + bodyLean, 7 + torsoBob, 1, 8, colors.torsoLight);
+      }
+      
+      // Belt
+      px(7 + bodyLean, 11 + torsoBob, 2, 4, colors.belt);
+      px(bodyX + bodyLean, 15 + torsoBob, bodyW, 1, colors.belt);
+      
+      // Arms
+      px(bodyX - 2 + armShift + bodyLean, 8 + torsoBob + leftArmDrop, 2, 5 - Math.min(leftArmDrop, 2), colors.skin);
+      px(bodyX + bodyW + armShift + bodyLean, 8 + torsoBob + rightArmDrop, 2, 5 - Math.min(rightArmDrop, 2), colors.skin);
+      
+      // Gloves
+      var fistSize = 2;
+      var fistY = 9 + torsoBob + gloveBob;
+      px(bodyX - 1 + armShift + bodyLean, fistY + leftArmDrop, fistSize, fistSize, colors.glove);
+      px(bodyX + bodyW - 1 + armShift + bodyLean, fistY + rightArmDrop, fistSize, fistSize, colors.glove);
+      
+      // Legs
+      px(bodyX + 1 + bodyLean, 16 + leftLegLift, 2, 6 - leftLegLift, colors.legs);
+      px(bodyX + bodyW - 3 + bodyLean, 16 + rightLegLift, 2, 6 - rightLegLift, colors.legs);
+      
+      px(bodyX + 1 + bodyLean, 21, 2, 1, colors.bootDetail);
+      px(bodyX + bodyW - 3 + bodyLean, 21, 2, 1, colors.bootDetail);
+      
+      px(bodyX + 1 + bodyLean, 22, 2, 2, colors.shoes);
+      px(bodyX + bodyW - 3 + bodyLean, 22, 2, 2, colors.shoes);
+      
+      px(bodyX + 1 + bodyLean, 23, 2, 1, colors.shoeAccent);
+      px(bodyX + bodyW - 3 + bodyLean, 23, 2, 1, colors.shoeAccent);
+      
+      // Outline
+      px(bodyX - 2 + bodyLean, 7 + torsoBob + leftArmDrop, 1, 9 - Math.min(leftArmDrop, 2), colors.outline);
+      px(bodyX + bodyW + 2 + bodyLean, 7 + torsoBob + rightArmDrop, 1, 9 - Math.min(rightArmDrop, 2), colors.outline);
+      px(5 + headTilt, 1 + torsoBob, 1, 6, colors.outline);
+      px(10 + headTilt, 1 + torsoBob, 1, 6, colors.outline);
+      
+      var texKey = 'player_' + key;
+      g.generateTexture(texKey, 48, 72);
+      g.destroy();
+      return texKey;
+    }
+    
+    // Generate textures for each outfit
+    Object.keys(outfitConfigs).forEach(function(outfitKey) {
+      var config = outfitConfigs[outfitKey];
+      var colors = Object.assign({}, baseColors, config);
+      
+      // Generate damage states for this outfit
+      var baseKey = 'player_' + outfitKey;
+      var healthyKey = generateOutfitTexture(baseKey, colors, { armShift: 1, bodyW: 6, hasHeadband: config.hasHeadband, hasMask: config.hasMask, hasGiCollar: config.hasGiCollar, hasRobe: config.hasRobe });
+      
+      // Hurt state
+      var hurtColors = Object.assign({}, colors);
+      colors.torso = Math.max(0, colors.torso - 0x202020);
+      var hurtKey = generateOutfitTexture(baseKey + '_hurt_1', colors, { 
+        armShift: 1, bodyW: 6, bodyLean: -1, leftArmDrop: 1, rightLegLift: 2,
+        hasHeadband: config.hasHeadband, hasMask: config.hasMask, hasGiCollar: config.hasGiCollar, hasRobe: config.hasRobe 
+      });
+      
+      // Bloodied state
+      var bloodiedColors = Object.assign({}, colors);
+      bloodiedColors.torso = Math.max(0, bloodiedColors.torso - 0x303030);
+      var bloodiedKey = generateOutfitTexture(baseKey + '_hurt_2', bloodiedColors, { 
+        armShift: 0, bodyW: 6, bodyLean: -2, leftArmDrop: 2, rightLegLift: 3,
+        hasHeadband: config.hasHeadband, hasMask: config.hasMask, hasGiCollar: config.hasGiCollar, hasRobe: config.hasRobe 
+      });
+      
+      outfitDamageKeys[outfitKey] = {
+        healthy: healthyKey,
+        bruised: hurtKey,
+        bloodied: bloodiedKey
+      };
+    });
+    
+    // Store outfit damage textures
+    window.MMA.Sprites.OUTFIT_TEXTURES = outfitDamageKeys;
+  },
+  
+  // Get outfit texture key for a given outfit
+  getOutfitTexture: function(outfitKey, damageState) {
+    if (!this.OUTFIT_TEXTURES || !this.OUTFIT_TEXTURES[outfitKey]) {
+      return 'player'; // Fallback to default
+    }
+    var state = damageState || 'healthy';
+    return this.OUTFIT_TEXTURES[outfitKey][state] || this.OUTFIT_TEXTURES[outfitKey].healthy;
   }
 };

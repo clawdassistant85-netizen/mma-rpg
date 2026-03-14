@@ -15,6 +15,12 @@ function checkLevelUp(playerStats) {
     playerStats.hp = playerStats.maxHp;
     playerStats.maxStamina += 5;
     playerStats.stamina = playerStats.maxStamina;
+    
+    // Check for outfit unlocks on level up
+    if (window.MMA && MMA.Outfits) {
+      MMA.Outfits.checkLevelUnlocks(playerStats.level);
+    }
+    
     return true; // leveled up
   }
   return false;

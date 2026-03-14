@@ -1039,6 +1039,15 @@ window.MMA.Enemies = {
 
     // Track enemy defeated in fight stats
     MMA.UI.recordEnemyDefeated();
+    
+    // Check for outfit unlocks based on enemy type
+    if (MMA.Outfits) {
+      var outfitUnlocked = MMA.Outfits.recordEnemyDefeat(enemy.typeKey);
+      if (outfitUnlocked && outfitUnlocked.length > 0 && scene.player) {
+        MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 50, 'NEW OUTFIT!', '#ffd700');
+      }
+    }
+    
     var contractTier = this.getContractTier(scene);
     var xp = enemy.type.xpReward; scene.player.stats.xp += xp;
     MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, '+' + xp + ' XP', '#e8c830');

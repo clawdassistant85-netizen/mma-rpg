@@ -59,6 +59,7 @@ var GameScene = new Phaser.Class({
     this.guillotineKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G);
     this.infoKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I);
     this.pauseKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I);
+    this.outfitKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.escapeKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.restartKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
 
@@ -144,6 +145,23 @@ var GameScene = new Phaser.Class({
           this.physics.pause();
           this.paused = true;
           this.scene.launch('PauseScene');
+        }
+      }
+      return;
+    }
+
+    // Outfit selection (E key)
+    if (this.outfitKey && Phaser.Input.Keyboard.JustDown(this.outfitKey)) {
+      if (!this.gameOver && !this.roomTransitioning) {
+        if (this.paused && this.scene.isActive('OutfitScene')) {
+          this.resumeFromPause();
+          this.scene.stop('OutfitScene');
+        } else if (this.paused) {
+          this.resumeFromPause();
+        } else {
+          this.physics.pause();
+          this.paused = true;
+          this.scene.launch('OutfitScene');
         }
       }
       return;

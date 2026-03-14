@@ -8,6 +8,7 @@ function saveGame(playerStats, playerUnlockedMoves, currentZone, currentRoomId) 
     if (typeof window === 'undefined' || !window.localStorage) return;
     // Basic validation / cloning to avoid storing Phaser objects
     var stats = playerStats || {};
+    var outfitData = (window.MMA && window.MMA.Outfits) ? window.MMA.Outfits.saveOutfitData() : null;
     var payload = {
       playerStats: {
         hp: stats.hp || 0,
@@ -19,7 +20,8 @@ function saveGame(playerStats, playerUnlockedMoves, currentZone, currentRoomId) 
       },
       playerUnlockedMoves: Array.isArray(playerUnlockedMoves) ? playerUnlockedMoves.slice() : [],
       currentZone: typeof currentZone === 'number' ? currentZone : 1,
-      currentRoomId: currentRoomId || 'room1'
+      currentRoomId: currentRoomId || 'room1',
+      outfitData: outfitData
     };
     window.localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
   } catch (e) {

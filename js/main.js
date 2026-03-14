@@ -128,9 +128,18 @@ window.onload = function() {
     if (window.MMA && MMA.UI && typeof MMA.UI.handleResponsiveLayout === 'function') {
       MMA.UI.handleResponsiveLayout();
     }
+    // Force Phaser scale manager to recalculate after rotation
+    if (window.phaserGame && window.phaserGame.scale) {
+      window.phaserGame.scale.refresh();
+    }
   }
 
   window.addEventListener('resize', handleResponsiveLayout);
-  window.addEventListener('orientationchange', handleResponsiveLayout);
+  window.addEventListener('orientationchange', function() {
+    // Delay to let the browser finish the orientation transition
+    setTimeout(handleResponsiveLayout, 100);
+    setTimeout(handleResponsiveLayout, 300);
+    setTimeout(handleResponsiveLayout, 600);
+  });
   setTimeout(handleResponsiveLayout, 150);
 };

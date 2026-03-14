@@ -73,6 +73,12 @@ window.MMA.Player = {
   },
   damage: function(scene, damage) {
     if (scene.gameOver) return;
+    // Check for dodge (agility-based)
+    var dodgeChance = scene.player.dodgeChance || 0;
+    if (Math.random() < dodgeChance) {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 20, 'DODGE!', '#88ff88');
+      return;
+    }
     var reducedDamage = Math.max(1, Math.round(damage - (scene.player.defenseBonus || 0)));
     scene.player.stats.hp -= reducedDamage;
     // Track damage taken in fight stats
@@ -84,5 +90,59 @@ window.MMA.Player = {
     if (scene.player.stats.hp <= 0) {
       scene.player.stats.hp = 0; scene.gameOver = true; scene.player.body.setVelocity(0,0); scene.registry.set('gameMessage', 'GAME OVER');
     }
+  },
+  // Apply outfit stat modifiers to player
+  applyOutfitModifiers: function(scene) {
+    if (!scene.player || !MMA.Outfits) return;
+    
+    var outfit = MMA.Outfits.getEquippedOutfit();
+    if (!outfit) return;
+    
+    var mods = outfit.modifiers;
+    var s = scene.player.stats;
+    
+    // Apply attribute modifiers (base + modifier)
+    s.strength = 10 + (mods.strength || 0);
+    s.speed = 10 + (mods.speed || 0);
+    s.defense = 10 + (mods.defense || 0);
+    s.agility = 10 + (mods.agility || 0);
+    s.endurance = 10 + (mods.endurance || 0);
+    
+    // Calculate derived bonuses
+    // Speed: each point = 5 speed bonus
+    scene.player.speedBonus = (mods.speed || 0) * 5;
+    // Defense: each point = 2 damage reduction
+    scene.player.defenseBonus = (mods.defense || 0) * 2;
+    // Strength: each point = 3 attack bonus
+    scene.player.attackBonus = (mods.strength || 0) * 3;
+    // Agility: each point = 1% dodge chance
+    scene.player.dodgeChance = Math.max(0, Math.min(0.3, (mods.agility || 0) * 0.01));
+    // Endurance is already used in regenStaminaTick
+    
+    // Update player texture based on outfit
+    var outfitKey = outfit.visualKey || 'streetClothes';
+    scene.player._mmaOutfitKey = outfitKey;
+    
+    // Regenerate player texture if the scene has the function
+    if (scene.regeneratePlayerTexture) {
+      scene.regeneratePlayerTexture(outfitKey);
+    }
+  },
+  // Equip a new outfit and update stats
+  equipOutfit: function(scene, outfitId) {
+    var modifiers = MMA.Outfits.equip(outfitId);
+    if (modifiers) {
+      this.applyOutfitModifiers(scene);
+      return true;
+    }
+    return false;
+  },
+  // Check for outfit unlocks based on level
+  checkOutfitUnlocks: function(scene, newLevel) {
+    var unlocked = MMA.Outfits.checkLevelUnlocks(newLevel);
+    if (unlocked.length > 0) {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'NEW OUTFIT UNLOCKED!', '#ffd700');
+    }
+    return unlocked;
   }
 };
