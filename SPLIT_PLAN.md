@@ -207,3 +207,41 @@ Reasoning: config first, then combat helpers (`damagePlayer`, rewards/status sys
 - Cross-file references are runtime namespace calls on `window.MMA.Enemies`, not static imports.
 - The only notable load-order-sensitive wrappers are the tail overrides in `enemies-core.js` (`spawnForRoom` and `damagePlayer`). Loading `enemies-combat.js` before `enemies-core.js` ensures the damage wrapper decorates the base `damagePlayer` function instead of replacing a missing value.
 - AI behaviors in `enemies-ai.js` depend on helpers from the other three files, so it should load last.
+
+---
+
+## Current Module Map (source of record — 2026-03-14)
+
+### Enemies (was enemies.js — DELETED)
+Edit these files:
+- `js/enemies-config.js` — constants, configs, type definitions
+- `js/enemies-combat.js` — damage, KO, bounty, nemesis, rewards
+- `js/enemies-core.js` — spawn, lifecycle, targeting, roles
+- `js/enemies-ai.js` — all AI behavior systems
+
+### Combat (was combat.js — DELETED)
+Edit these files:
+- `js/combat-core.js` — handleInput, MOVE_ROSTER, breathing system
+- `js/combat-moves.js` — move execution, XP, level-up
+- `js/combat-ground.js` — ground game, grappling, submissions
+
+### UI (was ui.js — DELETED)
+Edit these files:
+- `js/ui-core.js` — HUD, health/stamina bars, damage text, mobile controls
+- `js/ui-meters.js` — focus meter, momentum meter, other stat displays
+- `js/ui-settings.js` — settings menu, pause, loadout
+- `js/ui-layout.js` — responsive layout, mobile button sizing
+
+### Sprites (sprites.js — STILL ACTIVE, split was incomplete)
+- `js/sprites.js` — DO NOT DELETE, still the active source
+- `js/sprites-env.js`, `js/sprites-chars.js`, `js/sprites-effects.js` — reference only, not loaded
+
+### Scenes (no split needed, already well-scoped)
+- `js/scenes/GameScene.js`, `BootScene.js`, `HUDScene.js`, etc.
+
+## Rules for Agents
+- NEVER recreate enemies.js, combat.js, or ui.js
+- When asked to edit enemy logic → use enemies-*.js
+- When asked to edit combat → use combat-*.js
+- When asked to edit UI → use ui-*.js
+- Load order is documented in index.html script tags
