@@ -518,6 +518,102 @@ window.MMA.Zones = {
     var maxBonus = 0.10;
     return Math.min(maxBonus, maxBonus * hype);
   },
+  // Arena Atmosphere Gauge helpers
+  // Lightweight implementation of the backlog's "Arena Atmosphere Gauge"
+  // feature. Arena-style rooms (zones 3 and 4) expose a synthesized
+  // "atmosphere" state derived from crowd hype and accumulated floor wear.
+  // Other systems can read these registry values to drive lighting warmth,
+  // dodge chance from scuffed mats, and intimidation effectiveness.
+  _computeArenaAtmosphereState: function(scene, room) {
+    if (!scene || !scene.registry || !room) return null;
+    if (room.zone !== 3 && room.zone !== 4) return null;
+    var hype = scene.registry.get('crowdHype');
+    if (hype == null) hype = 0;
+    if (hype < 0) hype = 0;
+    if (hype > 1) hype = 1;
+    var floorWear = scene.registry.get('arenaFloorWear');
+    if (floorWear == null) floorWear = 0;
+    if (floorWear < 0) floorWear = 0;
+    if (floorWear > 120) floorWear = 120;
+    // Map raw floor wear points into coarse states so callers do not
+    // need to reason about raw numbers.
+    var floorState = 'pristine';
+    if (floorWear >= 80) floorState = 'damaged';
+    else if (floorWear >= 40) floorState = 'scuffed';
+    // Energy is a blended metric that primarily tracks hype but gets a
+    // small boost from worn-in floors during extended wars.
+    var energy = hype;
+    if (floorState === 'scuffed') energy += 0.05;
+    else if (floorState === 'damaged') energy += 0.10;
+    if (energy > 1) energy = 1;
+    if (energy < 0) energy = 0;
+    // Lighting warmth (0-1) – neutral at 0.5, warmer as the arena pops.
+    var lightingWarmth = 0.5 + 0.5 * energy;
+    if (lightingWarmth > 1) lightingWarmth = 1;
+    // Dodge/evasion gets a tiny boost on scuffed mats to match the
+    // backlog note about scuffed floors giving +3% dodge chance.
+    var dodgeBonus = 0;
+    if (floorState === 'scuffed') dodgeBonus = 0.02;
+    else if (floorState === 'damaged') dodgeBonus = 0.03;
+    // Crowd roar feeds intimidation-based effects – callers can fold
+    // this scalar into taunt or fear systems.
+    var intimidationBonus = energy * 0.10; // up to +10%
+    return {
+      active: true,
+      zone: room.zone,
+      energy: energy,
+      hype: hype,
+      floorWear: floorWear,
+      floorState: floorState,
+      lightingWarmth: lightingWarmth,
+      dodgeBonus: dodgeBonus,
+      intimidationBonus: intimidationBonus
+    };
+  },
+  _applyArenaAtmosphereToRegistry: function(scene, room) {
+    if (!scene || !scene.registry) return;
+    var state = this._computeArenaAtmosphereState(scene, room);
+    if (!state || !state.active) {
+      scene.registry.set('arenaAtmosphereActive', false);
+      scene.registry.set('arenaAtmosphereEnergy', 0);
+      scene.registry.set('arenaAtmosphereLightingWarmth', 0.5);
+      scene.registry.set('arenaAtmosphereFloorState', 'pristine');
+      scene.registry.set('arenaAtmosphereIntimidationBonus', 0);
+      return;
+    }
+    scene.registry.set('arenaAtmosphereActive', true);
+    scene.registry.set('arenaAtmosphereEnergy', state.energy);
+    scene.registry.set('arenaAtmosphereLightingWarmth', state.lightingWarmth);
+    scene.registry.set('arenaAtmosphereFloorState', state.floorState);
+    scene.registry.set('arenaAtmosphereIntimidationBonus', state.intimidationBonus);
+  },
+  // Public helper so combat/UI layers can query the current atmosphere
+  // snapshot without touching registry keys directly.
+  getArenaAtmosphereState: function(scene) {
+    if (!scene || !scene.registry || !scene.currentRoomId) return null;
+    var room = this.getRoom(scene.currentRoomId);
+    return this._computeArenaAtmosphereState(scene, room);
+  },
+  // Register a floor-wear event (knockdowns, scrambles, long exchanges).
+  // payload can include: steps, knockdowns, slides – we treat any
+  // positive input as "wear points" and then recompute atmosphere.
+  registerArenaFloorWearEvent: function(scene, payload) {
+    if (!scene || !scene.registry || !scene.currentRoomId) return;
+    var room = this.getRoom(scene.currentRoomId);
+    if (!room || (room.zone !== 3 && room.zone !== 4)) return;
+    var steps = payload && payload.steps ? payload.steps : 0;
+    var knockdowns = payload && payload.knockdowns ? payload.knockdowns : 0;
+    var slides = payload && payload.slides ? payload.slides : 0;
+    // Steps are cheap, knockdowns/long scrambles chew the canvas faster.
+    var delta = (steps * 0.5) + (knockdowns * 6) + (slides * 3);
+    if (delta <= 0) return;
+    var current = scene.registry.get('arenaFloorWear');
+    if (current == null) current = 0;
+    var next = current + delta;
+    if (next > 120) next = 120;
+    scene.registry.set('arenaFloorWear', next);
+    this._applyArenaAtmosphereToRegistry(scene, room);
+  },
   // Crowd Hypeman helpers
   // Certain arena rooms flag specific crowd members as "hypemen" that can
   // be acknowledged (usually via a pre-fight taunt) to grant temporary
@@ -855,6 +951,22 @@ window.MMA.Zones = {
         scene.registry.set('crowdMaxBonus', 0);
         scene.registry.set('crowdDamageBonus', 0);
         scene.registry.set('crowdLabel', '');
+      }
+      // Arena Atmosphere Gauge: arena-style rooms track a lightweight
+      // "atmosphere" state based on live crowd hype and accumulated
+      // floor wear so combat/UI/VFX layers can adapt lighting warmth,
+      // dodge bonuses, and intimidation effects without hardcoding
+      // specific rooms here.
+      if (room.zone === 3 || room.zone === 4) {
+        var existingWear = scene.registry.get('arenaFloorWear');
+        if (existingWear == null) scene.registry.set('arenaFloorWear', 0);
+        this._applyArenaAtmosphereToRegistry(scene, room);
+      } else {
+        scene.registry.set('arenaAtmosphereActive', false);
+        scene.registry.set('arenaAtmosphereEnergy', 0);
+        scene.registry.set('arenaAtmosphereLightingWarmth', 0.5);
+        scene.registry.set('arenaAtmosphereFloorState', 'pristine');
+        scene.registry.set('arenaAtmosphereIntimidationBonus', 0);
       }
       // Pre-Fight Betting metadata: optional wager layer for select arena rooms.
       // When active, UI can surface bet choices and combat systems can

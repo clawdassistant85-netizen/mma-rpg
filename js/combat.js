@@ -1427,6 +1427,10 @@ window.MMA.Combat = {
     state.engagedAt = scene.time.now;
     return state;
   },
+  isIntuitionPerfectCounterReady: function(scene) {
+    var state = this.ensureIntuitionState(scene);
+    return !!state.ready;
+  },
   applyTauntDebuffIfActive: function(scene, enemy, damage) {
     if (!enemy) return damage;
     enemy.combatState = enemy.combatState || {};
@@ -1589,7 +1593,8 @@ window.MMA.Combat = {
         }
         this.onIntuitionEngage(scene, enemy);
         if (this.maybeTriggerComboBreaker(scene, enemy)) continue;
-        var counterAttack = this.isCounterAttackWindow(scene, enemy);
+        var perfectIntuitionCounter = this.isIntuitionPerfectCounterReady(scene);
+        var counterAttack = perfectIntuitionCounter || this.isCounterAttackWindow(scene, enemy);
         var attackBonus = scene.player.attackBonus || 0;
         var baseDamage = Math.round((move.damage + attackBonus) * 1.2);
         var intuitionDamage = intuitionPrimed ? Math.round(baseDamage * this.INTUITION_DAMAGE_MULTIPLIER) : baseDamage;
@@ -1659,7 +1664,7 @@ window.MMA.Combat = {
           MMA.UI.showDamageText(scene, enemy.x, enemy.y - 102, 'DEADLY WINDOW x1.5', '#ff5c5c');
         }
         if (counterAttack) {
-          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 110, 'COUNTER!', '#8ef9ff');
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 110, perfectIntuitionCounter ? 'PERFECT COUNTER!' : 'COUNTER!', '#8ef9ff');
           this.onStyleShiftCounter(scene, moveKey, true);
           this.triggerAdrenaline(scene);
           adrenalinePrimed = this.isAdrenalinePrimed(scene);
@@ -1755,7 +1760,8 @@ window.MMA.Combat = {
         hit = true;
         this.onIntuitionEngage(scene, enemy);
         if (this.maybeTriggerComboBreaker(scene, enemy)) continue;
-        var counterAttack = this.isCounterAttackWindow(scene, enemy);
+        var perfectIntuitionCounter = this.isIntuitionPerfectCounterReady(scene);
+        var counterAttack = perfectIntuitionCounter || this.isCounterAttackWindow(scene, enemy);
         var attackBonus = scene.player.attackBonus || 0;
         var baseDamage = Math.round((move.damage + attackBonus) * 1.2);
         var intuitionDamage = intuitionPrimed ? Math.round(baseDamage * this.INTUITION_DAMAGE_MULTIPLIER) : baseDamage;
@@ -1820,7 +1826,7 @@ window.MMA.Combat = {
           MMA.UI.showDamageText(scene, enemy.x, enemy.y - 104, 'DEADLY WINDOW x1.5', '#ff5c5c');
         }
         if (counterAttack) {
-          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 112, 'COUNTER!', '#8ef9ff');
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 112, perfectIntuitionCounter ? 'PERFECT COUNTER!' : 'COUNTER!', '#8ef9ff');
           this.onStyleShiftCounter(scene, bestMoveKey, true);
           this.triggerAdrenaline(scene);
           adrenalinePrimed = this.isAdrenalinePrimed(scene);

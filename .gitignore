@@ -5,3 +5,5 @@ __pycache__/
 *.log
 worker.py
 tasks.json
+node_modules/
+server/node_modules/

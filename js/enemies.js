@@ -25,6 +25,115 @@ window.MMA.Enemies = {
     gold: { hpMultiplier: 2.0, attackMultiplier: 1.35, xpMultiplier: 1.35 }
   },
 
+  // Blood Money Bounty: after defeating a boss, player gains a bounty that attracts mercenary hunters
+  // Higher bounty = harder enemies spawn in subsequent zones with scaling bonuses
+  BOUNTY_SYSTEM: {
+    STORAGE_KEY: 'mma_rpg_bounty_level',
+    MAX_BOUNTY: 10,                  // Maximum bounty level
+    HP_PER_LEVEL: 0.15,              // +15% HP per bounty level
+    DAMAGE_PER_LEVEL: 0.12,          // +12% damage per bounty level
+    SPEED_PER_LEVEL: 0.05,           // +5% speed per bounty level
+    SPAWN_CHANCE_BASE: 0.12,         // Base chance to spawn bounty hunter
+    SPAWN_CHANCE_PER_LEVEL: 0.04,    // +4% per bounty level
+    MERCY_WINDOW_MS: 12000,          // Time window to use mercy (non-lethal) to reduce bounty
+    MERCY_REDUCTION: 1,              // Reduce bounty by 1 on mercy kill
+    MAX_BOUNTY_TEXT: 'MAX BOUNTY!',
+    HUNTER_NAME: 'Bounty Hunter',
+    HUNTER_COLOR: 0xff4444,          // Red tint for bounty hunters
+    WARNING_TEXT: 'BOUNTY HUNTER!',
+    APPROACH_TEXT: 'The hunter tracks you...'
+  },
+
+  // Get current bounty level from storage
+  getBountyLevel: function() {
+    try {
+      var data = localStorage.getItem(this.BOUNTY_SYSTEM.STORAGE_KEY);
+      return data ? parseInt(data, 10) : 0;
+    } catch(e) { return 0; }
+  },
+
+  // Increase bounty level (call after boss defeat)
+  increaseBounty: function() {
+    var current = this.getBountyLevel();
+    if (current >= this.BOUNTY_SYSTEM.MAX_BOUNTY) return current;
+    var newLevel = current + 1;
+    try {
+      localStorage.setItem(this.BOUNTY_SYSTEM.STORAGE_KEY, String(newLevel));
+    } catch(e) {}
+    return newLevel;
+  },
+
+  // Decrease bounty level (mercy kill reduces bounty)
+  decreaseBounty: function() {
+    var current = this.getBountyLevel();
+    if (current <= 0) return 0;
+    var newLevel = current - 1;
+    try {
+      localStorage.setItem(this.BOUNTY_SYSTEM.STORAGE_KEY, String(newLevel));
+    } catch(e) {}
+    return newLevel;
+  },
+
+  // Get bounty multipliers for enemy stats
+  getBountyMultipliers: function() {
+    var level = this.getBountyLevel();
+    var cfg = this.BOUNTY_SYSTEM;
+    return {
+      hp: 1 + (level * cfg.HP_PER_LEVEL),
+      damage: 1 + (level * cfg.DAMAGE_PER_LEVEL),
+      speed: 1 + (level * cfg.SPEED_PER_LEVEL),
+      xp: 1 + (level * 0.10) // +10% XP per bounty level for risk/reward
+    };
+  },
+
+  // Check if a bounty hunter should spawn in this room
+  shouldSpawnBountyHunter: function(scene) {
+    var level = this.getBountyLevel();
+    if (level <= 0) return false;
+    var zone = scene.currentZone || 1;
+    if (zone < 2) return false; // Bounty hunters only appear from zone 2+
+    
+    var cfg = this.BOUNTY_SYSTEM;
+    var chance = cfg.SPAWN_CHANCE_BASE + (level * cfg.SPAWN_CHANCE_PER_LEVEL);
+    chance = Math.min(chance, 0.5); // Cap at 50% chance
+    
+    return Math.random() < chance;
+  },
+
+  // Apply bounty hunter modifications to enemy type
+  applyBountyHunterMods: function(type) {
+    var mults = this.getBountyMultipliers();
+    type.hp = Math.round(type.hp * mults.hp);
+    type.maxHp = type.hp;
+    type.attackDamage = Math.round(type.attackDamage * mults.damage);
+    type.speed = Math.round(type.speed * mults.speed);
+    type.xpReward = Math.round(type.xpReward * mults.xp);
+    type.isBountyHunter = true;
+    return type;
+  },
+
+  // Get bounty warning text for UI
+  getBountyWarning: function() {
+    var level = this.getBountyLevel();
+    if (level >= this.BOUNTY_SYSTEM.MAX_BOUNTY) {
+      return { text: this.BOUNTY_SYSTEM.MAX_BOUNTY_TEXT, color: '#ff0000' };
+    }
+    if (level > 0) {
+      return { text: 'BOUNTY LV.' + level, color: '#ff4444' };
+    }
+    return null;
+  },
+
+  // Mercy kill tracking: record that player used non-lethal finish
+  recordMercyKill: function() {
+    // Called when enemy is defeated without lethal damage (stun/knockout only)
+    // Reduces bounty by 1
+    var newLevel = this.decreaseBounty();
+    if (newLevel >= 0 && typeof MMA !== 'undefined' && MMA.UI && MMA.UI.showDamageText) {
+      // This will be shown in the scene context
+    }
+  },
+
   // Get active mercenary contract tier from scene
   getContractTier: function(scene) {
     var tier = null;
@@ -1989,7 +2098,20 @@ window.MMA.Enemies = {
 
     // Trickster: special enemy that occasionally vanishes and reappears behind the player during combat
     // Requires quick camera awareness to defend. Visual: dissolve particle effect followed by reappearance behind player
-    trickster:{name:'Trickster',hp:75,maxHp:75,speed:95,attackDamage:14,attackCooldownMax:1100,attackRange:65,chaseRange:270,color:0xff00aa,xpReward:55,teachesMove:null,zone:2,aiPattern:'trickster',groundDefense:0.25,groundEscape:0.2}
+    trickster:{name:'Trickster',hp:75,maxHp:75,speed:95,attackDamage:14,attackCooldownMax:1100,attackRange:65,chaseRange:270,color:0xff00aa,xpReward:55,teachesMove:null,zone:2,aiPattern:'trickster',groundDefense:0.25,groundEscape:0.2},
+
+    // Bounty Hunter: mercenary hunter that tracks players with active bounties
+    // Spawns based on bounty level, scales with player progress, has unique red glow
+    bountyHunter:{name:'Bounty Hunter',hp:110,maxHp:110,speed:98,attackDamage:18,attackCooldownMax:950,attackRange:65,chaseRange:280,color:0xff4444,xpReward:75,teachesMove:null,zone:2,aiPattern:'bountyHunter',groundDefense:0.35,groundEscape:0.25}
+  },
+
+  // Bounty Hunter AI Config: aggressive hunter with tracking capabilities
+  BOUNTY_HUNTER_CONFIG: {
+    TRACKING_BONUS: 0.15,         // +15% damage when player is low HP
+    LOW_HP_THRESHOLD: 0.30,       // Trigger tracking bonus below 30% HP
+    PURSUE_SPEED_MULT: 1.2,       // 20% faster pursuit
+    SNIPE_RANGE: 120,              // Can attack from longer range
+    HUNTER_GLOW: 0xff4444          // Red glow color
   },
 
   // Trickster AI Config: teleports behind player mid-combat
@@ -2909,6 +3031,13 @@ window.MMA.Enemies = {
       type.contractTier = contractTier;
     }
 
+    // Blood Money Bounty: apply bounty hunter modifications if this is a bounty hunter
+    if (typeKey === 'bountyHunter') {
+      type = self.applyBountyHunterMods(type);
+      // Apply distinctive red tint
+      type.color = self.BOUNTY_SYSTEM.HUNTER_COLOR;
+    }
+
     // Comeback Kid: if you died to this archetype last run, weaken it slightly and grant +Focus.
     this.applyComebackIfAny(scene, typeKey, type);
 
@@ -3017,6 +3146,29 @@ window.MMA.Enemies = {
       if (type.rivalStyle === 'balanced') msg = 'SHADOW: "Still undecided? I\'ll decide for you."';
       scene.registry.set('gameMessage', msg);
       scene.time.delayedCall(2200, function(){ scene.registry.set('gameMessage', ''); });
+    }
+
+    // Blood Money Bounty: show bounty hunter spawn message with red glow
+    if (typeKey === 'bountyHunter') {
+      e.setTint(self.BOUNTY_SYSTEM.HUNTER_COLOR);
+      // Add pulsing glow effect for bounty hunter
+      if (scene.tweens) {
+        scene.tweens.add({
+          targets: e,
+          alpha: 0.7,
+          duration: 350,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
+      var bountyLvl = self.getBountyLevel();
+      var bountyMsg = self.BOUNTY_SYSTEM.WARNING_TEXT;
+      if (bountyLvl >= self.BOUNTY_SYSTEM.MAX_BOUNTY) {
+        bountyMsg = 'MAX BOUNTY HUNTER!';
+      }
+      scene.registry.set('gameMessage', bountyMsg);
+      scene.time.delayedCall(1800, function(){ scene.registry.set('gameMessage', ''); });
     }
 
     scene.enemyGroup.add(e); scene.enemies.push(e);
@@ -3195,6 +3347,22 @@ window.MMA.Enemies = {
         var currentType = pool[replaceIdx];
         if (currentType !== 'mmaChamp' && currentType !== 'shadowRival' && currentType !== 'coach' && currentType !== 'tutor' && currentType !== 'glitcher' && currentType !== 'echo' && currentType !== 'enforcer') {
           pool[replaceIdx] = 'tank';
+        }
+      }
+    }
+
+    // Blood Money Bounty: Bounty Hunter spawn based on player bounty level
+    // Bounty hunters appear when player has accumulated bounty from boss defeats
+    var bountyLevel = this.getBountyLevel();
+    if (bountyLevel > 0 && positions && positions.length && pool && pool.length) {
+      var bountyChance = 0.12 + (bountyLevel * 0.04); // 12% base + 4% per level
+      bountyChance = Math.min(bountyChance, 0.45); // Cap at 45%
+      if (Math.random() < bountyChance) {
+        var replaceIdx = Math.floor(Math.random() * pool.length);
+        var currentType = pool[replaceIdx];
+        // Only replace non-boss enemies
+        if (currentType !== 'mmaChamp' && currentType !== 'shadowRival' && currentType !== 'coach') {
+          pool[replaceIdx] = 'bountyHunter';
         }
       }
     }
@@ -3867,6 +4035,21 @@ window.MMA.Enemies = {
       if (MMA.UI.recordBossDefeat) {
         MMA.UI.recordBossDefeat(bossId, zone, duration);
       }
+      
+      // Blood Money Bounty: increase bounty after boss defeat
+      var newBountyLevel = this.increaseBounty();
+      if (newBountyLevel > 0) {
+        var bountyText = 'BOUNTY INCREASED TO LV.' + newBountyLevel + '!';
+        if (newBountyLevel >= this.BOUNTY_SYSTEM.MAX_BOUNTY) {
+          bountyText = 'MAX BOUNTY REACHED!';
+        }
+        // Show bounty message after victory
+        scene.time.delayedCall(500, function() {
+          scene.registry.set('gameMessage', bountyText);
+          scene.time.delayedCall(2000, function() { scene.registry.set('gameMessage', ''); });
+        });
+      }
+      
       scene.registry.set('gameMessage', 'VICTORY!'); scene.cameras.main.flash(500, 255, 215, 0); scene.gameOver = true;
       scene.registry.set('playerStats', Object.assign({}, scene.player.stats)); scene.registry.set('enemiesDefeated', scene.enemiesDefeated); scene.registry.set('playTime', Math.floor((Date.now() - scene.runStartMs) / 1000)); scene.registry.set('fightStats', Object.assign({}, MMA.UI.fightStats)); scene.registry.set('xpGained', scene._mmaRoomXpGained || 0); scene.registry.set('bossDefeated', true);
       scene.time.delayedCall(3000, function(){ scene.scene.stop(); scene.scene.launch('VictoryScene'); });
@@ -5366,6 +5549,63 @@ window.MMA.Enemies.AI = {
         }
       } else {
         enemy.setVelocity((dx / dist) * enemy.type.speed * speedMod, (dy / dist) * enemy.type.speed * speedMod);
+      }
+    } else {
+      enemy.setVelocity(0, 0);
+    }
+
+    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
+  },
+
+  // Bounty Hunter AI: aggressive hunter that pursues player relentlessly
+  // Gains bonuses when player is low HP, has red glow, and tracks the player
+  bountyHunter: function(enemy, player, scene, dt) {
+    var cfg = window.MMA.Enemies.BOUNTY_HUNTER_CONFIG;
+    var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+    var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
+    var vengeanceMult = window.MMA.Enemies.getVengeanceDamageMult(enemy);
+
+    // Tracking bonus: extra damage when player is low HP
+    var playerHpRatio = (scene.player && scene.player.stats) ? (scene.player.stats.hp / scene.player.stats.maxHp) : 1;
+    var trackingBonus = (playerHpRatio <= cfg.LOW_HP_THRESHOLD) ? cfg.TRACKING_BONUS : 0;
+
+    // Apply pursuit speed bonus
+    var pursuitSpeed = enemy.type.speed * cfg.PURSUE_SPEED_MULT * speedMod;
+
+    // Bounty hunter has longer attack range (can snipe)
+    var snipeRange = cfg.SNIPE_RANGE;
+
+    if (dist < enemy.type.chaseRange * 1.2) {
+      if (dist < snipeRange) {
+        enemy.setVelocity(0, 0);
+        var isEliteBreaker = window.MMA.Enemies.canEliteBreakCoordination(enemy);
+        if ((enemy.hasAttackToken || enemy.isBoss || isEliteBreaker) && enemy.attackCooldown <= 0) {
+          enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod;
+          
+          // Calculate damage with tracking bonus
+          var tMult = window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(enemy, scene) : 1;
+          var dmg = Math.round(enemy.type.attackDamage * (1 + trackingBonus) * vulnMult * vengeanceMult * tMult);
+          
+          if (isEliteBreaker) {
+            dmg = Math.round(dmg * window.MMA.Enemies.ELITE_COORDINATION_BREAK.DAMAGE_MULT);
+            window.MMA.Enemies.recordEliteStrike(enemy, scene, true);
+          }
+          
+          // Body Language Read: brief telegraph
+          if (!window.MMA.Enemies.startTelegraphAttack(enemy, player, scene, dmg, 100, 'HUNTER STRIKE', '#ff4444', 'SHOULDER DIP')) {
+            window.MMA.Enemies.damagePlayer(enemy, scene, dmg);
+          }
+          
+          // Show tracking bonus text if active
+          if (trackingBonus > 0 && typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+            MMA.UI.showDamageText(scene, player.x, player.y - 40, 'TRACKING SHOT!', '#ff4444');
+          }
+        }
+      } else {
+        // Pursuit: move faster than normal
+        enemy.setVelocity((dx/dist) * pursuitSpeed, (dy/dist) * pursuitSpeed);
       }
     } else {
       enemy.setVelocity(0, 0);
