@@ -1,5 +1,17 @@
 window.MMA = window.MMA || {};
 window.MMA.Enemies = {
+  // Helper: compute total damage multiplier for an enemy (packs, vengeance, injuries, enrage)
+  getTotalDamageMultiplier: function(enemy, scene) {
+    // Base pack multiplier
+    var pack = (this.getPackDamageMultiplier) ? this.getPackDamageMultiplier(enemy, scene) : 1;
+    // Vengeance damage multiplier
+    var vengeance = (this.getVengeanceDamageMult) ? this.getVengeanceDamageMult(enemy) : 1;
+    // Injury vulnerability multiplier
+    var injury = (this.getInjuryDamageMultiplier) ? this.getInjuryDamageMultiplier(enemy) : 1;
+    // Enrage attack bonus (converted to multiplier)
+    var enrage = (enemy && enemy.isEnraged && enemy.enrageAttackBonus) ? (1 - enemy.enrageAttackBonus) : 1;
+    return pack * vengeance * injury * enrage;
+  },
   // Mercenary Contracts: boosts enemy stats when active (purchased by player)
   MERCENARY_CONTRACTS: {
     // No contract: default behavior

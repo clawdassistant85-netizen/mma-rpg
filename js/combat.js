@@ -53,7 +53,7 @@ window.MMA.Combat = {
     jab: { name: 'Ground & Pound', damage: 22, staminaCost: 8, cooldown: 500 },
     cross: { name: 'Elbow', damage: 32, staminaCost: 18, cooldown: 900 },
     takedown: { name: 'Submission Attempt', staminaCost: 22, cooldown: 1200 },
-    special: { name: 'Stand Up', staminaCost: 6, cooldown: 600 }
+    special: { name: 'Improve Position', staminaCost: 10, cooldown: 800 }
   },
   rollDamage: function(baseDamage, critChance, forceCrit) {
     var finalCritChance = typeof critChance === 'number' ? critChance : this.CRIT_CHANCE;
@@ -366,7 +366,7 @@ window.MMA.Combat = {
     
     // Position-based submission availability
     var positionSubs = {
-      fullGuard: ['triangleChoke', 'armbar'],
+      fullGuard: ['rnc', 'triangleChoke', 'armbar', 'guillotine'],
       halfGuard: ['kimura', 'americana'],
       sideControl: ['americana', 'kimura'],
       mount: ['armbar', 'americana', 'rnc'],

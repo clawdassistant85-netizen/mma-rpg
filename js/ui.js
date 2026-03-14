@@ -1991,10 +1991,10 @@ window.MMA.UI = {
       unlockedSubs = ['rnc']; // default
     }
     
-    // Position-based submission availability
+    // Position-based submission availability (RNC available from guard + back control)
     var positionSubs = {
-      fullGuard: ['triangleChoke', 'armbar'],
-      halfGuard: ['kimura', 'americana'],
+      fullGuard: ['rnc', 'triangleChoke', 'armbar', 'guillotine'],
+      halfGuard: ['kimura', 'americana', 'rnc'],
       sideControl: ['americana', 'kimura'],
       mount: ['armbar', 'americana', 'rnc'],
       backControl: ['rnc', 'kimura', 'americana']

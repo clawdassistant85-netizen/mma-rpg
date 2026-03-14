@@ -13,6 +13,7 @@ var BootScene = new Phaser.Class({
     this.installPortraitHook();
     this.installReactionFaceHook();
     this.installStyleAuraHook();
+    this.installImpactSweatHook();
     this.installShadowDoubleHook();
     this.installShadowDoubleDamageHook();
     this.scene.start('GameScene');
@@ -529,6 +530,118 @@ var BootScene = new Phaser.Class({
 
     Phaser.Physics.Arcade.Sprite.prototype._mmaStyleAuraHookInstalled = true;
   },
+  installImpactSweatHook: function() {
+    if (window.MMA && window.MMA.Combat && window.MMA.Combat._mmaImpactSweatHookInstalled) return;
+    if (!window.MMA || !window.MMA.Combat) return;
+
+    function getImpactTextures() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.IMPACT_PARTICLE_TEXTURES) || {};
+    }
+
+    function readComboCount(scene) {
+      return (scene && scene.player && scene.player.comboState && typeof scene.player.comboState.index === 'number') ? scene.player.comboState.index : 1;
+    }
+
+    function spawnSweatBurst(scene, attacker, defender, damage, moveKey, comboCount, isSpecial) {
+      if (!scene || !scene.add || !scene.tweens || !defender || !defender.active) return;
+      var textures = getImpactTextures();
+      var heavy = !!(isSpecial || comboCount >= 6 || damage >= 18);
+      var textureKey = heavy ? (textures.heavySweat || textures.sweat) : textures.sweat;
+      if (!textureKey) return;
+
+      var dirX = 0;
+      var dirY = -1;
+      if (attacker && defender) {
+        dirX = defender.x - attacker.x;
+        dirY = defender.y - attacker.y;
+        var len = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
+        dirX /= len;
+        dirY /= len;
+      }
+      var spread = Math.min(18, 8 + comboCount * 0.8 + (isSpecial ? 4 : 0));
+      var droplets = Math.max(4, Math.min(14, 4 + Math.floor(comboCount / 2) + (heavy ? 3 : 0)));
+      var originX = defender.x - dirX * 10;
+      var originY = defender.y - 18 - Math.max(0, dirY) * 6;
+      for (var i = 0; i < droplets; i++) {
+        var droplet = scene.add.image(originX, originY, textureKey);
+        var angle = Phaser.Math.FloatBetween(-spread, spread);
+        var speed = Phaser.Math.Between(35, heavy ? 135 : 95) + comboCount * 4;
+        var velocity = new Phaser.Math.Vector2(dirX || 0, dirY || -1).rotate(Phaser.Math.DegToRad(angle)).scale(speed);
+        var driftX = velocity.x + Phaser.Math.Between(-16, 16);
+        var driftY = velocity.y - Phaser.Math.Between(10, heavy ? 34 : 22);
+        var scale = Phaser.Math.FloatBetween(heavy ? 0.5 : 0.38, heavy ? 0.95 : 0.72);
+        droplet.setDepth((defender.depth || 0) + 5);
+        droplet.setScale(scale);
+        droplet.setRotation(Phaser.Math.FloatBetween(-0.6, 0.6));
+        droplet.setAlpha(heavy ? 0.92 : 0.78);
+        if (heavy && i % 3 === 0) droplet.setTint(0xe8f7ff);
+        scene.tweens.add({
+          targets: droplet,
+          x: originX + driftX,
+          y: originY + driftY + Phaser.Math.Between(-6, 8),
+          alpha: 0,
+          scaleX: scale * 0.55,
+          scaleY: scale * 0.55,
+          angle: droplet.angle + Phaser.Math.Between(-90, 90),
+          duration: Phaser.Math.Between(180, heavy ? 360 : 280),
+          ease: 'Quad.easeOut',
+          onComplete: function(tween, targets) {
+            if (targets && targets[0]) targets[0].destroy();
+          }
+        });
+      }
+
+      if (comboCount >= 5 && window.MMA && window.MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        var label = comboCount >= 10 ? 'SWEAT STORM!' : 'SWEAT SHOWER!';
+        MMA.UI.showDamageText(scene, defender.x, defender.y - 96, label, heavy ? '#d7f0ff' : '#b8e8ff');
+      }
+      defender._mmaLastImpactSweatAt = scene.time && typeof scene.time.now === 'number' ? scene.time.now : 0;
+      defender._mmaLastImpactMove = moveKey || null;
+    }
+
+    function snapshotEnemyHealth(scene) {
+      var enemies = (scene && scene.enemyGroup && typeof scene.enemyGroup.getChildren === 'function') ? scene.enemyGroup.getChildren() : [];
+      return enemies.map(function(enemy) {
+        return {
+          enemy: enemy,
+          hp: enemy && enemy.stats && typeof enemy.stats.hp === 'number' ? enemy.stats.hp : null
+        };
+      });
+    }
+
+    function applyImpactSweat(scene, beforeState, moveKey, isSpecial) {
+      if (!scene || !scene.player) return;
+      var comboCount = readComboCount(scene);
+      for (var i = 0; i < beforeState.length; i++) {
+        var entry = beforeState[i];
+        var enemy = entry.enemy;
+        if (!enemy || !enemy.active || !enemy.stats || typeof entry.hp !== 'number' || typeof enemy.stats.hp !== 'number') continue;
+        var dealt = Math.max(0, entry.hp - enemy.stats.hp);
+        if (dealt <= 0) continue;
+        spawnSweatBurst(scene, scene.player, enemy, dealt, moveKey, comboCount, isSpecial);
+      }
+    }
+
+    function wrapCombatMethod(methodName, moveResolver, isSpecialResolver) {
+      var original = window.MMA.Combat[methodName];
+      if (typeof original !== 'function' || original._mmaImpactSweatWrapped) return;
+      var wrapped = function(scene) {
+        var before = snapshotEnemyHealth(scene);
+        var result = original.apply(this, arguments);
+        applyImpactSweat(scene, before, moveResolver ? moveResolver.apply(this, arguments) : methodName, isSpecialResolver ? isSpecialResolver.apply(this, arguments) : false);
+        return result;
+      };
+      wrapped._mmaImpactSweatWrapped = true;
+      window.MMA.Combat[methodName] = wrapped;
+    }
+
+    wrapCombatMethod('executeMove', function(scene, moveKey) { return moveKey; }, function(scene, moveKey) { return moveKey === 'special'; });
+    wrapCombatMethod('executeSpecialMove', function() { return 'special'; }, function() { return true; });
+    wrapCombatMethod('executeGroundMove', function(scene, moveKey) { return moveKey; }, function(scene, moveKey) { return moveKey === 'special' || moveKey === 'submission'; });
+
+    window.MMA.Combat._mmaImpactSweatHookInstalled = true;
+  },
+
   installShadowDoubleHook: function() {
     if (Phaser.Physics.Arcade.Sprite.prototype._mmaShadowDoubleHookInstalled) return;
 

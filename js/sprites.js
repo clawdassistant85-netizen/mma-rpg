@@ -6,6 +6,7 @@ window.MMA.Sprites = {
   PORTRAIT_TEXTURES: {},
   AURA_TEXTURES: {},
   AURA_LAYER_TEXTURES: {},
+  IMPACT_PARTICLE_TEXTURES: {},
   SHADOW_DOUBLE_CONFIG: {
     healthThreshold: 0.35,
     damageMultiplier: 0.3,
@@ -304,6 +305,16 @@ window.MMA.Sprites = {
       g.generateTexture(key, 24, 24); g.destroy();
     }
     function textureHitbox(key) { var g = self.make.graphics({ x:0, y:0, add:false }); g.fillStyle(0xffff00, 1); g.fillRect(0, 0, 24, 24); g.lineStyle(2, 0xffcc00, 1); g.strokeRect(1, 1, 22, 22); g.generateTexture(key, 24, 24); g.destroy(); }
+    function textureSweatParticle(key, opts) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var fill = (opts && opts.fill) || 0x9fd4ff;
+      var highlight = (opts && opts.highlight) || 0xffffff;
+      var alpha = (opts && typeof opts.alpha === 'number') ? opts.alpha : 0.9;
+      g.fillStyle(fill, alpha); g.fillEllipse(8, 10, 8, 12);
+      g.fillStyle(highlight, 0.72); g.fillEllipse(6, 7, 3, 4);
+      g.lineStyle(1, 0xffffff, 0.35); g.strokeEllipse(8, 10, 8, 12);
+      g.generateTexture(key, 16, 16); g.destroy();
+    }
 
     textureFloorStreet('floor'); textureWallStreet('wall'); textureGymFloor('gymFloor'); textureGymWall('gymWalls');
     textureCageFloor('cageFloor'); textureCageWall('cageWall'); textureCrate('crateProp'); textureDebris('debrisProp'); textureLamp('lampProp');
@@ -380,6 +391,12 @@ window.MMA.Sprites = {
     };
     texturePickup('item_pickup');
     texturePickup('pickup_health');
+    textureSweatParticle('impact_sweat', { fill: 0x9fd4ff, highlight: 0xffffff, alpha: 0.92 });
+    textureSweatParticle('impact_sweat_heavy', { fill: 0xbfe6ff, highlight: 0xffffff, alpha: 0.98 });
+    window.MMA.Sprites.IMPACT_PARTICLE_TEXTURES = {
+      sweat: 'impact_sweat',
+      heavySweat: 'impact_sweat_heavy'
+    };
     textureHitbox('hitbox');
   },
   
