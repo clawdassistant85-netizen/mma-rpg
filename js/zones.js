@@ -3,16 +3,64 @@ window.MMA.Zones = {
   ZONE1_ROOMS: {
     room1:{id:'room1',zone:1,weatherOptions:['clear','clear','rain','night'],weightClass:'light',doors:{left:{col:0,row:5},right:{col:15,row:5},up:{col:7,row:0}},connections:{left:'room2',right:'room3',up:'room4'},spawnPositions:[{col:3,row:3},{col:12,row:3},{col:12,row:9}],enemyPool:['streetThug','streetThug','barBrawler'],name:'Alley Entrance'},
     room2:{id:'room2',zone:1,weatherOptions:['clear','rain','wind'],weightClass:'light',doors:{right:{col:15,row:5}},connections:{right:'room1'},spawnPositions:[{col:3,row:3},{col:3,row:9}],enemyPool:['streetThug','barBrawler'],name:'Side Alley'},
+    // Secret alley with bonus loot hooks – discovered as a side path off the main street
+    secret1:{
+      id:'secret1',
+      zone:1,
+      weatherOptions:['night','clear'],
+      weightClass:'light',
+      doors:{down:{col:7,row:11}},
+      connections:{down:'room2'},
+      spawnPositions:[{col:7,row:6}],
+      enemyPool:['barBrawler'],
+      name:'Hidden Back Alley',
+      secret:true,
+      secretLabel:'Secret Loot Alley',
+      bonusLootTags:['cash','rare'],
+      bonusCurrencyMultiplier:2.0
+    },
     room3:{id:'room3',zone:1,weatherOptions:['clear','clear','night','wind'],weightClass:'light',doors:{left:{col:0,row:5}},connections:{left:'room1'},spawnPositions:[{col:3,row:5},{col:12,row:3},{col:12,row:9}],enemyPool:['barBrawler','barBrawler','muayThaiFighter'],name:'Back Lot'},
-    room4:{id:'room4',zone:1,weatherOptions:['clear','rain'],weightClass:'light',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'room1',up:'gym1'},spawnPositions:[{col:3,row:8},{col:12,row:8}],enemyPool:['barBrawler','muayThaiFighter','muayThaiFighter'],name:'Storage Area'}
+    room4:{id:'room4',zone:1,weatherOptions:['clear','rain'],weightClass:'light',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'room1',up:'clinic1'},spawnPositions:[{col:3,row:8},{col:12,row:8}],enemyPool:['barBrawler','muayThaiFighter','muayThaiFighter'],name:'Storage Area'},
+    // Clinic/Medical Bay: inter-zone recovery space between street and gym
+    clinic1:{
+      id:'clinic1',
+      zone:1,
+      weatherOptions:['clear','rain'],
+      weightClass:'standard',
+      doors:{down:{col:7,row:11},up:{col:7,row:0}},
+      connections:{down:'room4',up:'gym1'},
+      spawnPositions:[{col:7,row:6}],
+      enemyPool:[],
+      name:'Medical Tent',
+      clinic:true,
+      clinicLabel:'Clinic / Medical Bay',
+      clinicServices:{ healHp:true, removeInjuries:true },
+      clinicBaseCost:25,
+      clinicCostPerZone:10
+    }
   },
   ZONE2_ROOMS: {
-    gym1:{id:'gym1',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{left:{col:0,row:5},right:{col:15,row:5},down:{col:7,row:11}},connections:{left:'gym2',right:'gym3',down:'room4'},spawnPositions:[{col:4,row:4},{col:11,row:4},{col:7,row:8}],enemyPool:['wrestler','judoka','groundNPounder'],name:'Gym Entrance'},
+    gym1:{id:'gym1',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{left:{col:0,row:5},right:{col:15,row:5},down:{col:7,row:11}},connections:{left:'gym2',right:'gym3',down:'clinic1'},spawnPositions:[{col:4,row:4},{col:11,row:4},{col:7,row:8}],enemyPool:['wrestler','judoka','groundNPounder'],name:'Gym Entrance'},
     gym2:{id:'gym2',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{right:{col:15,row:5}},connections:{right:'gym1'},spawnPositions:[{col:4,row:4},{col:4,row:8}],enemyPool:['wrestler','judoka'],name:'Weight Area'},
     gym3:{id:'gym3',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{left:{col:0,row:5},up:{col:7,row:0}},connections:{left:'gym1',up:'gym4'},spawnPositions:[{col:11,row:4},{col:11,row:8}],enemyPool:['judoka','groundNPounder'],enemyPoolTrainers:['wrestler','judoka'],name:'Mats Hall'},
     // Dedicated Training Room: used for speed/accuracy/endurance minigame hooks
     gym4:{id:'gym4',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym3',up:'gymTraining'},spawnPositions:[{col:7,row:4},{col:7,row:8}],enemyPool:['wrestler','groundNPounder','groundNPounder'],name:'Training Ring'},
-    gymTraining:{id:'gymTraining',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{down:{col:7,row:11}},connections:{down:'gym4'},spawnPositions:[{col:5,row:4},{col:9,row:4},{col:7,row:8}],enemyPool:['wrestler','judoka','groundNPounder'],trainingTypes:['speed','accuracy','endurance'],trainingLabel:'Gym Training Room'}
+    gymTraining:{id:'gymTraining',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym4',up:'trainingSim'},spawnPositions:[{col:5,row:4},{col:9,row:4},{col:7,row:8}],enemyPool:['wrestler','judoka','groundNPounder'],trainingTypes:['speed','accuracy','endurance'],trainingLabel:'Gym Training Room'},
+    // Training Simulation: slow-mo friendly practice space with infinite stamina & dummy targets
+    trainingSim:{
+      id:'trainingSim',
+      zone:2,
+      weatherOptions:['clear'],
+      weightClass:'middle',
+      doors:{down:{col:7,row:11}},
+      connections:{down:'gymTraining'},
+      spawnPositions:[{col:7,row:6}],
+      enemyPool:[],
+      name:'Training Simulation Ring',
+      trainingSimulation:true,
+      trainingSimLabel:'Training Simulation',
+      trainingSimOptions:{ infiniteStamina:true, spawnDummies:true, allowSlowMoToggle:true }
+    }
   },
   ZONE3_ROOMS: {
     // Crowd metadata for arena rooms
@@ -22,19 +70,19 @@ window.MMA.Zones = {
     // crowdLabel: short description displayed to player
     // weightClass: "light", "middle", "heavy" or "standard" (default)
     oct1:{id:'oct1',zone:3,weatherOptions:['clear','night'],weightClass:'middle',cornerPressure:true,crowdSize:200,baseHype:0.3,maxHype:0.8,crowdLabel:'Rowdy Entrance Crowd',
-      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,
       doors:{right:{col:15,row:5},up:{col:7,row:0}},connections:{right:'oct2',up:'oct3'},
       spawnPositions:[{col:3,row:4},{col:12,row:4}],enemyPool:['bjjBlackBelt'],name:'Arena Entrance',narratorStyle:'arenaPrelims'},
     oct2:{id:'oct2',zone:3,weatherOptions:['clear','night','wind'],weightClass:'middle',cornerPressure:true,crowdSize:300,baseHype:0.5,maxHype:0.9,crowdLabel:'Boisterous Prelim Crowd',
-      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,
       doors:{left:{col:0,row:5}},connections:{left:'oct1'},
       spawnPositions:[{col:3,row:3},{col:3,row:8}],enemyPool:['bjjBlackBelt','bjjBlackBelt'],name:'Prelim Cage',narratorStyle:'arenaPrelims'},
     oct3:{id:'oct3',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:500,baseHype:0.7,maxHype:1.0,crowdLabel:'Electric Main Cage Crowd',
-      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct1',up:'oct4'},
       spawnPositions:[{col:5,row:5},{col:9,row:5}],enemyPool:['bjjBlackBelt'],name:'Main Cage',narratorStyle:'arenaMain'},
     oct4:{id:'oct4',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:800,baseHype:0.9,maxHype:1.0,crowdLabel:'Championship Crowd',
-      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct3',up:'survival1'},
       spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:'Championship Ring',narratorStyle:'arenaTitle'},
     // Survival Time Attack: 90s endurance room with escalating waves and score focus
@@ -50,8 +98,8 @@ window.MMA.Zones = {
       crowdLabel:'Time-Attack Crowd',
       ringPowerups:true,
       ringPowerupTypes:['hp','stamina','focus'],
-      doors:{down:{col:7,row:11}},
-      connections:{down:'oct4'},
+      doors:{down:{col:7,row:11},up:{col:7,row:0}},
+      connections:{down:'oct4',up:'rapid1'},
       spawnPositions:[{col:4,row:5},{col:11,row:5}],
       enemyPool:['bjjBlackBelt','mmaChamp'],
       name:'Survival Time Attack Cage',
@@ -59,6 +107,56 @@ window.MMA.Zones = {
       survivalMode:true,
       survivalDurationSeconds:90,
       survivalScoreMultiplier:1.5
+    },
+    // Rapid Fire Room: 15s escalation sprint with short-interval spawns
+    // Combat/enemy systems read rapidFire* registry keys to drive wave logic.
+    rapid1:{
+      id:'rapid1',
+      zone:3,
+      weatherOptions:['clear','night'],
+      weightClass:'heavy',
+      cornerPressure:true,
+      crowdSize:750,
+      baseHype:0.7,
+      maxHype:1.0,
+      crowdLabel:'Rapid Fire Crowd',
+      ringPowerups:true,
+      ringPowerupTypes:['hp','stamina','focus'],
+      doors:{down:{col:7,row:11},up:{col:7,row:0}},
+      connections:{down:'survival1',up:'bossRush1'},
+      spawnPositions:[{col:4,row:5},{col:11,row:5}],
+      enemyPool:['bjjBlackBelt','mmaChamp'],
+      name:'Rapid Fire Cage',
+      narratorStyle:'arenaSurvival',
+      rapidFireMode:true,
+      rapidFireDurationSeconds:15,
+      rapidFireSpawnIntervalSeconds:2,
+      rapidFireScoreMultiplier:2.0
+    },
+    // Boss Rush Corridor: sequential mini-boss gauntlet with no healing between waves
+    bossRush1:{
+      id:'bossRush1',
+      zone:3,
+      weatherOptions:['clear','night'],
+      weightClass:'heavy',
+      cornerPressure:true,
+      crowdSize:900,
+      baseHype:0.8,
+      maxHype:1.0,
+      crowdLabel:'Boss Rush Crowd',
+      ringPowerups:true,
+      ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,
+      doors:{down:{col:7,row:11}},
+      connections:{down:'rapid1'},
+      spawnPositions:[{col:7,row:5}],
+      enemyPool:['mmaChamp'],
+      name:'Boss Rush Corridor',
+      narratorStyle:'arenaTitle',
+      bossRushMode:true,
+      bossRushWaves:3,
+      bossRushWaveEnemyPool:['mmaChamp','bjjBlackBelt'],
+      bossRushNoHealBetweenWaves:true,
+      bossRushRewardTags:['rare','equipment']
     }
 
   },
@@ -77,7 +175,7 @@ window.MMA.Zones = {
       crowdLabel:'Legendary Dojo Crowd',
       // Ring side power-ups are active in the Dojo as well
       ringPowerups:true,
-      ringPowerupTypes:['hp','stamina','focus'],
+      ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,
       doors:{down:{col:7,row:11}},
       connections:{down:'oct4'},
       spawnPositions:[{col:7,row:5}],
@@ -248,10 +346,127 @@ window.MMA.Zones = {
       regions: regions
     };
   },
+  // Arena Wall Tech configuration helper
+  // Exposes rope and corner post regions so movement/combat systems can
+  // implement bounces, vaults, and rope-trip interactions without hardcoding
+  // geometry. This is intentionally conservative so it layers cleanly with
+  // corner pressure and crowd dynamics.
+  getArenaWallTechConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room) return null;
+    // Only cage/arena style zones support wall tech for now.
+    if (room.zone !== 3 && room.zone !== 4) return null;
+    // Use the same 16x12 tile grid assumptions as buildRoom(). Perimeter
+    // walls live on col 0/15 and row 0/11; we keep interaction pockets just
+    // inside those tiles so collision checks stay simple.
+    var ropeSegments = [
+      // Top and bottom ropes (horizontal runs just inside perimeter walls)
+      { colMin:1, colMax:14, rowMin:1, rowMax:1, side:'top' },
+      { colMin:1, colMax:14, rowMin:10, rowMax:10, side:'bottom' },
+      // Left and right ropes (vertical runs)
+      { colMin:1, colMax:1, rowMin:1, rowMax:10, side:'left' },
+      { colMin:14, colMax:14, rowMin:1, rowMax:10, side:'right' }
+    ];
+    var cornerPosts = [
+      { col:1, row:1, label:'topLeft' },
+      { col:14, row:1, label:'topRight' },
+      { col:1, row:10, label:'bottomLeft' },
+      { col:14, row:10, label:'bottomRight' }
+    ];
+    return {
+      active: true,
+      // Bounce dodge: quick wall-touch dodge uses these speed modifiers
+      bounceDodgeSpeedMultiplier: 1.20,
+      bounceDodgeStaminaCostMultiplier: 1.15,
+      // Rope vault: aerial attack launched off the ropes
+      ropeVaultDamageMultiplier: 1.30,
+      ropeVaultStaminaCostMultiplier: 1.25,
+      // Rope trip: grappler-only bonus when slamming opponents into ropes
+      ropeTripDamageMultiplier: 1.40,
+      ropeTripStunSeconds: 0.75,
+      ropeSegments: ropeSegments,
+      cornerPosts: cornerPosts
+    };
+  },
+  // Environmental Hazard Rooms helper
+  // Encodes special room variants like slippery floors, loose ropes,
+  // dark/limited-visibility arenas, and electrified cages entirely via
+  // metadata so combat/movement systems can opt-in by reading registry
+  // state instead of hardcoding specific room ids.
+  getHazardConfigForRoom: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room) return null;
+    // For the first pass we keep things simple and flag a single
+    // high-intensity arena room as an electrified cage hazard. This
+    // gives combat and movement systems a clear place to hook in
+    // without changing base arena layouts.
+    if (room.id === 'survival1') {
+      return {
+        active: true,
+        type: 'electrifiedCage',
+        label: 'Electrified Cage',
+        // Touching perimeter walls/ropes can be treated as periodic chip
+        // damage by combat systems. Values are intentionally conservative
+        // so this stacks gently with Corner Pressure and Wall Tech.
+        wallTouchDamageMultiplier: 1.25,
+        wallTouchTickSeconds: 1.0,
+        visibilityMultiplier: 0.9,
+        // Optional hook for VFX/audio systems: brief zap on contact.
+        vfxKey: 'hazardZap',
+        sfxKey: 'hazardZap'
+      };
+    }
+    return null;
+  },
   // Compute damage bonus (0 to 0.10) based on current hype (0-1)
   computeCrowdDamageBonus: function(hype) {
     var maxBonus = 0.10;
     return Math.min(maxBonus, maxBonus * hype);
+  },
+  // Crowd Funding System helpers
+  // Arena zones with crowdFunding:true can accumulate a between-rooms
+  // "donation" pool based on fight performance and current hype. Combat
+  // systems can later spend this balance for mid-combat boosts.
+  getCrowdFundingConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.crowdFunding) return null;
+    var crowd = this.getCrowdInfo(roomId) || { crowdSize: 0 };
+    // Keep numbers small so it feels like pocket money earned between rooms.
+    return {
+      active: true,
+      // Base donation rate per point of performance score.
+      // Final credit = performanceScore * (rate * crowdSizeScale)
+      baseRate: 0.15,
+      // Soft cap so one fight cannot flood the meter.
+      maxPerFight: 150,
+      // Crowd size increases generosity but with diminishing returns.
+      crowdSizeScale: Math.min(3, 0.001 * (crowd.crowdSize || 0) + 0.25)
+    };
+  },
+  // Register performance after a fight to grow the crowd funding pool.
+  // payload can include: damageDealt, killCount, maxCombo.
+  registerCrowdFundingPerformance: function(scene, payload) {
+    if (!scene || !scene.registry || !scene.currentRoomId) return;
+    var cfg = this.getCrowdFundingConfig(scene.currentRoomId);
+    if (!cfg || !cfg.active) return;
+    var damage = payload && payload.damageDealt ? payload.damageDealt : 0;
+    var kills = payload && payload.killCount ? payload.killCount : 0;
+    var combo = payload && payload.maxCombo ? payload.maxCombo : 0;
+    // Simple weighted score: damage carries most weight, then kills, then combo flair.
+    var performanceScore = (damage * 0.04) + (kills * 6) + (combo * 1.2);
+    if (performanceScore <= 0) return;
+    var hype = scene.registry.get('crowdHype') || 0;
+    // Hype makes the crowd more generous (up to +50%).
+    var hypeScale = 1 + 0.5 * Math.max(0, Math.min(1, hype));
+    var donationRaw = performanceScore * cfg.baseRate * cfg.crowdSizeScale * hypeScale;
+    var donation = Math.min(cfg.maxPerFight, donationRaw);
+    if (donation <= 0.5) return; // Ignore tiny trickles.
+    var existing = scene.registry.get('crowdFundingBalance') || 0;
+    var newBalance = existing + Math.round(donation);
+    scene.registry.set('crowdFundingBalance', newBalance);
+    // Optional subtle HUD ping so players notice momentum without spam.
+    scene.registry.set('gameMessage', 'Crowd Funding: +$'+Math.round(donation)+' from the arena crowd.');
+    scene.time.delayedCall(2200, function(){ scene.registry.set('gameMessage', ''); });
   },
   // Time-of-day helpers for outdoor zones (currently used by Zone 1 street rooms)
   // Stored on the scene registry so other systems (UI, VFX) can read it.
@@ -398,6 +613,27 @@ window.MMA.Zones = {
         scene.registry.set('crowdDamageBonus', 0);
         scene.registry.set('crowdLabel', '');
       }
+      // Crowd Funding System metadata: arena-only donation pool based on
+      // fight performance and hype. This is intentionally light-touch –
+      // combat systems decide when/how to spend it for one-time boosts.
+      if (room.crowdFunding && scene.registry.get('crowdActive')) {
+        scene.registry.set('crowdFundingActive', true);
+        // Preserve any existing balance when re-entering the same arena.
+        var existingBalance = scene.registry.get('crowdFundingBalance');
+        if (existingBalance == null) {
+          scene.registry.set('crowdFundingBalance', 0);
+        }
+        // Static menu of boosts that other systems can hook into.
+        scene.registry.set('crowdFundingOptions', [
+          { id:'damageSpike', label:'+30% damage next attack', cost:75 },
+          { id:'staminaRefill', label:'Instant +50% stamina', cost:60 },
+          { id:'enemyDistraction', label:'Crowd distraction – next enemy attack whiffs', cost:90 }
+        ]);
+      } else {
+        scene.registry.set('crowdFundingActive', false);
+        // Preserve balance so donations feel persistent within the broader arena run.
+        scene.registry.set('crowdFundingOptions', []);
+      }
       // Training Room metadata: used by player/combat/UI systems for minigames
       if (room.trainingTypes && room.trainingTypes.length) {
         scene.registry.set('trainingActive', true);
@@ -412,6 +648,55 @@ window.MMA.Zones = {
         scene.registry.set('trainingActive', false);
         scene.registry.set('trainingTypes', []);
         scene.registry.set('trainingLabel', '');
+      }
+      // Training Simulation metadata: sandbox practice room with infinite stamina & dummy targets
+      if (room.trainingSimulation) {
+        scene.registry.set('trainingSimActive', true);
+        scene.registry.set('trainingSimLabel', room.trainingSimLabel || 'Training Simulation');
+        scene.registry.set('trainingSimOptions', room.trainingSimOptions || { infiniteStamina:true, spawnDummies:true, allowSlowMoToggle:true });
+        scene.time.delayedCall(2350, function(){
+          scene.registry.set('gameMessage', 'Training Simulation: infinite stamina and dummy targets – perfect for learning patterns.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('trainingSimActive', false);
+        scene.registry.set('trainingSimLabel', '');
+        scene.registry.set('trainingSimOptions', {});
+      }
+      // Clinic / Medical Bay metadata: between-zone healing & injury removal hooks
+      if (room.clinic) {
+        scene.registry.set('clinicActive', true);
+        scene.registry.set('clinicLabel', room.clinicLabel || 'Clinic');
+        scene.registry.set('clinicServices', room.clinicServices || { healHp:true, removeInjuries:true });
+        scene.registry.set('clinicBaseCost', room.clinicBaseCost != null ? room.clinicBaseCost : 25);
+        scene.registry.set('clinicCostPerZone', room.clinicCostPerZone != null ? room.clinicCostPerZone : 10);
+        // Hint to the player that this is a recovery-focused space
+        scene.time.delayedCall(2150, function(){
+          scene.registry.set('gameMessage', 'Clinic: spend fight earnings to heal up or clear lingering injuries.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('clinicActive', false);
+        scene.registry.set('clinicLabel', '');
+        scene.registry.set('clinicServices', {});
+        scene.registry.set('clinicBaseCost', 0);
+        scene.registry.set('clinicCostPerZone', 0);
+      }
+      // Secret Room metadata: hidden rooms with bonus loot/currency hooks
+      if (room.secret) {
+        scene.registry.set('secretRoomActive', true);
+        scene.registry.set('secretRoomLabel', room.secretLabel || room.secretLabel || 'Secret Room');
+        scene.registry.set('secretBonusLootTags', (room.bonusLootTags || []).slice());
+        scene.registry.set('secretCurrencyMultiplier', room.bonusCurrencyMultiplier != null ? room.bonusCurrencyMultiplier : 1.5);
+        scene.time.delayedCall(2250, function(){
+          scene.registry.set('gameMessage', 'Secret Room: bonus loot and extra payout opportunities here.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('secretRoomActive', false);
+        scene.registry.set('secretRoomLabel', '');
+        scene.registry.set('secretBonusLootTags', []);
+        scene.registry.set('secretCurrencyMultiplier', 1.0);
       }
       // Weight Class metadata: used by player/combat systems to adjust speed vs power
       var weightClass = room.weightClass || 'standard';
@@ -469,6 +754,25 @@ window.MMA.Zones = {
         scene.registry.set('survivalScoreMultiplier', 1.0);
         scene.registry.set('survivalRoomName', '');
       }
+      // Rapid Fire Room metadata: short-timer wave sprint rooms
+      if (room.rapidFireMode) {
+        scene.registry.set('rapidFireModeActive', true);
+        scene.registry.set('rapidFireDurationSeconds', room.rapidFireDurationSeconds || 15);
+        scene.registry.set('rapidFireSpawnIntervalSeconds', room.rapidFireSpawnIntervalSeconds || 2);
+        scene.registry.set('rapidFireScoreMultiplier', room.rapidFireScoreMultiplier || 2.0);
+        scene.registry.set('rapidFireRoomName', room.name || 'Rapid Fire Room');
+        scene.time.delayedCall(2450, function(){
+          var dur = scene.registry.get('rapidFireDurationSeconds') || 15;
+          scene.registry.set('gameMessage', 'Rapid Fire Room: defeat as many as possible in '+dur+' seconds.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('rapidFireModeActive', false);
+        scene.registry.set('rapidFireDurationSeconds', 0);
+        scene.registry.set('rapidFireSpawnIntervalSeconds', 0);
+        scene.registry.set('rapidFireScoreMultiplier', 1.0);
+        scene.registry.set('rapidFireRoomName', '');
+      }
       // Ring Side Power-Ups metadata: arena-only buff item hooks
       if (room.ringPowerups) {
         scene.registry.set('ringPowerupsActive', true);
@@ -505,6 +809,82 @@ window.MMA.Zones = {
         scene.registry.set('cornerPressureDamageTakenMultiplier', 1.0);
         scene.registry.set('cornerPressureDamageDealtMultiplier', 1.0);
         scene.registry.set('cornerPressureRegions', []);
+      }
+      // Arena Wall Tech metadata: environmental interaction zones for bounces/vaults/trips
+      var wallTechCfg = this.getArenaWallTechConfig(room.id);
+      if (wallTechCfg && wallTechCfg.active) {
+        scene.registry.set('arenaWallTechActive', true);
+        scene.registry.set('arenaWallTechRopeSegments', wallTechCfg.ropeSegments || []);
+        scene.registry.set('arenaWallTechCornerPosts', wallTechCfg.cornerPosts || []);
+        scene.registry.set('arenaWallTechBounceDodgeSpeedMultiplier', wallTechCfg.bounceDodgeSpeedMultiplier || 1.0);
+        scene.registry.set('arenaWallTechBounceDodgeStaminaCostMultiplier', wallTechCfg.bounceDodgeStaminaCostMultiplier || 1.0);
+        scene.registry.set('arenaWallTechRopeVaultDamageMultiplier', wallTechCfg.ropeVaultDamageMultiplier || 1.0);
+        scene.registry.set('arenaWallTechRopeVaultStaminaCostMultiplier', wallTechCfg.ropeVaultStaminaCostMultiplier || 1.0);
+        scene.registry.set('arenaWallTechRopeTripDamageMultiplier', wallTechCfg.ropeTripDamageMultiplier || 1.0);
+        scene.registry.set('arenaWallTechRopeTripStunSeconds', wallTechCfg.ropeTripStunSeconds || 0);
+        scene.time.delayedCall(2400, function(){
+          scene.registry.set('gameMessage', 'Arena Wall Tech: bounce off posts, vault ropes, and trip foes into the cage.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('arenaWallTechActive', false);
+        scene.registry.set('arenaWallTechRopeSegments', []);
+        scene.registry.set('arenaWallTechCornerPosts', []);
+        scene.registry.set('arenaWallTechBounceDodgeSpeedMultiplier', 1.0);
+        scene.registry.set('arenaWallTechBounceDodgeStaminaCostMultiplier', 1.0);
+        scene.registry.set('arenaWallTechRopeVaultDamageMultiplier', 1.0);
+        scene.registry.set('arenaWallTechRopeVaultStaminaCostMultiplier', 1.0);
+        scene.registry.set('arenaWallTechRopeTripDamageMultiplier', 1.0);
+        scene.registry.set('arenaWallTechRopeTripStunSeconds', 0);
+      }
+      // Environmental Hazard Rooms metadata: special room variants such as
+      // slippery floors, loose ropes, dark sections, or electrified cages.
+      // We keep this purely data-driven so that movement/combat/VFX systems
+      // can decide how to react without hardcoding specific room ids.
+      var hazardCfg = this.getHazardConfigForRoom(room.id);
+      if (hazardCfg && hazardCfg.active) {
+        scene.registry.set('hazardActive', true);
+        scene.registry.set('hazardType', hazardCfg.type || 'generic');
+        scene.registry.set('hazardLabel', hazardCfg.label || 'Hazard Room');
+        scene.registry.set('hazardWallTouchDamageMultiplier', hazardCfg.wallTouchDamageMultiplier || 1.0);
+        scene.registry.set('hazardWallTouchTickSeconds', hazardCfg.wallTouchTickSeconds || 1.0);
+        scene.registry.set('hazardVisibilityMultiplier', hazardCfg.visibilityMultiplier || 1.0);
+        scene.registry.set('hazardVfxKey', hazardCfg.vfxKey || '');
+        scene.registry.set('hazardSfxKey', hazardCfg.sfxKey || '');
+        scene.time.delayedCall(2425, function(){
+          scene.registry.set('gameMessage', hazardCfg.label + ': watch the walls – environmental damage is live.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('hazardActive', false);
+        scene.registry.set('hazardType', '');
+        scene.registry.set('hazardLabel', '');
+        scene.registry.set('hazardWallTouchDamageMultiplier', 1.0);
+        scene.registry.set('hazardWallTouchTickSeconds', 1.0);
+        scene.registry.set('hazardVisibilityMultiplier', 1.0);
+        scene.registry.set('hazardVfxKey', '');
+        scene.registry.set('hazardSfxKey', '');
+      }
+      // Boss Rush Corridor metadata: sequential mini-boss waves with no healing between
+      if (room.bossRushMode) {
+        scene.registry.set('bossRushActive', true);
+        scene.registry.set('bossRushWaves', room.bossRushWaves || 3);
+        scene.registry.set('bossRushWaveEnemyPool', (room.bossRushWaveEnemyPool || ['mmaChamp']).slice());
+        scene.registry.set('bossRushNoHealBetweenWaves', room.bossRushNoHealBetweenWaves !== false);
+        scene.registry.set('bossRushRewardTags', (room.bossRushRewardTags || ['rare','equipment']).slice());
+        scene.registry.set('bossRushRoomName', room.name || 'Boss Rush Corridor');
+        scene.time.delayedCall(2500, function(){
+          var waves = scene.registry.get('bossRushWaves') || 3;
+          scene.registry.set('gameMessage', 'Boss Rush: '+waves+' back-to-back mini-bosses – no healing between waves.');
+          scene.time.delayedCall(2800, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('bossRushActive', false);
+        scene.registry.set('bossRushWaves', 0);
+        scene.registry.set('bossRushWaveEnemyPool', []);
+        scene.registry.set('bossRushNoHealBetweenWaves', false);
+        scene.registry.set('bossRushRewardTags', []);
+        scene.registry.set('bossRushRoomName', '');
       }
       // Apply zone-specific weather state so other systems can react
       this.applyWeatherToScene(scene, room);

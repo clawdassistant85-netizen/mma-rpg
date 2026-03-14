@@ -204,9 +204,64 @@
     #health-pulse-overlay.active {
       animation: healthPulse 800ms ease-in-out infinite;
     }
+    
+    /* Danger Warning Overlay - flashes screen edge for tactical warnings */
+    #danger-warning-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 28;
+      transition: opacity 150ms ease;
+    }
+    #danger-warning-overlay.active {
+      opacity: 1;
+    }
+    #danger-warning-overlay.active {
+      animation: dangerFlash 300ms ease-in-out infinite;
+    }
+    @keyframes dangerFlash {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    
     @keyframes healthPulse {
       0%, 100% { opacity: 0; }
       50% { opacity: 1; }
+    }
+    
+    /* Weight Class Indicator - DOM-based HUD element */
+    #weight-class-indicator {
+      position: absolute;
+      top: 50px;
+      left: 8px;
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.65);
+      border-radius: 6px;
+      font-size: 11px;
+      color: #44ff88;
+      z-index: 30;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: transform 150ms ease, color 300ms ease;
+    }
+    #weight-class-indicator .wc-icon {
+      font-size: 14px;
+    }
+    #weight-class-indicator .wc-name {
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    #weight-class-indicator .wc-bonus {
+      font-size: 9px;
+      color: #888;
+      margin-left: 4px;
+    }
+    #weight-class-indicator:hover {
+      cursor: pointer;
     }
     
     #dom-restart-btn {
@@ -243,6 +298,12 @@
     <!-- UI layer (mobile touch controls) -->
     <div id="ui-layer" aria-hidden="true">
       <div id="health-pulse-overlay"></div>
+      <div id="danger-warning-overlay"></div>
+      <div id="weight-class-indicator" title="Weight class affects speed/power">
+        <span class="wc-icon">⚖️</span>
+        <span class="wc-name">Featherweight</span>
+        <span class="wc-bonus">+Speed</span>
+      </div>
       <div id="ground-overlay"><div class="ground-text">GROUND GAME</div><div id="ground-timer"><div id="ground-timer-fill"></div></div></div>
       <button id="mobile-pause-btn" type="button" aria-label="Pause menu">⚙️</button>
       <div id="ground-banner">TAKEDOWN!</div>
@@ -266,17 +327,17 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=21"></script>
-  <script src="js/sprites.js?v=21"></script>
-  <script src="js/combat.js?v=21"></script>
-  <script src="js/enemies.js?v=21"></script>
-  <script src="js/zones.js?v=21"></script>
-  <script src="js/player.js?v=21"></script>
-  <script src="js/items.js?v=21"></script>
-  <script src="js/outfits.js?v=21"></script>
-  <script src="js/vfx.js?v=21"></script>
-  <script src="js/ui.js?v=21"></script>
-  <script src="js/progression.js?v=21"></script>
+  <script src="js/config.js?v=22"></script>
+  <script src="js/sprites.js?v=22"></script>
+  <script src="js/combat.js?v=22"></script>
+  <script src="js/enemies.js?v=22"></script>
+  <script src="js/zones.js?v=22"></script>
+  <script src="js/player.js?v=22"></script>
+  <script src="js/items.js?v=22"></script>
+  <script src="js/outfits.js?v=22"></script>
+  <script src="js/vfx.js?v=22"></script>
+  <script src="js/ui.js?v=22"></script>
+  <script src="js/progression.js?v=22"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -358,6 +419,8 @@
     if (isGameActive && gameScene.player && gameScene.player.stats && !gameScene.paused && !gameScene.gameOver) {
       window.MMA.UI.checkStaminaWarning(gameScene, gameScene.player.stats.stamina, gameScene.player.stats.maxStamina);
       window.MMA.UI.updateHealthPulse(gameScene, gameScene.player.stats.hp, gameScene.player.stats.maxHp);
+      // Update weight class indicator
+      window.MMA.UI.updateWeightClassFromDOM(gameScene.player.stats);
     }
   }, 500);
   // Start game on first tap (mobile) after audio unlock
@@ -522,17 +585,17 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=21"></script>
-  <script src="js/saveSystem.js?v=21"></script>
-  <script src="js/narrator.js?v=21"></script>
-  <script src="js/scenes/TitleScene.js?v=21"></script>
-  <script src="js/scenes/BootScene.js?v=21"></script>
-  <script src="js/scenes/GameScene.js?v=21"></script>
-  <script src="js/scenes/HUDScene.js?v=21"></script>
-  <script src="js/scenes/PauseScene.js?v=21"></script>
-  <script src="js/scenes/OutfitScene.js?v=21"></script>
-  <script src="js/scenes/UnlockScene.js?v=21"></script>
-  <script src="js/scenes/VictoryScene.js?v=21"></script>
-  <script src="js/main.js?v=21"></script>
+<script src="js/sounds.js?v=22"></script>
+  <script src="js/saveSystem.js?v=22"></script>
+  <script src="js/narrator.js?v=22"></script>
+  <script src="js/scenes/TitleScene.js?v=22"></script>
+  <script src="js/scenes/BootScene.js?v=22"></script>
+  <script src="js/scenes/GameScene.js?v=22"></script>
+  <script src="js/scenes/HUDScene.js?v=22"></script>
+  <script src="js/scenes/PauseScene.js?v=22"></script>
+  <script src="js/scenes/OutfitScene.js?v=22"></script>
+  <script src="js/scenes/UnlockScene.js?v=22"></script>
+  <script src="js/scenes/VictoryScene.js?v=22"></script>
+  <script src="js/main.js?v=22"></script>
 </body>
 </html>

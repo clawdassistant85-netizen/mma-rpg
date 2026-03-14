@@ -16,6 +16,7 @@ var GameScene = new Phaser.Class({
     this.enemiesDefeated = 0;
     this.groundState = { active: false, enemy: null, timer: 0, escapeTick: 0 };
     this.gameOverAt = 0;
+    this.rapidFireState = null;
   },
 
   create: function() {
@@ -24,6 +25,7 @@ var GameScene = new Phaser.Class({
     this.enemiesDefeated = 0;
     this.gameOverAt = 0;
     this.groundState = { active: false, enemy: null, timer: 0, escapeTick: 0 };
+    this.rapidFireState = null;
 
     this._savedGameData = null;
     if (typeof loadGame === 'function') {
@@ -156,6 +158,93 @@ var GameScene = new Phaser.Class({
     this.paused = false;
   },
 
+  startRapidFireMode: function() {
+    var room = MMA.Zones.getRoom(this.currentRoomId);
+    if (!room || !room.rapidFireMode) {
+      this.rapidFireState = null;
+      return;
+    }
+    this.rapidFireState = {
+      active: true,
+      completed: false,
+      elapsedMs: 0,
+      durationMs: (this.registry.get('rapidFireDurationSeconds') || room.rapidFireDurationSeconds || 15) * 1000,
+      spawnIntervalMs: (this.registry.get('rapidFireSpawnIntervalSeconds') || room.rapidFireSpawnIntervalSeconds || 2) * 1000,
+      spawnTimerMs: 0,
+      scoreMultiplier: this.registry.get('rapidFireScoreMultiplier') || room.rapidFireScoreMultiplier || 2.0,
+      kills: 0,
+      bonusXp: 0,
+      roomName: this.registry.get('rapidFireRoomName') || room.name || 'Rapid Fire Room'
+    };
+    this.registry.set('rapidFireKills', 0);
+    this.registry.set('rapidFireBonusXp', 0);
+    this.registry.set('rapidFireTimeLeftSeconds', Math.ceil(this.rapidFireState.durationMs / 1000));
+  },
+
+  updateRapidFireMode: function(delta) {
+    var state = this.rapidFireState;
+    if (!state || !state.active || state.completed) return;
+
+    state.elapsedMs += delta;
+    state.spawnTimerMs += delta;
+
+    var timeLeftMs = Math.max(0, state.durationMs - state.elapsedMs);
+    this.registry.set('rapidFireTimeLeftSeconds', Math.ceil(timeLeftMs / 1000));
+
+    if (state.elapsedMs >= state.durationMs) {
+      state.active = false;
+      state.completed = true;
+      this.registry.set('gameMessage', 'RAPID FIRE COMPLETE! KOs: ' + state.kills + ' | BONUS XP: ' + state.bonusXp);
+      var self = this;
+      this.time.delayedCall(2200, function() {
+        if (self.registry.get('gameMessage') && self.registry.get('gameMessage').indexOf('RAPID FIRE COMPLETE!') === 0) {
+          self.registry.set('gameMessage', '');
+        }
+      });
+      return;
+    }
+
+    var alive = this.enemies.filter(function(e) { return e && e.active && e.state !== 'dead'; }).length;
+    if (alive >= 4) return;
+
+    while (state.spawnTimerMs >= state.spawnIntervalMs) {
+      state.spawnTimerMs -= state.spawnIntervalMs;
+      this.spawnRapidFireEnemy();
+      alive += 1;
+      if (alive >= 4) break;
+    }
+  },
+
+  spawnRapidFireEnemy: function() {
+    if (!this.rapidFireState || !this.rapidFireState.active) return null;
+    var room = MMA.Zones.getRoom(this.currentRoomId);
+    if (!room) return null;
+    var pool = (room.enemyPool || []).slice();
+    var positions = (room.spawnPositions || []).slice();
+    if (!pool.length || !positions.length) return null;
+
+    var spawn = positions[Math.floor(Math.random() * positions.length)];
+    var DT = CONFIG.DISPLAY_TILE;
+    var x = spawn.col * DT + DT / 2;
+    var y = spawn.row * DT + DT / 2;
+    var enemyKey = pool[Math.floor(Math.random() * pool.length)];
+
+    if (this.player) {
+      for (var i = 0; i < positions.length; i++) {
+        var test = positions[i];
+        var tx = test.col * DT + DT / 2;
+        var ty = test.row * DT + DT / 2;
+        if (Phaser.Math.Distance.Between(this.player.x, this.player.y, tx, ty) > DT * 2) {
+          x = tx;
+          y = ty;
+          break;
+        }
+      }
+    }
+
+    return MMA.Enemies.spawnEnemy(this, enemyKey, x, y);
+  },
+
   update: function(time, delta) {
     if (this.infoKey && Phaser.Input.Keyboard.JustDown(this.infoKey)) {
       if (!this.gameOver && !this.roomTransitioning) {
@@ -239,6 +328,15 @@ var GameScene = new Phaser.Class({
     else {
       this.enemies.forEach(function(e){ if (e && e.active) e.setVelocity(0, 0); });
     }
+
+    if (this.registry.get('rapidFireModeActive')) {
+      if (!this.rapidFireState || this.rapidFireState.roomName !== (this.registry.get('rapidFireRoomName') || 'Rapid Fire Room')) {
+        this.startRapidFireMode();
+      }
+      this.updateRapidFireMode(delta);
+    } else if (this.rapidFireState) {
+      this.rapidFireState = null;
+    }
     MMA.Items.update(this, time, delta);
 
     this.playerHpGfx.clear();
@@ -249,6 +347,11 @@ var GameScene = new Phaser.Class({
     this.playerHpGfx.fillRect(this.player.x - bw / 2, this.player.y - DT / 2 - 8, bw, 5);
     this.playerHpGfx.fillStyle(0x44bb44);
     this.playerHpGfx.fillRect(this.player.x - bw / 2, this.player.y - DT / 2 - 8, bw * pct, 5);
+
+    // Update Focus Meter UI
+    var focusState = this.player.focusState || { meter: 0 };
+    var focusMax = window.MMA.Combat ? window.MMA.Combat.FOCUS_MAX : 100;
+    MMA.UI.updateFocusMeter(this, focusState.meter, focusMax);
 
     MMA.UI.updateHUDRegistry(this);
     MMA.UI.updateSpecialButton(this);

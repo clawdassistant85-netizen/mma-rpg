@@ -6,7 +6,76 @@ window.MMA.Sprites = {
   PORTRAIT_TEXTURES: {},
   AURA_TEXTURES: {},
   AURA_LAYER_TEXTURES: {},
+  BOSS_AURA_CONFIGS: {
+    champion: {
+      key: 'champion',
+      title: 'Gold Champion',
+      color: 0xffd54f,
+      glow: 0xfff2ad,
+      pulseSpeed: 0.0052,
+      hpPulseBoost: 0.012,
+      alpha: 0.24,
+      ringAlpha: 0.2,
+      flareAlpha: 0.16,
+      scale: 1.22,
+      ringScale: 1.3,
+      flareScale: 1.14,
+      bob: 1.4,
+      rotation: 3
+    },
+    undergroundKing: {
+      key: 'undergroundKing',
+      title: 'Underground King',
+      color: 0xd83b4a,
+      glow: 0xff8f96,
+      pulseSpeed: 0.0064,
+      hpPulseBoost: 0.016,
+      alpha: 0.28,
+      ringAlpha: 0.22,
+      flareAlpha: 0.18,
+      scale: 1.24,
+      ringScale: 1.34,
+      flareScale: 1.18,
+      bob: 1.8,
+      rotation: 4.2
+    },
+    shadowRival: {
+      key: 'shadowRival',
+      title: 'Shadow Rival',
+      color: 0x4f3d8f,
+      glow: 0xb9a8ff,
+      pulseSpeed: 0.0072,
+      hpPulseBoost: 0.02,
+      alpha: 0.26,
+      ringAlpha: 0.2,
+      flareAlpha: 0.22,
+      scale: 1.28,
+      ringScale: 1.38,
+      flareScale: 1.2,
+      bob: 2.2,
+      rotation: 5.4,
+      staticJitter: 1.3
+    }
+  },
   IMPACT_PARTICLE_TEXTURES: {},
+  FIRE_TRAIL_TEXTURES: {},
+  FOOTWORK_TEXTURES: {},
+  SILHOUETTE_TEXTURES: {},
+  SIGNATURE_SILHOUETTE_CONFIG: {
+    procCooldown: 420,
+    duration: 190,
+    specialDuration: 250,
+    scale: 1.28,
+    specialScale: 1.42,
+    offsetX: 0,
+    offsetY: -2,
+    alpha: 0.34,
+    specialAlpha: 0.48,
+    tint: 0x180c2d,
+    specialTint: 0x2b1250,
+    glowTint: 0xbfa2ff,
+    moveKeywords: ['signature', 'super', 'special', 'finisher', 'knockout', 'submission']
+  },
   SHADOW_DOUBLE_CONFIG: {
     healthThreshold: 0.35,
     damageMultiplier: 0.3,
@@ -20,7 +89,57 @@ window.MMA.Sprites = {
     attackOffsetX: 22,
     bobY: 2
   },
+  MUSCLE_TENSION_CONFIG: {
+    procCooldown: 120,
+    lingerMs: 240,
+    chargedLingerMs: 420,
+    speedThreshold: 155,
+    scaleX: 1.1,
+    scaleY: 0.94,
+    chargedScaleX: 1.16,
+    chargedScaleY: 0.9,
+    tint: 0xffd0d0,
+    chargedTint: 0xfff0a6,
+    alpha: 0.28,
+    chargedAlpha: 0.42,
+    offsetY: -6,
+    pulseRate: 0.018,
+    moveKeywords: ['special', 'signature', 'super', 'finisher', 'charge', 'haymaker', 'submission']
+  },
+  EXERTION_CONFIG: {
+    heavyThreshold: 0.3,
+    exhaustedThreshold: 0.08,
+    recoveryThreshold: 0.36,
+    breathPulseSpeed: 0.01,
+    wobbleSpeed: 0.015,
+    puffCooldown: 320,
+    recoveryPuffCooldown: 520,
+    stumbleCooldown: 520,
+    breathOffsetY: -18,
+    recoveryOffsetY: -14,
+    wobbleAngle: 4,
+    recoveryTint: 0xa8f0ff,
+    heavyTint: 0xe7f8ff,
+    exhaustedTint: 0xffd3a6
+  },
+  EXERTION_TEXTURES: {},
+  LAST_CHANCE_CONFIG: {
+    healthThreshold: 0.1,
+    pulseSpeed: 0.012,
+    pulseSpeedBoost: 0.02,
+    alpha: 0.24,
+    ringAlpha: 0.18,
+    flareAlpha: 0.14,
+    scale: 1.26,
+    ringScale: 1.36,
+    flareScale: 1.18,
+    tint: 0xff3b30,
+    glow: 0xffb0aa,
+    labelCooldown: 1800
+  },
+  LAST_CHANCE_TEXTURES: {},
   VISUAL_VARIANTS: {},
+  EQUIPMENT_TEXTURES: {},
   STYLE_AURA_COLORS: {
     striker: 0xff4d4d,
     grappler: 0x4d88ff,
@@ -31,7 +150,14 @@ window.MMA.Sprites = {
     trainer: 'npc_trainer',
     coach: 'npc_coach',
     sparringPartner: 'npc_trainer',
-    gymNpc: 'npc_trainer'
+    gymNpc: 'npc_trainer',
+    undergroundKing: 'enemy_underground_king_boss',
+    underground_boss: 'enemy_underground_king_boss',
+    cageBoss: 'enemy_underground_king_boss',
+    champion: 'enemy_champion_boss',
+    championBoss: 'enemy_champion_boss',
+    titleBoss: 'enemy_champion_boss',
+    shadowRival: 'enemy_shadow_boss'
   },
   makeAll: function(scene) {
     var self = scene;
@@ -284,6 +410,39 @@ window.MMA.Sprites = {
       }
       g.generateTexture(key, 24, 24); g.destroy();
     }
+    function textureSilhouette(baseKey, textureKey, colors, opts) {
+      var accent = (opts && opts.accent) || colors.glove || colors.headband || 0xffffff;
+      var shade = (opts && opts.tint) || 0x12091f;
+      var pose = (opts && opts.pose) || 'stance';
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      g.fillStyle(shade, 0); g.fillRect(0, 0, 64, 86);
+      g.fillStyle(shade, 1);
+      g.fillEllipse(32, 20, 18, 18);
+      g.fillRoundedRect(22, 24, 20, 26, 6);
+      if (pose === 'grapple') {
+        g.fillRoundedRect(12, 28, 16, 10, 5);
+        g.fillRoundedRect(37, 22, 15, 10, 5);
+        g.fillTriangle(44, 18, 57, 24, 46, 32);
+      } else if (pose === 'special') {
+        g.fillRoundedRect(12, 22, 16, 9, 5);
+        g.fillRoundedRect(37, 16, 17, 11, 5);
+        g.fillTriangle(43, 10, 58, 18, 44, 28);
+        g.fillTriangle(31, 6, 38, 20, 25, 19);
+      } else {
+        g.fillRoundedRect(12, 27, 15, 10, 5);
+        g.fillRoundedRect(37, 27, 15, 10, 5);
+      }
+      g.fillRect(27, 47, 10, 8);
+      g.fillRect(24, 53, 7, 20);
+      g.fillRect(33, 53, 7, 20);
+      g.fillEllipse(27.5, 75, 10, 6);
+      g.fillEllipse(36.5, 75, 10, 6);
+      g.lineStyle(3, accent, 0.25); g.strokeEllipse(32, 38, 42, 58);
+      g.lineStyle(2, accent, 0.3); g.beginPath(); g.moveTo(12, 60); g.lineTo(20, 52); g.lineTo(28, 60); g.strokePath();
+      g.beginPath(); g.moveTo(52, 60); g.lineTo(44, 52); g.lineTo(36, 60); g.strokePath();
+      g.generateTexture(textureKey, 64, 86); g.destroy();
+      window.MMA.Sprites.SILHOUETTE_TEXTURES[baseKey] = textureKey;
+    }
     function textureReactionFaceSet(baseKey, colors) {
       var set = {
         determined: baseKey + '_face_determined',
@@ -315,6 +474,62 @@ window.MMA.Sprites = {
       g.lineStyle(1, 0xffffff, 0.35); g.strokeEllipse(8, 10, 8, 12);
       g.generateTexture(key, 16, 16); g.destroy();
     }
+    function textureFireTrailParticle(key, opts) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var outer = (opts && opts.outer) || 0xff5a1f;
+      var core = (opts && opts.core) || 0xfff1a3;
+      var alpha = (opts && typeof opts.alpha === 'number') ? opts.alpha : 0.9;
+      g.fillStyle(outer, alpha * 0.95); g.fillTriangle(12, 0, 4, 16, 12, 12);
+      g.fillTriangle(12, 0, 20, 16, 12, 12);
+      g.fillStyle(outer, alpha * 0.6); g.fillEllipse(12, 16, 14, 10);
+      g.fillStyle(core, alpha); g.fillTriangle(12, 4, 8, 14, 12, 11);
+      g.fillTriangle(12, 4, 16, 14, 12, 11);
+      g.fillStyle(0xffffff, alpha * 0.4); g.fillEllipse(12, 10, 4, 6);
+      g.lineStyle(1, 0xffffff, alpha * 0.18); g.strokeEllipse(12, 14, 12, 8);
+      g.generateTexture(key, 24, 24); g.destroy();
+    }
+    function textureFootworkDust(key, opts) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var color = (opts && opts.color) || 0xd8d2c2;
+      var highlight = (opts && opts.highlight) || 0xf6f0de;
+      var alpha = (opts && typeof opts.alpha === 'number') ? opts.alpha : 0.82;
+      g.fillStyle(color, alpha * 0.34); g.fillEllipse(12, 12, 18, 10);
+      g.fillEllipse(8, 14, 10, 6); g.fillEllipse(16, 14, 10, 6);
+      g.fillStyle(color, alpha * 0.58); g.fillCircle(8, 12, 3); g.fillCircle(12, 9, 4); g.fillCircle(16, 12, 3);
+      g.fillStyle(highlight, alpha * 0.38); g.fillCircle(11, 10, 2); g.fillCircle(15, 11, 1);
+      g.generateTexture(key, 24, 24); g.destroy();
+    }
+    function textureFootprint(key, opts) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var color = (opts && opts.color) || 0xc9c1b3;
+      var alpha = (opts && typeof opts.alpha === 'number') ? opts.alpha : 0.4;
+      g.fillStyle(color, alpha); g.fillEllipse(7, 11, 6, 10);
+      g.fillEllipse(12, 6, 4, 4); g.fillEllipse(14, 8, 3, 3); g.fillEllipse(15, 11, 3, 3);
+      g.fillEllipse(13, 14, 3, 3); g.fillEllipse(10, 16, 3, 3);
+      g.generateTexture(key, 18, 18); g.destroy();
+    }
+    function textureBreathPuff(key, opts) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var color = (opts && opts.color) || 0xe7f8ff;
+      var alpha = (opts && typeof opts.alpha === 'number') ? opts.alpha : 0.85;
+      g.fillStyle(color, alpha * 0.34); g.fillCircle(12, 13, 8);
+      g.fillCircle(7, 14, 5); g.fillCircle(16, 14, 5);
+      g.fillStyle(color, alpha * 0.52); g.fillCircle(9, 12, 4); g.fillCircle(14, 11, 5);
+      g.fillStyle(0xffffff, alpha * 0.35); g.fillCircle(10, 10, 2); g.fillCircle(15, 12, 2);
+      g.lineStyle(1, 0xffffff, alpha * 0.18); g.strokeEllipse(12, 13, 16, 12);
+      g.generateTexture(key, 24, 24); g.destroy();
+    }
+    function textureStumbleSpark(key, opts) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var color = (opts && opts.color) || 0xffd3a6;
+      var alpha = (opts && typeof opts.alpha === 'number') ? opts.alpha : 0.92;
+      g.fillStyle(color, alpha); g.fillTriangle(12, 0, 15, 9, 24, 12);
+      g.fillTriangle(24, 12, 15, 15, 12, 24);
+      g.fillTriangle(12, 24, 9, 15, 0, 12);
+      g.fillTriangle(0, 12, 9, 9, 12, 0);
+      g.fillStyle(0xffffff, alpha * 0.42); g.fillCircle(12, 12, 4);
+      g.generateTexture(key, 24, 24); g.destroy();
+    }
 
     textureFloorStreet('floor'); textureWallStreet('wall'); textureGymFloor('gymFloor'); textureGymWall('gymWalls');
     textureCageFloor('cageFloor'); textureCageWall('cageWall'); textureCrate('crateProp'); textureDebris('debrisProp'); textureLamp('lampProp');
@@ -322,7 +537,8 @@ window.MMA.Sprites = {
     var thugColors = { hair:0x171717, skin:0xd9a77b, skinDark:0xb9845a, torso:0xb62626, torsoLight:0xd13a3a, belt:0x551414, glove:0x7a1b1b, weapon:0x5c4033, legs:0x2d2d33, shoes:0x0c0c0c, bootDetail:0x1a1a1a, shoeAccent:0x2a2a2a, outline:0x1a1a1a };
     var brawlerColors = { hair:0x3d2516, skin:0xd6a178, skinDark:0xb7835c, torso:0xc66a2a, torsoLight:0xde8a44, belt:0x6b3a14, glove:0x8b4a1d, weapon:0x4a3020, legs:0x4f3a2a, shoes:0x1a120d, bootDetail:0x2a1a15, shoeAccent:0x3a2a20, outline:0x2a1a10 };
     var eliteColors = { hair:0x090909, skin:0xc99667, skinDark:0x9e6e49, torso:0x5c1fa8, torsoLight:0x7f46d1, belt:0x2d1259, glove:0xd6c8ff, weapon:0x7a7a90, legs:0x221d34, shoes:0x050505, bootDetail:0x171125, shoeAccent:0xbca6ff, outline:0xf3dc7a };
-    var bossColors = { hair:0xe7d37a, skin:0xd19a6c, skinDark:0xa86e43, torso:0x111111, torsoLight:0x3a3a3a, belt:0x9b1c1c, glove:0xffd54f, weapon:0xe7d37a, legs:0x2b2b2b, shoes:0x090909, bootDetail:0x3d2a12, shoeAccent:0xffd54f, outline:0xfff1a8 };
+    var championBossColors = { hair:0xf1da7d, skin:0xd19a6c, skinDark:0xa86e43, torso:0x151515, torsoLight:0x3d3d3d, belt:0xb41f1f, glove:0xffd54f, weapon:0xe7d37a, legs:0x2b2b2b, shoes:0x090909, bootDetail:0x3d2a12, shoeAccent:0xffd54f, outline:0xfff1a8, headband:0xfff0a6 };
+    var undergroundBossColors = { hair:0x1a1a1a, skin:0xc98c66, skinDark:0x9c623e, torso:0x4f0f16, torsoLight:0x81222d, belt:0x25070a, glove:0xd83b4a, weapon:0xff8f96, legs:0x2a1619, shoes:0x0c0506, bootDetail:0x311416, shoeAccent:0xff7a84, outline:0xffc0c6, headband:0x7d111d };
     var shadowBossColors = { hair:0xd9d7ff, skin:0xa882b8, skinDark:0x7f5e92, torso:0x25143f, torsoLight:0x4b2d78, belt:0x8a5cff, glove:0xd7c8ff, weapon:0xcab8ff, legs:0x1a1230, shoes:0x05030a, bootDetail:0x110a1e, shoeAccent:0x8a5cff, outline:0xe4dcff, headband:0x6d4ad8 };
     var trainerColors = { hair:0x5a3922, skin:0xe0b384, skinDark:0xbd8c64, torso:0x167a5c, torsoLight:0x2aa37f, belt:0x0f3f32, headband:0xf5f0d7, glove:0xe3fff7, legs:0x1b4f42, shoes:0x0b1614, bootDetail:0x15312c, shoeAccent:0x52d8b0, outline:0x0a241f };
     var coachColors = { hair:0xd9d9d9, skin:0xc99567, skinDark:0x9d6c47, torso:0x4d2a91, torsoLight:0x7551c2, belt:0x2b1657, headband:0xffd86b, glove:0xffefba, legs:0x2d2250, shoes:0x0c0815, bootDetail:0x1a1230, shoeAccent:0xcab6ff, outline:0xf0d88d };
@@ -338,7 +554,9 @@ window.MMA.Sprites = {
     textureDamageSet('enemy_thug', thugColors, { armShift:0, bodyW:5, hasWeapon:true });
     textureDamageSet('enemy_brawler', brawlerColors, { armShift:1, bodyW:8, bigFists:true, hasWeapon:true });
     textureDamageSet('enemy_thug_elite', eliteColors, { armShift:0, bodyW:5, hasWeapon:true, hasHeadband:true });
-    textureDamageSet('enemy_brawler_boss', bossColors, { armShift:1, bodyW:8, bigFists:true, hasWeapon:true, hasHeadband:true });
+    textureDamageSet('enemy_brawler_boss', championBossColors, { armShift:1, bodyW:8, bigFists:true, hasWeapon:true, hasHeadband:true });
+    textureDamageSet('enemy_champion_boss', championBossColors, { armShift:1, bodyW:8, bigFists:true, hasWeapon:true, hasHeadband:true });
+    textureDamageSet('enemy_underground_king_boss', undergroundBossColors, { armShift:1, bodyW:8, bigFists:true, hasWeapon:true, hasHeadband:true, torsoBob:1 });
     textureDamageSet('enemy_shadow_boss', shadowBossColors, { armShift:1, bodyW:7, bigFists:true, hasWeapon:true, hasHeadband:true });
     textureDamageSet('npc_trainer', trainerColors, { armShift:0, bodyW:6, hasHeadband:true });
     textureDamageSet('npc_coach', coachColors, { armShift:-1, bodyW:7, hasHeadband:true, bigFists:true });
@@ -346,7 +564,9 @@ window.MMA.Sprites = {
     texturePortraitSet('enemy_thug', thugColors, { accent: 0xff7a7a });
     texturePortraitSet('enemy_brawler', brawlerColors, { accent: 0xffb14d });
     texturePortraitSet('enemy_thug_elite', eliteColors, { accent: 0xbca6ff });
-    texturePortraitSet('enemy_brawler_boss', bossColors, { accent: 0xffd54f });
+    texturePortraitSet('enemy_brawler_boss', championBossColors, { accent: 0xffd54f });
+    texturePortraitSet('enemy_champion_boss', championBossColors, { accent: 0xffd54f });
+    texturePortraitSet('enemy_underground_king_boss', undergroundBossColors, { accent: 0xd83b4a });
     texturePortraitSet('enemy_shadow_boss', shadowBossColors, { accent: 0x8a5cff });
     texturePortraitSet('npc_trainer', trainerColors, { accent: 0x52d8b0 });
     texturePortraitSet('npc_coach', coachColors, { accent: 0xffd86b });
@@ -354,16 +574,35 @@ window.MMA.Sprites = {
     textureReactionFaceSet('enemy_thug', thugColors);
     textureReactionFaceSet('enemy_brawler', brawlerColors);
     textureReactionFaceSet('enemy_thug_elite', eliteColors);
-    textureReactionFaceSet('enemy_brawler_boss', bossColors);
+    textureReactionFaceSet('enemy_brawler_boss', championBossColors);
+    textureReactionFaceSet('enemy_champion_boss', championBossColors);
+    textureReactionFaceSet('enemy_underground_king_boss', undergroundBossColors);
     textureReactionFaceSet('enemy_shadow_boss', shadowBossColors);
     textureReactionFaceSet('npc_trainer', trainerColors);
     textureReactionFaceSet('npc_coach', coachColors);
+    textureSilhouette('player', 'player_silhouette', playerColors, { pose: 'special', accent: window.MMA.Sprites.STYLE_AURA_COLORS.striker, tint: 0x180c2d });
+    textureSilhouette('enemy_thug', 'enemy_thug_silhouette', thugColors, { pose: 'stance', accent: 0xff7a7a, tint: 0x1f0c0c });
+    textureSilhouette('enemy_brawler', 'enemy_brawler_silhouette', brawlerColors, { pose: 'grapple', accent: 0xffb14d, tint: 0x271505 });
+    textureSilhouette('enemy_thug_elite', 'enemy_thug_elite_silhouette', eliteColors, { pose: 'stance', accent: 0xbca6ff, tint: 0x140d23 });
+    textureSilhouette('enemy_brawler_boss', 'enemy_brawler_boss_silhouette', championBossColors, { pose: 'special', accent: 0xffd54f, tint: 0x241a06 });
+    textureSilhouette('enemy_champion_boss', 'enemy_champion_boss_silhouette', championBossColors, { pose: 'special', accent: 0xffd54f, tint: 0x241a06 });
+    textureSilhouette('enemy_underground_king_boss', 'enemy_underground_king_boss_silhouette', undergroundBossColors, { pose: 'grapple', accent: 0xd83b4a, tint: 0x2a080d });
+    textureSilhouette('enemy_shadow_boss', 'enemy_shadow_boss_silhouette', shadowBossColors, { pose: 'special', accent: 0x8a5cff, tint: 0x12091f });
+    textureSilhouette('npc_trainer', 'npc_trainer_silhouette', trainerColors, { pose: 'stance', accent: 0x52d8b0, tint: 0x071814 });
+    textureSilhouette('npc_coach', 'npc_coach_silhouette', coachColors, { pose: 'grapple', accent: 0xffd86b, tint: 0x180d28 });
     window.MMA.Sprites.VISUAL_VARIANTS = {
-      mmaChamp: 'enemy_brawler_boss',
-      boss: 'enemy_brawler_boss',
+      mmaChamp: 'enemy_champion_boss',
+      boss: 'enemy_champion_boss',
+      champion: 'enemy_champion_boss',
+      championBoss: 'enemy_champion_boss',
+      titleBoss: 'enemy_champion_boss',
+      undergroundKing: 'enemy_underground_king_boss',
+      underground_boss: 'enemy_underground_king_boss',
+      cageBoss: 'enemy_underground_king_boss',
       rival: 'enemy_shadow_boss',
       shadow: 'enemy_shadow_boss',
       shadowBoss: 'enemy_shadow_boss',
+      shadowRival: 'enemy_shadow_boss',
       elite: 'enemy_thug_elite',
       trainer: 'npc_trainer',
       coach: 'npc_coach',
@@ -379,6 +618,21 @@ window.MMA.Sprites = {
     textureAura('aura_balanced', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.14, 'core');
     textureAura('aura_balanced_ring', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.2, 'ring');
     textureAura('aura_balanced_flare', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.18, 'flare');
+    var lastChanceCfg = window.MMA.Sprites.LAST_CHANCE_CONFIG || {};
+    textureAura('last_chance_pulse', lastChanceCfg.tint || 0xff3b30, lastChanceCfg.alpha || 0.24, 'core');
+    textureAura('last_chance_pulse_ring', lastChanceCfg.glow || 0xffb0aa, lastChanceCfg.ringAlpha || 0.18, 'ring');
+    textureAura('last_chance_pulse_flare', lastChanceCfg.tint || 0xff3b30, lastChanceCfg.flareAlpha || 0.14, 'flare');
+    window.MMA.Sprites.LAST_CHANCE_TEXTURES = {
+      core: 'last_chance_pulse',
+      ring: 'last_chance_pulse_ring',
+      flare: 'last_chance_pulse_flare'
+    };
+    Object.keys(window.MMA.Sprites.BOSS_AURA_CONFIGS).forEach(function(auraKey) {
+      var cfg = window.MMA.Sprites.BOSS_AURA_CONFIGS[auraKey];
+      textureAura('boss_aura_' + cfg.key, cfg.color, cfg.alpha || 0.22, 'core');
+      textureAura('boss_aura_' + cfg.key + '_ring', cfg.glow || cfg.color, cfg.ringAlpha || 0.2, 'ring');
+      textureAura('boss_aura_' + cfg.key + '_flare', cfg.color, cfg.flareAlpha || 0.18, 'flare');
+    });
     window.MMA.Sprites.AURA_TEXTURES = {
       striker: 'aura_striker',
       grappler: 'aura_grappler',
@@ -393,9 +647,33 @@ window.MMA.Sprites = {
     texturePickup('pickup_health');
     textureSweatParticle('impact_sweat', { fill: 0x9fd4ff, highlight: 0xffffff, alpha: 0.92 });
     textureSweatParticle('impact_sweat_heavy', { fill: 0xbfe6ff, highlight: 0xffffff, alpha: 0.98 });
+    textureFireTrailParticle('combo_fire_trail', { outer: 0xff6a26, core: 0xfff1a3, alpha: 0.92 });
+    textureFireTrailParticle('combo_fire_trail_hot', { outer: 0xff2a2a, core: 0xffd36e, alpha: 1 });
+    textureFootworkDust('footwork_dust_soft', { color: 0xd7d0c1, highlight: 0xf7efdb, alpha: 0.76 });
+    textureFootworkDust('footwork_dust_heavy', { color: 0xc9c0ae, highlight: 0xfff6e3, alpha: 0.94 });
+    textureFootprint('footwork_print_left', { color: 0xbab2a4, alpha: 0.36 });
+    textureFootprint('footwork_print_right', { color: 0xbab2a4, alpha: 0.36 });
+    textureBreathPuff('exertion_breath_heavy', { color: 0xe7f8ff, alpha: 0.88 });
+    textureBreathPuff('exertion_breath_recovery', { color: 0xa8f0ff, alpha: 0.8 });
+    textureStumbleSpark('exertion_stumble', { color: 0xffd3a6, alpha: 0.96 });
     window.MMA.Sprites.IMPACT_PARTICLE_TEXTURES = {
       sweat: 'impact_sweat',
       heavySweat: 'impact_sweat_heavy'
+    };
+    window.MMA.Sprites.FIRE_TRAIL_TEXTURES = {
+      combo: 'combo_fire_trail',
+      hot: 'combo_fire_trail_hot'
+    };
+    window.MMA.Sprites.FOOTWORK_TEXTURES = {
+      dust: 'footwork_dust_soft',
+      heavyDust: 'footwork_dust_heavy',
+      leftPrint: 'footwork_print_left',
+      rightPrint: 'footwork_print_right'
+    };
+    window.MMA.Sprites.EXERTION_TEXTURES = {
+      heavyBreath: 'exertion_breath_heavy',
+      recoveryBreath: 'exertion_breath_recovery',
+      stumble: 'exertion_stumble'
     };
     textureHitbox('hitbox');
   },
@@ -553,6 +831,128 @@ window.MMA.Sprites = {
     
     // Store outfit damage textures
     window.MMA.Sprites.OUTFIT_TEXTURES = outfitDamageKeys;
+    try {
+      this.generateEquipmentTextures(self, baseColors, outfitDamageKeys);
+    } catch (e) {
+      console.error('Error generating equipment textures:', e);
+    }
+  },
+
+  generateEquipmentTextures: function(self, baseColors, outfitDamageKeys) {
+    var gearConfigs = {
+      baseline: null,
+      speed_wraps: { glove: 0x7dd3fc, headband: 0x9be7ff, accent: 0xdff7ff },
+      fighters_gloves: { glove: 0xff4d4d, headband: 0xffb347, accent: 0xffddb3 },
+      champions_belt: { glove: 0xffd54f, belt: 0xffd54f, headband: 0xfff0a6, accent: 0xfff4c2 }
+    };
+    var equipmentTextures = {};
+
+    function tintColor(color, delta) {
+      var r = (color >> 16) & 0xff;
+      var g = (color >> 8) & 0xff;
+      var b = color & 0xff;
+      r = Phaser.Math.Clamp(r + delta, 0, 255);
+      g = Phaser.Math.Clamp(g + delta, 0, 255);
+      b = Phaser.Math.Clamp(b + delta, 0, 255);
+      return Phaser.Display.Color.GetColor(r, g, b);
+    }
+
+    Object.keys(outfitDamageKeys || {}).forEach(function(outfitKey) {
+      equipmentTextures[outfitKey] = {};
+      var baseSet = outfitDamageKeys[outfitKey];
+      Object.keys(gearConfigs).forEach(function(gearKey) {
+        if (!gearConfigs[gearKey]) {
+          equipmentTextures[outfitKey][gearKey] = baseSet;
+          return;
+        }
+
+        var gear = gearConfigs[gearKey];
+        var colors = Object.assign({}, baseColors, {
+          glove: gear.glove || baseColors.glove,
+          headband: gear.headband || baseColors.headband,
+          belt: gear.belt || baseColors.belt,
+          torsoLight: tintColor(baseColors.torsoLight, gearKey === 'champions_belt' ? 22 : 8),
+          shoeAccent: gear.accent || baseColors.shoeAccent
+        });
+        var opts = {
+          armShift: 1,
+          bodyW: 6,
+          hasHeadband: true,
+          equipmentAccent: gear.accent || gear.glove || gear.belt || 0xffffff,
+          equipmentType: gearKey
+        };
+        var prefix = 'player_' + outfitKey + '_' + gearKey;
+        equipmentTextures[outfitKey][gearKey] = {
+          healthy: this.generateEquipmentVariantTexture(self, prefix, colors, Object.assign({}, opts, { damageLevel: 0 })),
+          bruised: this.generateEquipmentVariantTexture(self, prefix + '_hurt_1', colors, Object.assign({}, opts, { damageLevel: 1, bodyLean: -1, leftArmDrop: 1, rightLegLift: 2, headTilt: -1 })),
+          bloodied: this.generateEquipmentVariantTexture(self, prefix + '_hurt_2', colors, Object.assign({}, opts, { damageLevel: 2, bodyLean: -2, leftArmDrop: 2, rightArmDrop: 1, rightLegLift: 3, torsoBob: 1, headTilt: -1 }))
+        };
+      }, this);
+    }, this);
+
+    this.EQUIPMENT_TEXTURES = equipmentTextures;
+  },
+
+  generateEquipmentVariantTexture: function(self, key, colors, opts) {
+    var g = self.make.graphics({ x:0, y:0, add:false });
+    var s = 3;
+    var armShift = (opts && typeof opts.armShift === 'number') ? opts.armShift : 1;
+    var bodyW = (opts && opts.bodyW) ? opts.bodyW : 6;
+    var bodyX = Math.floor((16 - bodyW) / 2);
+    var torsoBob = (opts && typeof opts.torsoBob === 'number') ? opts.torsoBob : 0;
+    var leftLegLift = (opts && typeof opts.leftLegLift === 'number') ? opts.leftLegLift : 0;
+    var rightLegLift = (opts && typeof opts.rightLegLift === 'number') ? opts.rightLegLift : 0;
+    var gloveBob = (opts && typeof opts.gloveBob === 'number') ? opts.gloveBob : 0;
+    var damageLevel = (opts && typeof opts.damageLevel === 'number') ? opts.damageLevel : 0;
+    var bodyLean = (opts && typeof opts.bodyLean === 'number') ? opts.bodyLean : 0;
+    var leftArmDrop = (opts && typeof opts.leftArmDrop === 'number') ? opts.leftArmDrop : 0;
+    var rightArmDrop = (opts && typeof opts.rightArmDrop === 'number') ? opts.rightArmDrop : 0;
+    var headTilt = (opts && typeof opts.headTilt === 'number') ? opts.headTilt : 0;
+    var accent = (opts && opts.equipmentAccent) || colors.glove || colors.headband || 0xffffff;
+    var equipmentType = (opts && opts.equipmentType) || 'baseline';
+    function px(x, y, w, h, color) { g.fillStyle(color, 1); g.fillRect(x * s, y * s, w * s, h * s); }
+
+    px(5 + headTilt, 1 + torsoBob, 6, 5, colors.skin); px(4 + headTilt, 0 + torsoBob, 8, 2, colors.hair); px(4 + headTilt, 2 + torsoBob, 1, 2, colors.hair); px(11 + headTilt, 2 + torsoBob, 1, 2, colors.hair); px(6 + headTilt, 5 + torsoBob, 4, 1, colors.skinDark);
+    px(4 + headTilt, 1 + torsoBob, 8, 1, colors.headband || 0xd92b2b); px(4 + headTilt, 2 + torsoBob, 1, 1, colors.headband || 0xd92b2b); px(11 + headTilt, 2 + torsoBob, 1, 1, colors.headband || 0xd92b2b);
+    if (equipmentType === 'speed_wraps') {
+      px(3 + headTilt, 1 + torsoBob, 1, 1, accent); px(12 + headTilt, 1 + torsoBob, 1, 1, accent);
+    }
+    px(7 + headTilt, 6 + torsoBob, 2, 1, colors.skinDark); px(bodyX + bodyLean, 7 + torsoBob, bodyW, 8, colors.torso); px(bodyX + 1 + bodyLean, 8 + torsoBob, bodyW - 2, 1, colors.torsoLight); px(7 + bodyLean, 11 + torsoBob, 2, 4, colors.belt);
+    var fistSize = equipmentType === 'fighters_gloves' ? 3 : 2;
+    var fistY = (equipmentType === 'fighters_gloves' ? 8 : 9) + torsoBob + gloveBob;
+    px(bodyX - 2 + armShift + bodyLean, 8 + torsoBob + leftArmDrop, 2, 5 - Math.min(leftArmDrop, 2), colors.skin); px(bodyX + bodyW + armShift + bodyLean, 8 + torsoBob + rightArmDrop, 2, 5 - Math.min(rightArmDrop, 2), colors.skin);
+    px(bodyX - 1 + armShift + bodyLean, fistY + leftArmDrop, fistSize, fistSize, colors.glove); px(bodyX + bodyW - 1 + armShift + bodyLean, fistY + rightArmDrop, fistSize, fistSize, colors.glove);
+    if (equipmentType === 'speed_wraps') {
+      px(bodyX - 2 + armShift + bodyLean, 11 + torsoBob + leftArmDrop, 1, 2, accent); px(bodyX + bodyW + armShift + bodyLean, 11 + torsoBob + rightArmDrop, 1, 2, accent);
+    }
+    if (equipmentType === 'champions_belt') {
+      px(bodyX + bodyLean, 15 + torsoBob, bodyW, 1, accent); px(bodyX + 1 + bodyLean, 14 + torsoBob, bodyW - 2, 1, accent);
+    }
+    px(bodyX + 1 + bodyLean, 16 + leftLegLift, 2, 6 - leftLegLift, colors.legs); px(bodyX + bodyW - 3 + bodyLean, 16 + rightLegLift, 2, 6 - rightLegLift, colors.legs);
+    px(bodyX + 1 + bodyLean, 21, 2, 1, colors.bootDetail); px(bodyX + bodyW - 3 + bodyLean, 21, 2, 1, colors.bootDetail);
+    px(bodyX + 1 + bodyLean, 22, 2, 2, colors.shoes); px(bodyX + bodyW - 3 + bodyLean, 22, 2, 2, colors.shoes);
+    px(bodyX + 1 + bodyLean, 23, 2, 1, colors.shoeAccent); px(bodyX + bodyW - 3 + bodyLean, 23, 2, 1, colors.shoeAccent);
+    if (damageLevel >= 1) {
+      px(4, 4 + torsoBob, 1, 1, 0x6a2d7c); px(11, 5 + torsoBob, 1, 1, 0x6a2d7c);
+      px(bodyX - 1 + armShift + bodyLean, 13 + torsoBob + leftArmDrop, 2, 1, 0x6a2d7c); px(bodyX + bodyW - 1 + armShift + bodyLean, 13 + torsoBob + rightArmDrop, 2, 1, 0x6a2d7c);
+      px(bodyX + 1 + bodyLean, 10 + torsoBob, Math.max(2, bodyW - 2), 1, 0x5e364f);
+    }
+    if (damageLevel >= 2) {
+      px(7 + headTilt, 4 + torsoBob, 1, 2, 0x9b1c1c); px(8 + headTilt, 5 + torsoBob, 2, 1, 0x9b1c1c);
+      px(bodyX + 2 + bodyLean, 12 + torsoBob, Math.max(2, bodyW - 4), 1, 0x9b1c1c);
+      px(bodyX + 1 + bodyLean, 19, 2, 1, 0x9b1c1c); px(bodyX + bodyW - 3 + bodyLean, 19, 2, 1, 0x9b1c1c);
+    }
+    px(bodyX - 2 + bodyLean, 7 + torsoBob + leftArmDrop, 1, 9 - Math.min(leftArmDrop, 2), colors.outline); px(bodyX + bodyW + 2 + bodyLean, 7 + torsoBob + rightArmDrop, 1, 9 - Math.min(rightArmDrop, 2), colors.outline); px(5 + headTilt, 1 + torsoBob, 1, 6, colors.outline); px(10 + headTilt, 1 + torsoBob, 1, 6, colors.outline);
+    g.generateTexture(key, 48, 72); g.destroy();
+    return key;
+  },
+
+  getEquipmentTexture: function(outfitKey, gearKey, damageState) {
+    if (!this.EQUIPMENT_TEXTURES || !this.EQUIPMENT_TEXTURES[outfitKey]) return null;
+    var gearSet = this.EQUIPMENT_TEXTURES[outfitKey][gearKey || 'baseline'] || this.EQUIPMENT_TEXTURES[outfitKey].baseline;
+    if (!gearSet) return null;
+    var state = damageState || 'healthy';
+    return gearSet[state] || gearSet.healthy || null;
   },
   
   // Get outfit texture key for a given outfit

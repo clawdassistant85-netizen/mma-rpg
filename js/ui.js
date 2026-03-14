@@ -1,5 +1,331 @@
 window.MMA = window.MMA || {};
 window.MMA.UI = {
+  // Danger Proximity Warning - screen edge flashes when enemies are about to attack
+  dangerWarning: {
+    active: false,
+    overlay: null,
+    arrow: null,
+    currentThreat: null, // { type: 'coordination'|'special', direction: 'left'|'right'|'up'|'down', source: enemy }
+    warningDuration: 1000, // 1 second warning
+    fadeDuration: 300
+  },
+  // Show danger warning overlay
+  showDangerWarning: function(scene, threatType, direction, enemy) {
+    // Only show if not already showing a warning (or show higher priority)
+    if (this.dangerWarning.active && threatType !== 'special') return; // Special overrides coordination
+    
+    var self = this;
+    this.dangerWarning.currentThreat = {
+      type: threatType,
+      direction: direction,
+      source: enemy,
+      timestamp: Date.now()
+    };
+    this.dangerWarning.active = true;
+    
+    // Get or create overlay
+    var overlay = this.getDangerWarningOverlay();
+    if (!overlay) return;
+    
+    // Set color based on threat type
+    var color = threatType === 'special' ? 'rgba(255, 0, 0,' : 'rgba(255, 191, 0,';
+    var intensity = threatType === 'special' ? 0.6 : 0.4;
+    
+    // Show overlay
+    overlay.classList.add('active');
+    overlay.style.background = color + intensity + ')';
+    
+    // Create/update arrow
+    this.showDangerArrow(scene, direction, threatType);
+    
+    // Play warning sound if available
+    if (window.MMA_AUDIO && window.MMA_AUDIO.playDangerWarning) {
+      window.MMA_AUDIO.playDangerWarning();
+    }
+    
+    // Auto-hide after warning duration
+    setTimeout(function() {
+      self.hideDangerWarning(scene);
+    }, this.dangerWarning.warningDuration);
+  },
+  // Get or create danger warning overlay element
+  getDangerWarningOverlay: function() {
+    if (!this.dangerWarning.overlay) {
+      var el = document.getElementById('danger-warning-overlay');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'danger-warning-overlay';
+        document.getElementById('game-shell').appendChild(el);
+      }
+      this.dangerWarning.overlay = el;
+    }
+    return this.dangerWarning.overlay;
+  },
+  // Show directional arrow for danger
+  showDangerArrow: function(scene, direction, threatType) {
+    var arrow = this.dangerWarning.arrow;
+    var overlay = this.getDangerWarningOverlay();
+    
+    // Remove existing arrow
+    if (arrow && arrow.parentNode) {
+      arrow.parentNode.removeChild(arrow);
+    }
+    
+    // Create new arrow
+    arrow = document.createElement('div');
+    arrow.id = 'danger-arrow';
+    arrow.style.cssText = 'position:absolute;z-index:30;pointer-events:none;font-size:32px;opacity:0;transition:opacity 150ms ease;';
+    
+    // Position based on direction
+    var arrows = { left: '◀', right: '▶', up: '▲', down: '▼' };
+    arrow.textContent = arrows[direction] || '⚠';
+    
+    var color = threatType === 'special' ? '#ff0000' : '#ffbf00';
+    arrow.style.color = color;
+    
+    switch(direction) {
+      case 'left':
+        arrow.style.left = '15%';
+        arrow.style.top = '50%';
+        arrow.style.transform = 'translateY(-50%)';
+        break;
+      case 'right':
+        arrow.style.right = '15%';
+        arrow.style.top = '50%';
+        arrow.style.transform = 'translateY(-50%)';
+        break;
+      case 'up':
+        arrow.style.top = '20%';
+        arrow.style.left = '50%';
+        arrow.style.transform = 'translateX(-50%)';
+        break;
+      case 'down':
+        arrow.style.bottom = '20%';
+        arrow.style.left = '50%';
+        arrow.style.transform = 'translateX(-50%)';
+        break;
+    }
+    
+    overlay.appendChild(arrow);
+    this.dangerWarning.arrow = arrow;
+    
+    // Fade in arrow
+    requestAnimationFrame(function() {
+      arrow.style.opacity = '1';
+    });
+  },
+  // Hide danger warning
+  hideDangerWarning: function(scene) {
+    this.dangerWarning.active = false;
+    this.dangerWarning.currentThreat = null;
+    
+    var overlay = this.getDangerWarningOverlay();
+    if (overlay) {
+      overlay.classList.remove('active');
+    }
+    
+    var arrow = this.dangerWarning.arrow;
+    if (arrow) {
+      arrow.style.opacity = '0';
+      setTimeout(function() {
+        if (arrow && arrow.parentNode) {
+          arrow.parentNode.removeChild(arrow);
+        }
+      }, 150);
+      this.dangerWarning.arrow = null;
+    }
+  },
+  // Check if danger warning is active
+  isDangerWarningActive: function() {
+    return this.dangerWarning.active;
+  },
+  // Get current threat info
+  getCurrentThreat: function() {
+    return this.dangerWarning.currentThreat;
+  },
+  // Fight Timer Display - countdown for timed challenges
+  fightTimer: {
+    active: false,
+    duration: 0,
+    remaining: 0,
+    container: null,
+    text: null,
+    intervalId: null,
+    lastUpdate: 0
+  },
+  // Start fight timer (for timed challenges)
+  startFightTimer: function(scene, durationMs) {
+    this.stopFightTimer();
+    this.fightTimer.active = true;
+    this.fightTimer.duration = durationMs;
+    this.fightTimer.remaining = durationMs;
+    this.fightTimer.lastUpdate = Date.now();
+    
+    var container = this.showFightTimer(scene);
+    
+    // Start countdown interval
+    var self = this;
+    this.fightTimer.intervalId = setInterval(function() {
+      if (!self.fightTimer.active) {
+        clearInterval(self.fightTimer.intervalId);
+        return;
+      }
+      
+      var now = Date.now();
+      var delta = now - self.fightTimer.lastUpdate;
+      self.fightTimer.lastUpdate = now;
+      self.fightTimer.remaining = Math.max(0, self.fightTimer.remaining - delta);
+      
+      self.updateFightTimer(scene);
+      
+      // Check for timer expiring
+      if (self.fightTimer.remaining <= 0) {
+        self.onFightTimerExpired(scene);
+      }
+    }, 100);
+    
+    return container;
+  },
+  // Show fight timer display
+  showFightTimer: function(scene) {
+    if (this.fightTimer.container) return this.fightTimer.container;
+    
+    var topX = scene.cameras.main.width / 2;
+    var topY = 180;
+    
+    var container = scene.add.container(topX, topY);
+    container.setDepth(55);
+    
+    // Background
+    var bg = scene.add.graphics();
+    bg.fillStyle(0x000000, 0.7);
+    bg.fillRoundedRect(-50, -15, 100, 30, 8);
+    container.add(bg);
+    
+    // Timer text
+    var text = scene.add.text(0, 0, '00:00', {
+      fontFamily: 'Arial Black, sans-serif',
+      fontSize: '20px',
+      color: '#44ff44'
+    }).setOrigin(0.5);
+    container.add(text);
+    
+    container.setVisible(false);
+    container.setAlpha(0);
+    
+    this.fightTimer.container = container;
+    this.fightTimer.text = text;
+    
+    return container;
+  },
+  // Update fight timer display
+  updateFightTimer: function(scene) {
+    if (!this.fightTimer.active) return;
+    
+    if (!this.fightTimer.container) {
+      this.showFightTimer(scene);
+    }
+    
+    var container = this.fightTimer.container;
+    var text = this.fightTimer.text;
+    var remaining = this.fightTimer.remaining;
+    
+    // Format time
+    var totalSec = Math.ceil(remaining / 1000);
+    var mins = Math.floor(totalSec / 60);
+    var secs = totalSec % 60;
+    var timeStr = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    
+    text.setText(timeStr);
+    
+    // Color changes based on time remaining
+    var totalDuration = this.fightTimer.duration;
+    var pct = remaining / totalDuration;
+    
+    if (pct <= 0.2) {
+      text.setColor('#ff4444'); // Critical - red
+    } else if (pct <= 0.5) {
+      text.setColor('#ffaa00'); // Warning - orange
+    } else {
+      text.setColor('#44ff44'); // Normal - green
+    }
+    
+    // Show container
+    if (!container.visible) {
+      container.setVisible(true);
+      scene.tweens.add({
+        targets: container,
+        alpha: 1,
+        duration: 200
+      });
+    }
+    
+    // Pulse effect when critical
+    if (pct <= 0.2) {
+      scene.tweens.add({
+        targets: container,
+        scaleX: 1.1,
+        scaleY: 1.1,
+        duration: 200,
+        yoyo: true,
+        repeat: 1
+      });
+    }
+  },
+  // Handle timer expiration
+  onFightTimerExpired: function(scene) {
+    this.stopFightTimer();
+    
+    // Show "TIME'S UP" message
+    var centerX = scene.cameras.main.width / 2;
+    var centerY = scene.cameras.main.height / 2;
+    
+    var text = scene.add.text(centerX, centerY, "TIME'S UP!", {
+      fontFamily: 'Arial Black, sans-serif',
+      fontSize: '48px',
+      color: '#ff4444',
+      stroke: '#000000',
+      strokeThickness: 6
+    }).setOrigin(0.5).setDepth(100);
+    
+    scene.tweens.add({
+      targets: text,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 300,
+      yoyo: true,
+      repeat: 2,
+      onComplete: function() {
+        text.destroy();
+      }
+    });
+    
+    // Trigger timeout callback if defined
+    if (this.fightTimer.onTimeout) {
+      this.fightTimer.onTimeout(scene);
+    }
+  },
+  // Stop fight timer
+  stopFightTimer: function() {
+    this.fightTimer.active = false;
+    if (this.fightTimer.intervalId) {
+      clearInterval(this.fightTimer.intervalId);
+      this.fightTimer.intervalId = null;
+    }
+  },
+  // Destroy fight timer display
+  destroyFightTimer: function(scene) {
+    this.stopFightTimer();
+    if (this.fightTimer.container) {
+      this.fightTimer.container.destroy();
+      this.fightTimer.container = null;
+      this.fightTimer.text = null;
+    }
+  },
+  // Set callback for timer expiration
+  setFightTimerCallback: function(callback) {
+    this.fightTimer.onTimeout = callback;
+  },
   cooldowns: {
     jab: { remaining: 0, total: 0 },
     heavy: { remaining: 0, total: 0 },
@@ -31,6 +357,25 @@ window.MMA.UI = {
     bar: null,
     label: null
   },
+  // Focus/Chi Meter - builds during combat, fuels special abilities
+  focusMeter: {
+    value: 0,
+    maxValue: 100,
+    container: null,
+    bar: null,
+    label: null,
+    glow: null
+  },
+  // Momentum System - consecutive hits build momentum stacks for bonus damage
+  momentumMeter: {
+    stacks: 0,
+    maxStacks: 5,
+    container: null,
+    indicators: [],
+    surgeText: null,
+    surgeActive: false,
+    surgeTimeout: null
+  },
   resetFightStats: function() {
     this.fightStats = {
       damageDealt: 0,
@@ -42,9 +387,25 @@ window.MMA.UI = {
       enemiesDefeated: 0,
       critsLanded: 0
     };
+    // Reset per-fight style points
+    this.fightStylePoints = { strike: 0, grapple: 0 };
     // Deactivate health pulse on fight reset
     this.deactivateHealthPulse();
+    // Reset focus meter for new fight
+    this.resetFocusMeter();
+    // Reset momentum for new fight
+    this.momentumMeter.stacks = 0;
+    this.momentumMeter.surgeActive = false;
+    if (this.momentumMeter.surgeTimeout) {
+      clearTimeout(this.momentumMeter.surgeTimeout);
+      this.momentumMeter.surgeTimeout = null;
+    }
+    // Reset perfect block counter for new fight
+    this.perfectBlockCounter.count = 0;
+    this.perfectBlockCounter.lastBlockTime = 0;
   },
+  // Per-fight style tracking (resets each fight)
+  fightStylePoints: { strike: 0, grapple: 0 },
   recordHitDealt: function(damage, isCrit, comboCount) {
     this.fightStats.damageDealt += damage;
     this.fightStats.hitsLanded += 1;
@@ -278,6 +639,336 @@ window.MMA.UI = {
       this.hypeMeter.label = null;
     }
     this.hypeMeter.value = 0;
+  },
+  // Focus Meter methods
+  showFocusMeter: function(scene) {
+    if (this.focusMeter.container) return this.focusMeter.container;
+    
+    var leftX = 30;
+    var topY = 60;
+    
+    var container = scene.add.container(leftX, topY);
+    container.setDepth(50);
+    
+    // Background
+    var bg = scene.add.graphics();
+    bg.fillStyle(0x000000, 0.6);
+    bg.fillRoundedRect(-20, -35, 40, 120, 8);
+    container.add(bg);
+    
+    // Label
+    var label = scene.add.text(0, -20, 'FOCUS', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '12px',
+      color: '#66e6ff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    container.add(label);
+    
+    // Bar background
+    var barBg = scene.add.graphics();
+    barBg.fillStyle(0x333333, 0.8);
+    barBg.fillRect(-12, -5, 24, 90);
+    container.add(barBg);
+    
+    // Bar fill
+    var bar = scene.add.graphics();
+    bar.fillStyle(0x66e6ff, 1);
+    bar.fillRect(-10, 0, 20, 0);
+    container.add(bar);
+    
+    // Glow effect (hidden until full)
+    var glow = scene.add.graphics();
+    glow.fillStyle(0x66e6ff, 0);
+    glow.fillCircle(0, 45, 35);
+    container.add(glow);
+    
+    this.focusMeter.container = container;
+    this.focusMeter.bar = bar;
+    this.focusMeter.label = label;
+    this.focusMeter.glow = glow;
+    
+    return container;
+  },
+  updateFocusMeter: function(scene, value, maxValue) {
+    if (!this.focusMeter.container) {
+      this.showFocusMeter(scene);
+    }
+    
+    this.focusMeter.value = Math.max(0, Math.min(value, maxValue));
+    this.focusMeter.maxValue = maxValue;
+    
+    var pct = this.focusMeter.value / maxValue;
+    var barHeight = pct * 85;
+    
+    // Clear and redraw bar
+    var bar = this.focusMeter.bar;
+    bar.clear();
+    
+    // Color based on focus level
+    var color;
+    if (pct >= 1.0) {
+      color = 0xffffff; // White for full
+    } else if (pct >= 0.7) {
+      color = 0x66e6ff; // Cyan for high
+    } else if (pct >= 0.3) {
+      color = 0x4488ff; // Blue for medium
+    } else {
+      color = 0x224488; // Dark blue for low
+    }
+    
+    bar.fillStyle(color, 1);
+    bar.fillRect(-10, 0, 20, -barHeight);
+    
+    // Update glow for full meter
+    var glow = this.focusMeter.glow;
+    glow.clear();
+    if (pct >= 1.0) {
+      glow.fillStyle(0x66e6ff, 0.4 + 0.2 * Math.sin(Date.now() / 150));
+      glow.fillCircle(0, 45, 35);
+    }
+  },
+  // Reset focus meter (call at start of new fight)
+  resetFocusMeter: function() {
+    this.focusMeter.value = 0;
+  },
+  // Check if focus is full and ready
+  isFocusFull: function() {
+    return this.focusMeter.value >= this.focusMeter.maxValue;
+  },
+  destroyFocusMeter: function() {
+    if (this.focusMeter.container) {
+      this.focusMeter.container.destroy();
+      this.focusMeter.container = null;
+      this.focusMeter.bar = null;
+      this.focusMeter.label = null;
+      this.focusMeter.glow = null;
+    }
+    this.focusMeter.value = 0;
+  },
+  // Momentum System methods - builds on landed hits, max 5 stacks, each adds +5% damage and +2% crit
+  showMomentumMeter: function(scene) {
+    if (this.momentumMeter.container) return this.momentumMeter.container;
+    
+    var centerX = scene.cameras.main.width / 2;
+    var topY = 155; // Below style gauge
+    
+    var container = scene.add.container(centerX, topY);
+    container.setDepth(50);
+    
+    // Background pill shape
+    var bg = scene.add.graphics();
+    bg.fillStyle(0x000000, 0.6);
+    bg.fillRoundedRect(-70, -10, 140, 20, 10);
+    container.add(bg);
+    
+    // Label
+    var label = scene.add.text(0, -18, 'MOMENTUM', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '9px',
+      color: '#ffaa00',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    container.add(label);
+    
+    // Stack indicators (5 circles)
+    var indicators = [];
+    var startX = -55;
+    var spacing = 22;
+    
+    for (var i = 0; i < 5; i++) {
+      var ind = scene.add.graphics();
+      ind.fillStyle(0x333333, 1);
+      ind.fillCircle(startX + i * spacing, 0, 8);
+      container.add(ind);
+      indicators.push(ind);
+    }
+    
+    this.momentumMeter.container = container;
+    this.momentumMeter.indicators = indicators;
+    
+    return container;
+  },
+  // Update momentum stacks display
+  updateMomentumMeter: function(scene, stacks) {
+    if (!this.momentumMeter.container) {
+      this.showMomentumMeter(scene);
+    }
+    
+    stacks = Math.max(0, Math.min(stacks, this.momentumMeter.maxStacks));
+    this.momentumMeter.stacks = stacks;
+    
+    var indicators = this.momentumMeter.indicators;
+    var startX = -55;
+    var spacing = 22;
+    
+    for (var i = 0; i < 5; i++) {
+      var ind = indicators[i];
+      ind.clear();
+      
+      if (i < stacks) {
+        // Active stack - golden glow
+        ind.fillStyle(0xffaa00, 1);
+        ind.fillCircle(startX + i * spacing, 0, 8);
+        ind.lineStyle(2, 0xffdd44, 1);
+        ind.strokeCircle(startX + i * spacing, 0, 8);
+      } else {
+        // Empty slot
+        ind.fillStyle(0x333333, 1);
+        ind.fillCircle(startX + i * spacing, 0, 8);
+      }
+    }
+    
+    // Pulse effect when gaining a stack
+    if (stacks > 0 && this.momentumMeter.container) {
+      scene.tweens.add({
+        targets: this.momentumMeter.container,
+        scaleX: 1.1,
+        scaleY: 1.1,
+        duration: 100,
+        yoyo: true,
+        ease: 'Quad.easeOut'
+      });
+    }
+  },
+  // Add momentum stack (returns true if reached max)
+  addMomentumStack: function(scene) {
+    var newStacks = Math.min(this.momentumMeter.stacks + 1, this.momentumMeter.maxStacks);
+    this.updateMomentumMeter(scene, newStacks);
+    
+    // Check for Momentum Surge (5 stacks)
+    if (newStacks >= 5 && !this.momentumMeter.surgeActive) {
+      this.triggerMomentumSurge(scene);
+      return true;
+    }
+    return false;
+  },
+  // Reset momentum (on getting hit or missing)
+  resetMomentum: function(scene) {
+    this.updateMomentumMeter(scene || this.momentumMeter.container._scene, 0);
+    this.momentumMeter.surgeActive = false;
+    if (this.momentumMeter.surgeTimeout) {
+      clearTimeout(this.momentumMeter.surgeTimeout);
+      this.momentumMeter.surgeTimeout = null;
+    }
+    if (this.momentumMeter.surgeText && this.momentumMeter.surgeText.destroy) {
+      this.momentumMeter.surgeText.destroy();
+      this.momentumMeter.surgeText = null;
+    }
+  },
+  // Trigger Momentum Surge effect at 5 stacks
+  triggerMomentumSurge: function(scene) {
+    this.momentumMeter.surgeActive = true;
+    
+    var centerX = scene.cameras.main.width / 2;
+    var centerY = scene.cameras.main.height / 2;
+    
+    // Create surge text
+    var surgeText = scene.add.text(centerX, centerY - 80, 'MOMENTUM SURGE!', {
+      fontFamily: 'Arial Black, sans-serif',
+      fontSize: '36px',
+      color: '#ffdd00',
+      stroke: '#000000',
+      strokeThickness: 6
+    }).setOrigin(0.5).setDepth(100);
+    
+    // Glow effect
+    var glow = scene.add.graphics();
+    glow.fillStyle(0xffaa00, 0.3);
+    glow.fillCircle(centerX, centerY, 150);
+    glow.setDepth(99);
+    
+    // Flash the momentum container gold
+    var container = this.momentumMeter.container;
+    if (container) {
+      scene.tweens.add({
+        targets: container,
+        alpha: 0.3,
+        duration: 100,
+        yoyo: true,
+        repeat: 3
+      });
+    }
+    
+    // Animate surge text
+    scene.tweens.add({
+      targets: surgeText,
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 200,
+      yoyo: true,
+      repeat: 2
+    });
+    
+    scene.tweens.add({
+      targets: [surgeText, glow],
+      alpha: 0,
+      delay: 1200,
+      duration: 400,
+      onComplete: function() {
+        if (surgeText && surgeText.destroy) surgeText.destroy();
+        if (glow && glow.destroy) glow.destroy();
+      }
+    });
+    
+    this.momentumMeter.surgeText = surgeText;
+    
+    // Screen edge flash (cyan for momentum)
+    var flash = scene.add.graphics();
+    flash.fillStyle(0x00ffff, 0.4);
+    flash.fillRect(0, 0, scene.cameras.main.width, scene.cameras.main.height);
+    flash.setDepth(98);
+    scene.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 300,
+      onComplete: function() { if (flash && flash.destroy) flash.destroy(); }
+    });
+    
+    // Auto-reset after 5 seconds if not triggered
+    var self = this;
+    if (this.momentumMeter.surgeTimeout) {
+      clearTimeout(this.momentumMeter.surgeTimeout);
+    }
+    this.momentumMeter.surgeTimeout = setTimeout(function() {
+      self.momentumMeter.surgeActive = false;
+    }, 5000);
+  },
+  // Check if momentum surge is active (next attack auto-crits with +50% damage)
+  isMomentumSurgeActive: function() {
+    return this.momentumMeter.surgeActive;
+  },
+  // Consume momentum surge (after triggering the empowered attack)
+  consumeMomentumSurge: function() {
+    this.momentumMeter.surgeActive = false;
+    if (this.momentumMeter.container && this.momentumMeter.container._scene) {
+      this.resetMomentum(this.momentumMeter.container._scene);
+    }
+  },
+  // Get momentum damage bonus (5% per stack)
+  getMomentumDamageBonus: function() {
+    return this.momentumMeter.stacks * 0.05;
+  },
+  // Get momentum crit bonus (2% per stack)
+  getMomentumCritBonus: function() {
+    return this.momentumMeter.stacks * 0.02;
+  },
+  destroyMomentumMeter: function() {
+    if (this.momentumMeter.container) {
+      this.momentumMeter.container.destroy();
+      this.momentumMeter.container = null;
+      this.momentumMeter.indicators = [];
+    }
+    if (this.momentumMeter.surgeText && this.momentumMeter.surgeText.destroy) {
+      this.momentumMeter.surgeText.destroy();
+      this.momentumMeter.surgeText = null;
+    }
+    if (this.momentumMeter.surgeTimeout) {
+      clearTimeout(this.momentumMeter.surgeTimeout);
+      this.momentumMeter.surgeTimeout = null;
+    }
+    this.momentumMeter.stacks = 0;
+    this.momentumMeter.surgeActive = false;
   },
   // Fighter's Diary - auto-logged milestones and memorable moments
   fighterDiary: {
@@ -796,12 +1487,707 @@ window.MMA.UI = {
     this.miniMap.exploredRooms = [];
     this.miniMap.currentRoom = null;
   },
+  // Style Gauge - shows player's striking vs grappling preference in real-time
+  styleGauge: {
+    value: 0, // -100 = full grappler, +100 = full striker, 0 = balanced
+    maxValue: 100,
+    container: null,
+    strikerBar: null,
+    grapplerBar: null,
+    label: null,
+    icon: null
+  },
+  // Show Style Gauge in HUD
+  showStyleGauge: function(scene) {
+    if (this.styleGauge.container) return this.styleGauge.container;
+    
+    var centerX = scene.cameras.main.width / 2;
+    var topY = 25;
+    
+    var container = scene.add.container(centerX, topY);
+    container.setDepth(50);
+    
+    // Background
+    var bg = scene.add.graphics();
+    bg.fillStyle(0x000000, 0.6);
+    bg.fillRoundedRect(-55, -12, 110, 24, 12);
+    container.add(bg);
+    
+    // Striker side (left, red)
+    var strikerBar = scene.add.graphics();
+    strikerBar.fillStyle(0xff4444, 1);
+    strikerBar.fillRect(-50, -6, 45, 12);
+    container.add(strikerBar);
+    
+    // Grappler side (right, blue)
+    var grapplerBar = scene.add.graphics();
+    grapplerBar.fillStyle(0x4488ff, 1);
+    grapplerBar.fillRect(5, -6, 45, 12);
+    container.add(grapplerBar);
+    
+    // Center divider
+    var divider = scene.add.graphics();
+    divider.fillStyle(0xffffff, 0.5);
+    divider.fillRect(-2, -6, 4, 12);
+    container.add(divider);
+    
+    // Icon in center
+    var icon = scene.add.text(0, 0, '⚖️', { fontSize: '14px' }).setOrigin(0.5);
+    container.add(icon);
+    
+    // Label below
+    var label = scene.add.text(0, 18, 'STYLE', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '9px',
+      color: '#aaaaaa',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    container.add(label);
+    
+    this.styleGauge.container = container;
+    this.styleGauge.strikerBar = strikerBar;
+    this.styleGauge.grapplerBar = grapplerBar;
+    this.styleGauge.label = label;
+    this.styleGauge.icon = icon;
+    
+    // Also show technique mastery meter below style gauge
+    this.showTechniqueMasteryMeter(scene);
+    this.updateTechniqueMasteryMeter(scene);
+    
+    return container;
+  },
+  // Update Style Gauge display
+  updateStyleGauge: function(scene, stylePoints) {
+    if (!this.styleGauge.container) {
+      this.showStyleGauge(scene);
+    }
+    
+    var sp = stylePoints || this.fighterCard.stylePoints;
+    var striker = sp.strike || 0;
+    var grappler = sp.grapple || 0;
+    var total = striker + grappler;
+    
+    // Calculate gauge position (-100 to +100)
+    if (total === 0) {
+      this.styleGauge.value = 0;
+    } else {
+      // If more strikes, positive; more grapples, negative
+      var diff = striker - grappler;
+      var maxDiff = Math.max(total, 50); // Scale relative to activity
+      this.styleGauge.value = Math.max(-100, Math.min(100, (diff / maxDiff) * 100));
+    }
+    
+    var value = this.styleGauge.value;
+    var strikerWidth, grapplerWidth;
+    
+    if (value >= 0) {
+      // Strikers dominate
+      strikerWidth = 5 + (value / 100) * 45;
+      grapplerWidth = 50 - strikerWidth;
+    } else {
+      // Grapplers dominate
+      grapplerWidth = 5 + (Math.abs(value) / 100) * 45;
+      strikerWidth = 50 - grapplerWidth;
+    }
+    
+    // Redraw bars
+    var strikerBar = this.styleGauge.strikerBar;
+    var grapplerBar = this.styleGauge.grapplerBar;
+    
+    strikerBar.clear();
+    grapplerBar.clear();
+    
+    // Striker bar (left side, fills from center left)
+    strikerBar.fillStyle(0xff4444, 1);
+    strikerBar.fillRect(-50, -6, strikerWidth, 12);
+    
+    // Grappler bar (right side, fills from center right)
+    grapplerBar.fillStyle(0x4488ff, 1);
+    grapplerBar.fillRect(50 - grapplerWidth, -6, grapplerWidth, 12);
+    
+    // Update icon based on dominant style
+    var icon = this.styleGauge.icon;
+    if (value > 30) {
+      icon.setText('👊'); // Striker
+    } else if (value < -30) {
+      icon.setText('🤼'); // Grappler
+    } else {
+      icon.setText('⚖️'); // Balanced
+    }
+  },
+  destroyStyleGauge: function() {
+    if (this.styleGauge.container) {
+      this.styleGauge.container.destroy();
+      this.styleGauge.container = null;
+      this.styleGauge.strikerBar = null;
+      this.styleGauge.grapplerBar = null;
+      this.styleGauge.label = null;
+      this.styleGauge.icon = null;
+    }
+    this.styleGauge.value = 0;
+  },
+  // Technique Mastery Progress - tracks mastery levels (1-5 stars) for learned techniques
+  techniqueMastery: {
+    // Mastery data: { techniqueKey: { xp: number, level: number, totalXp: number } }
+    techniques: {},
+    // XP needed per level: [0, 10, 25, 50, 100] - level 1 needs 10 XP, level 2 needs 25, etc.
+    xpThresholds: [0, 10, 25, 50, 100, 200],
+    // Milestone bonuses at 3/6/10 techniques mastered (level 3+)
+    milestoneBonuses: {
+      3: { name: 'Technique Apprentice', bonus: '+5% damage' },
+      6: { name: 'Technique Expert', bonus: '+10% damage' },
+      10: { name: 'Technique Master', bonus: '+15% damage' }
+    },
+    unlockedMilestones: [],
+    container: null,
+    indicators: []
+  },
+  // Weight Class System - determines speed/power tradeoffs based on player stats
+  weightClass: {
+    current: 'featherweight', // featherweight, lightweight, welterweight, middleweight, heavyweight
+    container: null,
+    // Weight class definitions with stat tradeoffs
+    classes: {
+      featherweight: { 
+        name: 'Featherweight', 
+        icon: '🪶', 
+        color: '#44ff88',
+        speedBonus: 0.25, 
+        powerBonus: -0.15,
+        staminaBonus: 0.10,
+        desc: '+Speed, -Power'
+      },
+      lightweight: { 
+        name: 'Lightweight', 
+        icon: '⚡', 
+        color: '#44ffff',
+        speedBonus: 0.15, 
+        powerBonus: -0.05,
+        staminaBonus: 0.05,
+        desc: '+Speed, -Power'
+      },
+      welterweight: { 
+        name: 'Welterweight', 
+        icon: '⚖️', 
+        color: '#ffff44',
+        speedBonus: 0, 
+        powerBonus: 0,
+        staminaBonus: 0,
+        desc: 'Balanced'
+      },
+      middleweight: { 
+        name: 'Middleweight', 
+        icon: '💪', 
+        color: '#ff8844',
+        speedBonus: -0.05, 
+        powerBonus: 0.15,
+        staminaBonus: 0,
+        desc: '+Power, -Speed'
+      },
+      heavyweight: { 
+        name: 'Heavyweight', 
+        icon: '🏋️', 
+        color: '#ff4444',
+        speedBonus: -0.15, 
+        powerBonus: 0.30,
+        staminaBonus: -0.10,
+        desc: '++Power, -Speed'
+      }
+    }
+  },
+  // Show Technique Mastery meter (next to Style Gauge)
+  showTechniqueMasteryMeter: function(scene) {
+    if (this.techniqueMastery.container) return this.techniqueMastery.container;
+    
+    var centerX = scene.cameras.main.width / 2;
+    var topY = 45; // Below style gauge
+    
+    var container = scene.add.container(centerX, topY);
+    container.setDepth(50);
+    
+    // Background pill
+    var bg = scene.add.graphics();
+    bg.fillStyle(0x000000, 0.5);
+    bg.fillRoundedRect(-50, -8, 100, 16, 8);
+    container.add(bg);
+    
+    // Label
+    var label = scene.add.text(0, -5, 'TECHNIQUE', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '8px',
+      color: '#aa88ff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    container.add(label);
+    
+    // Star indicators (5 slots for techniques, but we show aggregate mastery)
+    var indicators = [];
+    var startX = -40;
+    var spacing = 16;
+    
+    for (var i = 0; i < 5; i++) {
+      var star = scene.add.text(startX + i * spacing, 6, '☆', {
+        fontSize: '12px',
+        color: '#444444'
+      }).setOrigin(0.5);
+      container.add(star);
+      indicators.push(star);
+    }
+    
+    this.techniqueMastery.container = container;
+    this.techniqueMastery.indicators = indicators;
+    
+    return container;
+  },
+  // Update Technique Mastery display based on mastered techniques count
+  updateTechniqueMasteryMeter: function(scene) {
+    if (!this.techniqueMastery.container) {
+      this.showTechniqueMasteryMeter(scene);
+    }
+    
+    var mastery = this.techniqueMastery;
+    var indicators = mastery.indicators;
+    
+    // Count techniques with level 3+ (considered "mastered")
+    var techniques = mastery.techniques || {};
+    var masteredCount = 0;
+    var totalMasteryLevel = 0;
+    var totalTechniques = 0;
+    
+    for (var key in techniques) {
+      var tech = techniques[key];
+      totalTechniques++;
+      totalMasteryLevel += tech.level || 0;
+      if ((tech.level || 0) >= 3) {
+        masteredCount++;
+      }
+    }
+    
+    // Update star indicators based on mastered count (max 5 stars)
+    var displayStars = Math.min(5, masteredCount);
+    
+    for (var i = 0; i < 5; i++) {
+      var star = indicators[i];
+      if (i < displayStars) {
+        // Filled star - gold/purple gradient effect
+        star.setText('★');
+        if (displayStars >= 4) {
+          star.setColor('#ff44ff'); // Purple for high mastery
+        } else if (displayStars >= 2) {
+          star.setColor('#ffaa00'); // Gold for medium mastery
+        } else {
+          star.setColor('#44ffaa'); // Green for low mastery
+        }
+      } else {
+        star.setText('☆');
+        star.setColor('#444444');
+      }
+    }
+    
+    // Check for milestone unlocks
+    this.checkTechniqueMilestones(scene, masteredCount);
+    
+    return { masteredCount: masteredCount, totalLevel: totalMasteryLevel };
+  },
+  // Add mastery XP to a technique
+  addTechniqueMasteryXP: function(techniqueKey, xpAmount, scene) {
+    var mastery = this.techniqueMastery;
+    var techniques = mastery.techniques;
+    
+    // Initialize technique if not exists
+    if (!techniques[techniqueKey]) {
+      techniques[techniqueKey] = { xp: 0, level: 1, totalXp: 0 };
+    }
+    
+    var tech = techniques[techniqueKey];
+    var oldLevel = tech.level;
+    tech.xp += xpAmount;
+    tech.totalXp += xpAmount;
+    
+    // Level up based on thresholds
+    var newLevel = 1;
+    for (var i = 1; i < mastery.xpThresholds.length; i++) {
+      if (tech.totalXp >= mastery.xpThresholds[i]) {
+        newLevel = i;
+      }
+    }
+    tech.level = newLevel;
+    
+    // Level up effect
+    if (newLevel > oldLevel && scene) {
+      this.showTechniqueLevelUp(scene, techniqueKey, newLevel);
+    }
+    
+    // Update the display
+    if (scene) {
+      this.updateTechniqueMasteryMeter(scene);
+    }
+    
+    return { oldLevel: oldLevel, newLevel: newLevel };
+  },
+  // Show technique level up notification
+  showTechniqueLevelUp: function(scene, techniqueKey, newLevel) {
+    var centerX = scene.cameras.main.width / 2;
+    var centerY = scene.cameras.main.height / 2 - 50;
+    
+    // Get technique name from roster
+    var moveName = techniqueKey;
+    if (window.MMA && MMA.Combat && MMA.Combat.MOVE_ROSTER && MMA.Combat.MOVE_ROSTER[techniqueKey]) {
+      moveName = MMA.Combat.MOVE_ROSTER[techniqueKey].name;
+    }
+    
+    var text = scene.add.text(centerX, centerY, moveName.toUpperCase() + ' MASTERY ' + newLevel + '!', {
+      fontFamily: 'Arial Black, sans-serif',
+      fontSize: '18px',
+      color: '#ff44ff',
+      stroke: '#000000',
+      strokeThickness: 4
+    }).setOrigin(0.5).setDepth(100);
+    
+    // Star display
+    var stars = '';
+    for (var i = 0; i < newLevel; i++) {
+      stars += '★';
+    }
+    var starText = scene.add.text(centerX, centerY + 22, stars, {
+      fontSize: '16px',
+      color: '#ffaa00'
+    }).setOrigin(0.5).setDepth(100);
+    
+    // Animate
+    scene.tweens.add({
+      targets: [text, starText],
+      scaleX: 1.2,
+      scaleY: 1.2,
+      duration: 200,
+      yoyo: true,
+      ease: 'Quad.easeOut'
+    });
+    
+    scene.tweens.add({
+      targets: [text, starText],
+      alpha: 0,
+      y: centerY - 30,
+      delay: 1500,
+      duration: 500,
+      onComplete: function() {
+        if (text && text.destroy) text.destroy();
+        if (starText && starText.destroy) starText.destroy();
+      }
+    });
+  },
+  // Check and unlock technique milestones
+  checkTechniqueMilestones: function(scene, masteredCount) {
+    var mastery = this.techniqueMastery;
+    var bonuses = mastery.milestoneBonuses;
+    
+    for (var threshold in bonuses) {
+      threshold = parseInt(threshold);
+      if (masteredCount >= threshold && mastery.unlockedMilestones.indexOf(threshold) === -1) {
+        // New milestone unlocked!
+        mastery.unlockedMilestones.push(threshold);
+        this.showTechniqueMilestoneUnlock(scene, threshold, bonuses[threshold]);
+      }
+    }
+  },
+  // Show milestone unlock notification
+  showTechniqueMilestoneUnlock: function(scene, threshold, bonus) {
+    var centerX = scene.cameras.main.width / 2;
+    var centerY = scene.cameras.main.height / 2;
+    
+    var text = scene.add.text(centerX, centerY - 40, 'MILESTONE UNLOCKED!', {
+      fontFamily: 'Arial Black, sans-serif',
+      fontSize: '20px',
+      color: '#ff44ff',
+      stroke: '#000000',
+      strokeThickness: 4
+    }).setOrigin(0.5).setDepth(100);
+    
+    var title = scene.add.text(centerX, centerY, bonus.name, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '16px',
+      color: '#ffaa00',
+      fontStyle: 'bold'
+    }).setOrigin(0.5).setDepth(100);
+    
+    var desc = scene.add.text(centerX, centerY + 20, bonus.bonus, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '14px',
+      color: '#44ffaa'
+    }).setOrigin(0.5).setDepth(100);
+    
+    // Flash effect
+    var flash = scene.add.graphics();
+    flash.fillStyle(0xff44ff, 0.3);
+    flash.fillRect(0, 0, scene.cameras.main.width, scene.cameras.main.height);
+    flash.setDepth(99);
+    
+    scene.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 500,
+      onComplete: function() { if (flash && flash.destroy) flash.destroy(); }
+    });
+    
+    scene.tweens.add({
+      targets: [text, title, desc],
+      alpha: 0,
+      y: centerY - 50,
+      delay: 2500,
+      duration: 500,
+      onComplete: function() {
+        if (text && text.destroy) text.destroy();
+        if (title && title.destroy) title.destroy();
+        if (desc && desc.destroy) desc.destroy();
+      }
+    });
+  },
+  // Get technique mastery damage bonus
+  getTechniqueMasteryBonus: function() {
+    var mastery = this.techniqueMastery;
+    var techniques = mastery.techniques || {};
+    var masteredCount = 0;
+    
+    for (var key in techniques) {
+      if ((techniques[key].level || 0) >= 3) {
+        masteredCount++;
+      }
+    }
+    
+    // Bonus based on milestone
+    if (masteredCount >= 10) return 0.15;
+    if (masteredCount >= 6) return 0.10;
+    if (masteredCount >= 3) return 0.05;
+    return 0;
+  },
+  // Save technique mastery data
+  saveTechniqueMastery: function() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      var key = 'mma-rpg-technique-mastery';
+      var data = {
+        techniques: this.techniqueMastery.techniques,
+        unlockedMilestones: this.techniqueMastery.unlockedMilestones
+      };
+      window.localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {}
+  },
+  // Load technique mastery data
+  loadTechniqueMastery: function() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      var key = 'mma-rpg-technique-mastery';
+      var raw = window.localStorage.getItem(key);
+      if (!raw) return;
+      var data = JSON.parse(raw);
+      if (!data || typeof data !== 'object') return;
+      if (data.techniques) this.techniqueMastery.techniques = data.techniques;
+      if (data.unlockedMilestones) this.techniqueMastery.unlockedMilestones = data.unlockedMilestones;
+    } catch (e) {}
+  },
+  // Destroy technique mastery meter
+  destroyTechniqueMasteryMeter: function() {
+    if (this.techniqueMastery.container) {
+      this.techniqueMastery.container.destroy();
+      this.techniqueMastery.container = null;
+      this.techniqueMastery.indicators = [];
+    }
+  },
+  // Weight Class Indicator methods
+  // Determine weight class based on player stats (level + total fights + upgrades)
+  calculateWeightClass: function(playerStats) {
+    var totalPower = 0;
+    if (playerStats) {
+      // Calculate based on level, upgrades, and total stats
+      totalPower = (playerStats.level || 1) * 10;
+      totalPower += (playerStats.strength || 0) * 5;
+      totalPower += (playerStats.upgrades?.power || 0) * 20;
+      totalPower += (playerStats.totalFights || 0);
+    }
+    
+    // Determine weight class based on total power
+    if (totalPower < 30) return 'featherweight';
+    if (totalPower < 60) return 'lightweight';
+    if (totalPower < 100) return 'welterweight';
+    if (totalPower < 160) return 'middleweight';
+    return 'heavyweight';
+  },
+  // Get weight class bonuses
+  getWeightClassBonuses: function() {
+    var wc = this.weightClass.classes[this.weightClass.current];
+    return wc || this.weightClass.classes.welterweight;
+  },
+  // Apply weight class bonuses to a stat value
+  applyWeightClassBonus: function(statValue, bonusType) {
+    var bonuses = this.getWeightClassBonuses();
+    var bonus = bonuses[bonusType + 'Bonus'] || 0;
+    return statValue * (1 + bonus);
+  },
+  // Show Weight Class indicator in HUD
+  showWeightClassIndicator: function(scene) {
+    if (this.weightClass.container) return this.weightClass.container;
+    
+    var leftX = 30;
+    var topY = 120; // Below focus meter
+    
+    var container = scene.add.container(leftX, topY);
+    container.setDepth(50);
+    
+    // Background pill
+    var bg = scene.add.graphics();
+    bg.fillStyle(0x000000, 0.6);
+    bg.fillRoundedRect(-18, -10, 36, 20, 10);
+    container.add(bg);
+    
+    // Icon text (will be updated)
+    var icon = scene.add.text(0, 0, '⚖️', { 
+      fontSize: '14px' 
+    }).setOrigin(0.5);
+    container.add(icon);
+    
+    // Label below
+    var label = scene.add.text(0, 16, 'CLASS', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '8px',
+      color: '#aaaaaa',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    container.add(label);
+    
+    this.weightClass.container = container;
+    this.weightClass.icon = icon;
+    this.weightClass.label = label;
+    
+    return container;
+  },
+  // Update Weight Class display
+  updateWeightClassIndicator: function(scene, playerStats) {
+    // Calculate current weight class
+    var newClass = this.calculateWeightClass(playerStats);
+    
+    // Only update if changed
+    if (newClass !== this.weightClass.current) {
+      this.weightClass.current = newClass;
+    }
+    
+    // Create container if needed
+    if (!this.weightClass.container) {
+      this.showWeightClassIndicator(scene);
+    }
+    
+    var wc = this.weightClass.classes[this.weightClass.current];
+    var container = this.weightClass.container;
+    var icon = this.weightClass.icon;
+    
+    // Update icon and color
+    icon.setText(wc.icon);
+    icon.setColor(wc.color);
+    
+    // Pulse effect on change
+    if (container) {
+      scene.tweens.add({
+        targets: container,
+        scaleX: 1.2,
+        scaleY: 1.2,
+        duration: 150,
+        yoyo: true,
+        ease: 'Quad.easeOut'
+      });
+    }
+  },
+  // Show weight class details in a tooltip (on hover/click)
+  showWeightClassTooltip: function(scene, x, y) {
+    var wc = this.weightClass.classes[this.weightClass.current];
+    
+    // Create tooltip container
+    var tooltip = scene.add.container(x, y);
+    tooltip.setDepth(100);
+    
+    // Background
+    var bg = scene.add.graphics();
+    bg.fillStyle(0x000000, 0.9);
+    bg.fillRoundedRect(0, 0, 140, 60, 8);
+    bg.lineStyle(2, wc.color, 1);
+    bg.strokeRoundedRect(0, 0, 140, 60, 8);
+    tooltip.add(bg);
+    
+    // Title
+    var title = scene.add.text(70, 12, wc.name.toUpperCase(), {
+      fontFamily: 'Arial Black, sans-serif',
+      fontSize: '12px',
+      color: wc.color
+    }).setOrigin(0.5);
+    tooltip.add(title);
+    
+    // Stats
+    var statsText = scene.add.text(10, 30, wc.desc, {
+      fontSize: '11px',
+      color: '#aaaaaa'
+    });
+    tooltip.add(statsText);
+    
+    // Auto-hide after 2 seconds
+    scene.time.delayedCall(2000, function() {
+      tooltip.destroy();
+    });
+    
+    return tooltip;
+  },
+  // Destroy weight class indicator
+  destroyWeightClassIndicator: function() {
+    if (this.weightClass.container) {
+      this.weightClass.container.destroy();
+      this.weightClass.container = null;
+      this.weightClass.icon = null;
+      this.weightClass.label = null;
+    }
+  },
+  // Update DOM-based weight class indicator (called from index.html)
+  updateWeightClassFromDOM: function(playerStats) {
+    var el = document.getElementById('weight-class-indicator');
+    if (!el) return;
+    
+    // Calculate weight class
+    var newClass = this.calculateWeightClass(playerStats);
+    var oldClass = this.weightClass.current;
+    
+    // Only update if changed
+    if (newClass !== oldClass) {
+      this.weightClass.current = newClass;
+    }
+    
+    var wc = this.weightClass.classes[this.weightClass.current];
+    
+    // Update DOM elements
+    var icon = el.querySelector('.wc-icon');
+    var name = el.querySelector('.wc-name');
+    var bonus = el.querySelector('.wc-bonus');
+    
+    if (icon) icon.textContent = wc.icon;
+    if (name) {
+      name.textContent = wc.name;
+      name.style.color = wc.color;
+    }
+    if (bonus) bonus.textContent = wc.desc;
+    
+    // Update indicator color
+    el.style.borderColor = wc.color;
+    el.style.color = wc.color;
+  },
   // Stamina warning indicator
   staminaWarning: {
     active: false,
     container: null,
     scene: null,
     shown: false
+  },
+  // Perfect Block Counter - tracks perfect blocks with satisfying feedback
+  perfectBlockCounter: {
+    count: 0,
+    lastBlockTime: 0,
+    container: null,
+    text: null,
+    flashEffect: null
   },
   // Health Pulse Warning - red vignette when HP < 25%
   healthPulse: {
@@ -832,20 +2218,28 @@ window.MMA.UI = {
     this.updateStyle();
   },
   // Record move usage for Style DNA Breakdown
-  recordMoveUsage: function(moveKey) {
+  recordMoveUsage: function(moveKey, scene) {
     var mu = this.fighterCard.moveUsageStats;
     if (mu.hasOwnProperty(moveKey)) {
       mu[moveKey]++;
     }
-    // Also update style points
+    // Also update style points (career)
     var strikeMoves = { jab:1, cross:1, hook:1, kick:1, uppercut:1 };
     var grappleMoves = { takedown:1, grapple:1, submission:1, clinch:1 };
     if (strikeMoves[moveKey]) {
       this.fighterCard.stylePoints.strike++;
+      this.fightStylePoints.strike++;
     } else if (grappleMoves[moveKey]) {
       this.fighterCard.stylePoints.grapple++;
+      this.fightStylePoints.grapple++;
     }
     this.updateStyle();
+    // Update style gauge in real-time during combat (using per-fight points)
+    if (scene) {
+      this.updateStyleGauge(scene, this.fightStylePoints);
+      // Add technique mastery XP for this move
+      this.addTechniqueMasteryXP(moveKey, 1, scene);
+    }
   },
   // Get Style DNA breakdown percentages
   getStyleBreakdown: function() {
@@ -1153,6 +2547,159 @@ window.MMA.UI = {
   resetStaminaWarning: function() {
     this.staminaWarning.shown = false;
     this.staminaWarning.scene = null;
+  },
+  // Perfect Block Counter - track perfect blocks with visual feedback
+  showPerfectBlockCounter: function(scene) {
+    if (this.perfectBlockCounter.container) return this.perfectBlockCounter.container;
+    
+    // Show in top-right area, above action buttons
+    var rightX = scene.cameras.main.width - 40;
+    var topY = 50;
+    
+    var container = scene.add.container(rightX, topY);
+    container.setDepth(50);
+    container.setAlpha(0);
+    
+    // Background glow (only visible when counter > 0)
+    var glow = scene.add.graphics();
+    glow.fillStyle(0x00ffff, 0);
+    glow.fillCircle(0, 0, 30);
+    container.add(glow);
+    
+    // Counter icon and text
+    var icon = scene.add.text(-15, 0, '🛡️', { fontSize: '18px' }).setOrigin(0.5);
+    container.add(icon);
+    
+    var text = scene.add.text(10, 0, '0', {
+      fontFamily: 'Arial Black, sans-serif',
+      fontSize: '16px',
+      color: '#00ffff',
+      stroke: '#000000',
+      strokeThickness: 2
+    }).setOrigin(0, 0.5);
+    container.add(text);
+    
+    this.perfectBlockCounter.container = container;
+    this.perfectBlockCounter.text = text;
+    this.perfectBlockCounter.glow = glow;
+    this.perfectBlockCounter.icon = icon;
+    
+    // Fade in
+    container.setAlpha(1);
+    
+    return container;
+  },
+  // Record a perfect block - call this when player perfectly times a block
+  recordPerfectBlock: function(scene) {
+    var now = Date.now();
+    var pbc = this.perfectBlockCounter;
+    
+    // Increment counter
+    pbc.count++;
+    pbc.lastBlockTime = now;
+    
+    // Show/ensure container exists
+    if (!pbc.container) {
+      this.showPerfectBlockCounter(scene);
+    }
+    
+    // Update text
+    if (pbc.text) {
+      pbc.text.setText(pbc.count.toString());
+      
+      // Pulse effect on increment
+      scene.tweens.add({
+        targets: pbc.container,
+        scaleX: 1.3,
+        scaleY: 1.3,
+        duration: 80,
+        yoyo: true,
+        ease: 'Quad.easeOut'
+      });
+      
+      // Glow effect for high counts
+      if (pbc.count >= 5) {
+        pbc.text.setColor('#ff00ff'); // Purple for high mastery
+      } else if (pbc.count >= 3) {
+        pbc.text.setColor('#00ff00'); // Green for medium
+      }
+    }
+    
+    // Update glow intensity
+    if (pbc.glow) {
+      var glowIntensity = Math.min(0.4, 0.1 + (pbc.count * 0.05));
+      pbc.glow.clear();
+      pbc.glow.fillStyle(0x00ffff, glowIntensity);
+      pbc.glow.fillCircle(0, 0, 30 + (pbc.count * 2));
+    }
+    
+    // Show "PERFECT!" popup
+    var centerX = scene.cameras.main.width / 2;
+    var centerY = scene.cameras.main.height / 2;
+    
+    var popup = scene.add.text(centerX, centerY - 60, 'PERFECT BLOCK!', {
+      fontFamily: 'Arial Black, sans-serif',
+      fontSize: '20px',
+      color: '#00ffff',
+      stroke: '#000000',
+      strokeThickness: 3
+    }).setOrigin(0.5).setDepth(100);
+    
+    scene.tweens.add({
+      targets: popup,
+      y: centerY - 100,
+      alpha: 0,
+      duration: 800,
+      onComplete: function() {
+        if (popup && popup.destroy) popup.destroy();
+      }
+    });
+    
+    // Screen edge flash for perfect block
+    var flash = scene.add.graphics();
+    flash.fillStyle(0x00ffff, 0.2);
+    flash.fillRect(0, 0, scene.cameras.main.width, scene.cameras.main.height);
+    flash.setDepth(98);
+    scene.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 200,
+      onComplete: function() { if (flash && flash.destroy) flash.destroy(); }
+    });
+    
+    return pbc.count;
+  },
+  // Get perfect block count
+  getPerfectBlockCount: function() {
+    return this.perfectBlockCounter.count;
+  },
+  // Reset perfect block counter (call at start of each fight)
+  resetPerfectBlockCounter: function(scene) {
+    this.perfectBlockCounter.count = 0;
+    this.perfectBlockCounter.lastBlockTime = 0;
+    
+    if (this.perfectBlockCounter.container) {
+      if (this.perfectBlockCounter.text) {
+        this.perfectBlockCounter.text.setText('0');
+        this.perfectBlockCounter.text.setColor('#00ffff');
+      }
+      if (this.perfectBlockCounter.glow) {
+        this.perfectBlockCounter.glow.clear();
+        this.perfectBlockCounter.glow.fillStyle(0x00ffff, 0);
+        this.perfectBlockCounter.glow.fillCircle(0, 0, 30);
+      }
+    }
+  },
+  // Destroy perfect block counter
+  destroyPerfectBlockCounter: function() {
+    if (this.perfectBlockCounter.container) {
+      this.perfectBlockCounter.container.destroy();
+      this.perfectBlockCounter.container = null;
+      this.perfectBlockCounter.text = null;
+      this.perfectBlockCounter.glow = null;
+      this.perfectBlockCounter.icon = null;
+    }
+    this.perfectBlockCounter.count = 0;
   },
   // Health Pulse Warning - activates when HP < 25%
   getHealthPulseOverlay: function() {
@@ -1536,6 +3083,9 @@ window.MMA.UI = {
     var ttl = scene.add.text(70, 20, 'FIGHTER CARD', { fontFamily: 'Arial Black, sans-serif', fontSize: '22px', color: '#e8c830' }).setOrigin(0, 0.5); con.add(ttl);
     var stc = this.getStyleColor(), stl = this.getStyleLabel();
     var stt = scene.add.text(70, 42, stl, { fontSize: '12px', color: stc, fontStyle: 'bold' }).setOrigin(0, 0.5); con.add(stt);
+    // Weight class display
+    var wc = this.weightClass.classes[this.weightClass.current];
+    var wct = scene.add.text(150, 42, wc.icon + ' ' + wc.name, { fontSize: '11px', color: wc.color, fontStyle: 'bold' }).setOrigin(0, 0.5); con.add(wct);
     var st = this.fighterCard.stats, sy = 80, c1x = 20, c2x = cw / 2 + 10;
     con.add(scene.add.text(c1x, sy, 'CAREER STATS', { fontSize: '11px', color: '#888888', fontStyle: 'bold' }).setDepth(10));
     ['Record: '+st.wins+'W - '+st.losses+'L', 'Fights: '+st.totalFights, 'KOs: '+st.enemiesDefeated, 'Damage: '+st.totalDamageDealt, 'Hits: '+st.totalHitsLanded, 'Best Combo: '+st.longestCombo, 'Crits: '+st.critsLanded].forEach(function(line, i) {
@@ -1736,13 +3286,141 @@ window.MMA.UI = {
     var t = scene.add.text(x, y, text, { fontSize: '16px', color: color || '#ff4444', stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5).setDepth(10);
     scene.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 600, onComplete: function() { t.destroy(); } });
   },
+  // Move Input Display functions
+  moveInputIcons: {
+    jab: '👊', cross: '✊', hook: '🪝', kick: '🦵', uppercut: '⬆️',
+    takedown: '🦵', grapple: '🤼', special: '⭐', block: '🛡️', dodge: '💨',
+    heavy: '💥', standup: '⬆️'
+  },
+  showMoveInputDisplay: function(scene) {
+    if (!this.settings.showMoveInput) return;
+    if (this.moveInputDisplay.container) return this.moveInputDisplay.container;
+    
+    var leftX = 30;
+    var bottomY = scene.cameras.main.height - 30;
+    
+    var container = scene.add.container(leftX, bottomY);
+    container.setDepth(50);
+    
+    // Background pill
+    var bg = scene.add.graphics();
+    bg.fillStyle(0x000000, 0.5);
+    bg.fillRoundedRect(-5, -18, 180, 36, 18);
+    container.add(bg);
+    
+    // "INPUTS" label
+    var label = scene.add.text(0, -22, 'INPUTS', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '9px',
+      color: '#888888',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    container.add(label);
+    
+    // Create icon slots (6 positions)
+    var icons = [];
+    var startX = 8;
+    var spacing = 28;
+    
+    for (var i = 0; i < 6; i++) {
+      var icon = scene.add.text(startX + i * spacing, 0, '·', {
+        fontSize: '20px'
+      }).setOrigin(0.5);
+      container.add(icon);
+      icons.push(icon);
+    }
+    
+    this.moveInputDisplay.container = container;
+    this.moveInputDisplay.icons = icons;
+    
+    return container;
+  },
+  recordMoveInput: function(moveKey, scene) {
+    if (!this.settings.showMoveInput) return;
+    
+    var icon = this.moveInputIcons[moveKey] || '❓';
+    
+    // Add to history
+    this.moveInputDisplay.history.unshift({
+      key: moveKey,
+      icon: icon,
+      timestamp: Date.now()
+    });
+    
+    // Keep only maxHistory items
+    if (this.moveInputDisplay.history.length > this.moveInputDisplay.maxHistory) {
+      this.moveInputDisplay.history.pop();
+    }
+    
+    this.updateMoveInputDisplay(scene);
+  },
+  updateMoveInputDisplay: function(scene) {
+    if (!this.settings.showMoveInput) return;
+    
+    // Create container if doesn't exist
+    if (!this.moveInputDisplay.container) {
+      this.showMoveInputDisplay(scene);
+    }
+    
+    var icons = this.moveInputDisplay.icons;
+    var history = this.moveInputDisplay.history;
+    
+    // Update each icon
+    for (var i = 0; i < icons.length; i++) {
+      var icon = icons[i];
+      if (history[i]) {
+        icon.setText(history[i].icon);
+        icon.setAlpha(1);
+        
+        // Flash effect for newest input
+        if (i === 0) {
+          scene.tweens.add({
+            targets: icon,
+            scaleX: 1.3,
+            scaleY: 1.3,
+            duration: 80,
+            yoyo: true,
+            ease: 'Quad.easeOut'
+          });
+        }
+      } else {
+        icon.setText('·');
+        icon.setAlpha(0.3);
+      }
+    }
+  },
+  clearMoveInputDisplay: function() {
+    this.moveInputDisplay.history = [];
+    if (this.moveInputDisplay.icons) {
+      this.moveInputDisplay.icons.forEach(function(icon) {
+        icon.setText('·');
+        icon.setAlpha(0.3);
+      });
+    }
+  },
+  destroyMoveInputDisplay: function() {
+    if (this.moveInputDisplay.container) {
+      this.moveInputDisplay.container.destroy();
+      this.moveInputDisplay.container = null;
+      this.moveInputDisplay.icons = [];
+    }
+    this.moveInputDisplay.history = [];
+  },
   // Settings Menu
   settings: {
     difficulty: 'normal',
     soundVolume: 0.8,
     musicVolume: 0.6,
     showHud: true,
-    vibration: true
+    vibration: true,
+    showMoveInput: true
+  },
+  // Move Input Display - shows last 6 button inputs in real-time
+  moveInputDisplay: {
+    history: [], // Array of last inputs { key, icon, timestamp }
+    maxHistory: 6,
+    container: null,
+    icons: []
   },
   showSettingsMenu: function(scene) {
     var self = this;
@@ -1843,6 +3521,24 @@ window.MMA.UI = {
     hudToggle.setInteractive({ useHandCursor: true });
     hudToggle.on('pointerdown', function() { self.settings.showHud = !self.settings.showHud; self.showSettingsMenu(scene); });
     con.add(hudToggle);
+    
+    // Move Input Display toggle
+    var inputY = startY + rowHeight * 5;
+    con.add(scene.add.text(labelX, inputY, 'Move Inputs', { fontSize: '14px', color: '#ffffff' }).setOrigin(0, 0.5));
+    var inputToggle = scene.add.container(cw - 60, inputY);
+    var inputBg = scene.add.graphics();
+    var isInputOn = this.settings.showMoveInput;
+    inputBg.fillStyle(isInputOn ? 0x44ff88 : 0x333333, 1);
+    inputBg.fillRoundedRect(-20, -12, 40, 24, 12);
+    inputToggle.add(inputBg);
+    var inputKnob = scene.add.graphics();
+    inputKnob.fillStyle(0xffffff, 1);
+    inputKnob.fillCircle(isInputOn ? 8 : -8, 0, 8);
+    inputToggle.add(inputKnob);
+    inputToggle.setSize(40, 24);
+    inputToggle.setInteractive({ useHandCursor: true });
+    inputToggle.on('pointerdown', function() { self.settings.showMoveInput = !self.settings.showMoveInput; self.showSettingsMenu(scene); });
+    con.add(inputToggle);
     
     var closeBtn = scene.add.text(cw / 2, ch - 48, 'CLOSE', {
       fontSize: '13px',

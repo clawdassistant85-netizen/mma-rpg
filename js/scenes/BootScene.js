@@ -8,14 +8,22 @@ var BootScene = new Phaser.Class({
     this.registerIdleAnimations();
     this.installIdleAnimationHook();
     this.installVisualVariantHook();
+    this.installEquipmentVisualHook();
     this.installDamageStateHook();
     this.installLimbDamageHook();
     this.installPortraitHook();
     this.installReactionFaceHook();
     this.installStyleAuraHook();
+    this.installBossChromaAuraHook();
     this.installImpactSweatHook();
+    this.installComboFireTrailHook();
+    this.installArenaFootworkTrailHook();
     this.installShadowDoubleHook();
     this.installShadowDoubleDamageHook();
+    this.installSignatureSilhouetteHook();
+    this.installMuscleTensionHook();
+    this.installExertionCueHook();
+    this.installLastChancePulseHook();
     this.scene.start('GameScene');
     this.scene.stop('BootScene');
   },
@@ -95,15 +103,54 @@ var BootScene = new Phaser.Class({
       return fallback;
     }
 
+    function resolveEquippedOutfitBase(sprite) {
+      if (!sprite || !sprite.scene || sprite.scene.player !== sprite) return null;
+      var spriteDefs = window.MMA && window.MMA.Sprites;
+      if (!spriteDefs || !spriteDefs.OUTFIT_TEXTURES) return null;
+      var outfitId = null;
+      if (sprite.equippedOutfit && sprite.equippedOutfit.id) outfitId = sprite.equippedOutfit.id;
+      if (!outfitId && sprite.stats && sprite.stats.equippedOutfit) outfitId = sprite.stats.equippedOutfit;
+      if (!outfitId && sprite.data && typeof sprite.data.get === 'function') outfitId = sprite.data.get('equippedOutfit');
+      if (!outfitId && window.MMA && window.MMA.Outfits && typeof window.MMA.Outfits.getEquippedOutfit === 'function') {
+        var equipped = window.MMA.Outfits.getEquippedOutfit();
+        if (equipped && equipped.id) outfitId = equipped.id;
+      }
+      return outfitId && spriteDefs.OUTFIT_TEXTURES[outfitId] ? spriteDefs.OUTFIT_TEXTURES[outfitId].healthy : null;
+    }
+
+    function resolveEquipmentTier(sprite) {
+      if (!sprite || !sprite.scene || sprite.scene.player !== sprite) return 'baseline';
+      function trophyHas(itemId) {
+        try {
+          var raw = window.localStorage ? window.localStorage.getItem('mma_rpg_trophy_room') : null;
+          if (!raw) return false;
+          var parsed = JSON.parse(raw);
+          var items = parsed && parsed.rareItems;
+          if (!Array.isArray(items)) return false;
+          for (var i = 0; i < items.length; i++) {
+            if (items[i] && items[i].id === itemId) return true;
+          }
+        } catch (e) {}
+        return false;
+      }
+      if (trophyHas('champions_belt')) return 'champions_belt';
+      if (trophyHas('fighters_gloves')) return 'fighters_gloves';
+      if (trophyHas('speed_wraps')) return 'speed_wraps';
+      return 'baseline';
+    }
+
     var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
     Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
       originalPreUpdate.call(this, time, delta);
 
       if (!this.active || !this.scene || !this._mmaBaseTextureKey) return;
-      var nextBase = resolveVisualBase(this);
-      if (!nextBase || this._mmaVisualBaseKey === nextBase) return;
+      var nextBase = resolveEquippedOutfitBase(this) || resolveVisualBase(this);
+      var nextEquipmentTier = resolveEquipmentTier(this);
+      if (!nextBase) return;
+      if (this._mmaVisualBaseKey === nextBase && this._mmaEquipmentTier === nextEquipmentTier) return;
 
       this._mmaVisualBaseKey = nextBase;
+      this._mmaEquipmentTier = nextEquipmentTier;
       this._mmaLastDamageTier = 'healthy';
       this._mmaCurrentVisualKey = nextBase;
       this.setTexture(nextBase);
@@ -116,6 +163,90 @@ var BootScene = new Phaser.Class({
 
     Phaser.Physics.Arcade.Sprite.prototype._mmaVisualVariantHookInstalled = true;
   },
+  installEquipmentVisualHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaEquipmentVisualHookInstalled) return;
+
+    function resolveDamageTier(sprite) {
+      if (!sprite || !sprite.stats || !sprite.stats.maxHp) return sprite && sprite._mmaLastDamageTier ? sprite._mmaLastDamageTier : 'healthy';
+      var ratio = Phaser.Math.Clamp(sprite.stats.hp / sprite.stats.maxHp, 0, 1);
+      return ratio <= 0.33 ? 'bloodied' : (ratio <= 0.66 ? 'bruised' : 'healthy');
+    }
+
+    function resolveEquippedOutfit(sprite) {
+      if (!sprite || !sprite.scene || sprite.scene.player !== sprite) return null;
+      if (sprite.equippedOutfit && sprite.equippedOutfit.id) return sprite.equippedOutfit.id;
+      if (sprite.stats && sprite.stats.equippedOutfit) return sprite.stats.equippedOutfit;
+      if (sprite.data && typeof sprite.data.get === 'function') {
+        var dataOutfit = sprite.data.get('equippedOutfit');
+        if (dataOutfit) return dataOutfit;
+      }
+      if (window.MMA && window.MMA.Outfits && typeof window.MMA.Outfits.getEquippedOutfit === 'function') {
+        var equipped = window.MMA.Outfits.getEquippedOutfit();
+        if (equipped && equipped.id) return equipped.id;
+      }
+      return null;
+    }
+
+    function resolveEquipmentTier(sprite) {
+      if (!sprite || !sprite.scene || sprite.scene.player !== sprite) return 'baseline';
+      function trophyHas(itemId) {
+        try {
+          var raw = window.localStorage ? window.localStorage.getItem('mma_rpg_trophy_room') : null;
+          if (!raw) return false;
+          var parsed = JSON.parse(raw);
+          var items = parsed && parsed.rareItems;
+          if (!Array.isArray(items)) return false;
+          for (var i = 0; i < items.length; i++) {
+            if (items[i] && items[i].id === itemId) return true;
+          }
+        } catch (e) {}
+        return false;
+      }
+      if (trophyHas('champions_belt')) return 'champions_belt';
+      if (trophyHas('fighters_gloves')) return 'fighters_gloves';
+      if (trophyHas('speed_wraps')) return 'speed_wraps';
+      return 'baseline';
+    }
+
+    function refreshEquipmentVisual(sprite) {
+      if (!sprite || !sprite.active || !sprite.scene || sprite.scene.player !== sprite) return;
+      var spriteDefs = window.MMA && window.MMA.Sprites;
+      if (!spriteDefs || !spriteDefs.OUTFIT_TEXTURES || !spriteDefs.EQUIPMENT_TEXTURES) return;
+      var outfitId = resolveEquippedOutfit(sprite);
+      if (!outfitId || !spriteDefs.OUTFIT_TEXTURES[outfitId]) return;
+      var damageTier = resolveDamageTier(sprite);
+      var tier = resolveEquipmentTier(sprite);
+      var nextTexture = spriteDefs.getEquipmentTexture(outfitId, tier, damageTier) || spriteDefs.getOutfitTexture(outfitId, damageTier);
+      if (!nextTexture || sprite._mmaCurrentVisualKey === nextTexture) {
+        sprite._mmaEquipmentTier = tier;
+        sprite._mmaVisualBaseKey = (spriteDefs.OUTFIT_TEXTURES[outfitId] && spriteDefs.OUTFIT_TEXTURES[outfitId].healthy) || sprite._mmaVisualBaseKey;
+        return;
+      }
+      sprite._mmaEquipmentTier = tier;
+      sprite._mmaVisualBaseKey = (spriteDefs.OUTFIT_TEXTURES[outfitId] && spriteDefs.OUTFIT_TEXTURES[outfitId].healthy) || sprite._mmaVisualBaseKey;
+      sprite._mmaLastDamageTier = damageTier;
+      sprite._mmaCurrentVisualKey = nextTexture;
+      sprite.setTexture(nextTexture);
+      var animKey = nextTexture + '_idle';
+      if (sprite.anims && sprite.scene.anims && sprite.scene.anims.exists(animKey)) {
+        sprite.play(animKey, true);
+      }
+    }
+
+    Phaser.Physics.Arcade.Sprite.prototype.refreshEquipmentVisual = function() {
+      refreshEquipmentVisual(this);
+      return this._mmaCurrentVisualKey || (this.texture && this.texture.key) || null;
+    };
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+      refreshEquipmentVisual(this);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaEquipmentVisualHookInstalled = true;
+  },
+
   installDamageStateHook: function() {
     if (Phaser.Physics.Arcade.Sprite.prototype._mmaDamageHookInstalled) return;
 
@@ -530,6 +661,213 @@ var BootScene = new Phaser.Class({
 
     Phaser.Physics.Arcade.Sprite.prototype._mmaStyleAuraHookInstalled = true;
   },
+  installBossChromaAuraHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaBossChromaAuraHookInstalled) return;
+
+    function getBossAuraConfigs() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.BOSS_AURA_CONFIGS) || {};
+    }
+
+    function getBossAuraLayers(key) {
+      return {
+        core: 'boss_aura_' + key,
+        ring: 'boss_aura_' + key + '_ring',
+        flare: 'boss_aura_' + key + '_flare'
+      };
+    }
+
+    function normalizeToken(value) {
+      return String(value || '').toLowerCase();
+    }
+
+    function spriteHasBossIdentity(sprite) {
+      if (!sprite) return false;
+      if (sprite.isBoss || sprite.isRival || sprite.isShadow) return true;
+      var values = [
+        sprite.typeKey,
+        sprite.role,
+        sprite.npcRole,
+        sprite.enemyClass,
+        sprite.archetype,
+        sprite.title,
+        sprite.bossTitle,
+        sprite.name,
+        sprite.displayName,
+        sprite.meta && sprite.meta.role,
+        sprite.meta && sprite.meta.typeKey,
+        sprite.meta && sprite.meta.archetype,
+        sprite.meta && sprite.meta.title,
+        sprite.meta && sprite.meta.bossTitle,
+        sprite.meta && sprite.meta.name
+      ];
+      if (sprite.data && typeof sprite.data.get === 'function') {
+        values.push(sprite.data.get('role'));
+        values.push(sprite.data.get('typeKey'));
+        values.push(sprite.data.get('archetype'));
+        values.push(sprite.data.get('title'));
+        values.push(sprite.data.get('bossTitle'));
+        values.push(sprite.data.get('name'));
+      }
+      for (var i = 0; i < values.length; i++) {
+        var token = normalizeToken(values[i]);
+        if (token && (token.indexOf('boss') !== -1 || token.indexOf('champion') !== -1 || token.indexOf('king') !== -1 || token.indexOf('rival') !== -1 || token.indexOf('shadow') !== -1)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function resolveBossAuraKey(sprite) {
+      if (!sprite || !spriteHasBossIdentity(sprite)) return null;
+      var configs = getBossAuraConfigs();
+      var values = [
+        sprite.typeKey,
+        sprite.role,
+        sprite.npcRole,
+        sprite.enemyClass,
+        sprite.archetype,
+        sprite.title,
+        sprite.bossTitle,
+        sprite.name,
+        sprite.displayName,
+        sprite._mmaVisualBaseKey,
+        sprite._mmaBaseTextureKey,
+        sprite.meta && sprite.meta.role,
+        sprite.meta && sprite.meta.typeKey,
+        sprite.meta && sprite.meta.archetype,
+        sprite.meta && sprite.meta.title,
+        sprite.meta && sprite.meta.bossTitle,
+        sprite.meta && sprite.meta.name
+      ];
+      if (sprite.data && typeof sprite.data.get === 'function') {
+        values.push(sprite.data.get('role'));
+        values.push(sprite.data.get('typeKey'));
+        values.push(sprite.data.get('archetype'));
+        values.push(sprite.data.get('title'));
+        values.push(sprite.data.get('bossTitle'));
+        values.push(sprite.data.get('name'));
+      }
+      for (var i = 0; i < values.length; i++) {
+        var token = normalizeToken(values[i]);
+        if (!token) continue;
+        if (token.indexOf('shadow') !== -1 || token.indexOf('rival') !== -1) return configs.shadowRival ? 'shadowRival' : null;
+        if (token.indexOf('underground') !== -1 || token.indexOf('king') !== -1 || token.indexOf('cage') !== -1) return configs.undergroundKing ? 'undergroundKing' : null;
+        if (token.indexOf('champion') !== -1 || token.indexOf('belt') !== -1 || token.indexOf('title') !== -1) return configs.champion ? 'champion' : null;
+      }
+      if (sprite.isShadow || sprite.isRival) return configs.shadowRival ? 'shadowRival' : null;
+      if (sprite._mmaVisualBaseKey === 'enemy_shadow_boss') return configs.shadowRival ? 'shadowRival' : null;
+      if (sprite._mmaVisualBaseKey === 'enemy_underground_king_boss') return configs.undergroundKing ? 'undergroundKing' : null;
+      if (sprite._mmaVisualBaseKey === 'enemy_champion_boss' || sprite._mmaVisualBaseKey === 'enemy_brawler_boss') return configs.champion ? 'champion' : null;
+      return configs.champion ? 'champion' : null;
+    }
+
+    function ensureBossAura(sprite, auraKey) {
+      if (!sprite || !sprite.scene || !sprite.active || !auraKey) return null;
+      if (sprite._mmaBossChromaAura && sprite._mmaBossChromaAura.core && sprite._mmaBossChromaAura.core.active) return sprite._mmaBossChromaAura;
+      var layers = getBossAuraLayers(auraKey);
+      var aura = {
+        core: sprite.scene.add.image(sprite.x, sprite.y, layers.core),
+        ring: sprite.scene.add.image(sprite.x, sprite.y, layers.ring),
+        flare: sprite.scene.add.image(sprite.x, sprite.y, layers.flare)
+      };
+      aura.core.setBlendMode(Phaser.BlendModes.ADD);
+      aura.ring.setBlendMode(Phaser.BlendModes.SCREEN);
+      aura.flare.setBlendMode(Phaser.BlendModes.ADD);
+      aura.core.setVisible(false);
+      aura.ring.setVisible(false);
+      aura.flare.setVisible(false);
+      aura.core._mmaOwner = sprite;
+      aura.ring._mmaOwner = sprite;
+      aura.flare._mmaOwner = sprite;
+      sprite._mmaBossChromaAura = aura;
+      return aura;
+    }
+
+    function setAuraVisible(aura, visible) {
+      if (!aura) return;
+      aura.core.setVisible(visible);
+      aura.ring.setVisible(visible);
+      aura.flare.setVisible(visible);
+    }
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+
+      if (!this.active || !this.scene || !this._mmaBaseTextureKey) {
+        if (this._mmaBossChromaAura) setAuraVisible(this._mmaBossChromaAura, false);
+        return;
+      }
+
+      var auraKey = resolveBossAuraKey(this);
+      if (!auraKey) {
+        if (this._mmaBossChromaAura) setAuraVisible(this._mmaBossChromaAura, false);
+        return;
+      }
+
+      var configs = getBossAuraConfigs();
+      var cfg = configs[auraKey];
+      if (!cfg) return;
+      var layers = getBossAuraLayers(auraKey);
+      var aura = ensureBossAura(this, auraKey);
+      if (!aura) return;
+      setAuraVisible(aura, true);
+
+      if (aura.core.texture && aura.core.texture.key !== layers.core) aura.core.setTexture(layers.core);
+      if (aura.ring.texture && aura.ring.texture.key !== layers.ring) aura.ring.setTexture(layers.ring);
+      if (aura.flare.texture && aura.flare.texture.key !== layers.flare) aura.flare.setTexture(layers.flare);
+
+      var hpRatio = 1;
+      if (this.stats && this.stats.maxHp) hpRatio = Phaser.Math.Clamp(this.stats.hp / this.stats.maxHp, 0, 1);
+      var lowHpBoost = (1 - hpRatio);
+      var pulseSpeed = (cfg.pulseSpeed || 0.005) + lowHpBoost * (cfg.hpPulseBoost || 0.01);
+      var pulse = 0.72 + Math.abs(Math.sin(time * pulseSpeed)) * (0.26 + lowHpBoost * 0.18);
+      var crackle = Math.sin(time * (pulseSpeed * 1.7) + this.x * 0.06);
+      var jitter = (cfg.staticJitter || 0) * lowHpBoost;
+      var xJitter = jitter ? crackle * jitter : 0;
+      var yJitter = jitter ? Math.cos(time * (pulseSpeed * 2.1)) * (jitter * 0.7) : 0;
+      var bob = Math.sin(time * (pulseSpeed * 0.9)) * (cfg.bob || 1.5);
+      var baseScaleX = this.scaleX || 1;
+      var baseScaleY = this.scaleY || 1;
+      var baseDepth = (this.depth || 0) - 2;
+
+      aura.core.setPosition(this.x + xJitter, this.y + bob + yJitter);
+      aura.ring.setPosition(this.x - xJitter * 0.5, this.y + bob * 0.8);
+      aura.flare.setPosition(this.x + xJitter * 1.2, this.y - 2 + yJitter);
+      aura.core.setDepth(baseDepth);
+      aura.ring.setDepth(baseDepth - 1);
+      aura.flare.setDepth(baseDepth - 2);
+      aura.core.setFlipX(!!this.flipX);
+      aura.ring.setFlipX(!!this.flipX);
+      aura.flare.setFlipX(!!this.flipX);
+
+      aura.core.setScale(baseScaleX * ((cfg.scale || 1.22) + pulse * 0.06), baseScaleY * (((cfg.scale || 1.22) - 0.12) + pulse * 0.05));
+      aura.ring.setScale(baseScaleX * ((cfg.ringScale || 1.3) + pulse * 0.08), baseScaleY * (((cfg.ringScale || 1.3) - 0.14) + pulse * 0.06));
+      aura.flare.setScale(baseScaleX * ((cfg.flareScale || 1.14) + lowHpBoost * 0.08), baseScaleY * (((cfg.flareScale || 1.14) - 0.08) + pulse * 0.07));
+      aura.core.setAlpha((cfg.alpha || 0.24) + pulse * 0.14 + lowHpBoost * 0.12);
+      aura.ring.setAlpha((cfg.ringAlpha || 0.2) + Math.abs(crackle) * 0.1 + lowHpBoost * 0.14);
+      aura.flare.setAlpha((cfg.flareAlpha || 0.16) + pulse * 0.08 + lowHpBoost * 0.12);
+      aura.core.setTint(cfg.color || 0xffffff);
+      aura.ring.setTint(cfg.glow || cfg.color || 0xffffff);
+      aura.flare.setTint(cfg.color || 0xffffff);
+      aura.ring.setAngle(crackle * (cfg.rotation || 3));
+      aura.flare.setAngle(-crackle * ((cfg.rotation || 3) + 1.5));
+      this._mmaBossAuraKey = auraKey;
+    };
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      if (this._mmaBossChromaAura) {
+        this._mmaBossChromaAura.core.destroy();
+        this._mmaBossChromaAura.ring.destroy();
+        this._mmaBossChromaAura.flare.destroy();
+        this._mmaBossChromaAura = null;
+      }
+      return originalDestroy.call(this, fromScene);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaBossChromaAuraHookInstalled = true;
+  },
   installImpactSweatHook: function() {
     if (window.MMA && window.MMA.Combat && window.MMA.Combat._mmaImpactSweatHookInstalled) return;
     if (!window.MMA || !window.MMA.Combat) return;
@@ -642,6 +980,195 @@ var BootScene = new Phaser.Class({
     window.MMA.Combat._mmaImpactSweatHookInstalled = true;
   },
 
+  installComboFireTrailHook: function() {
+    if (window.MMA && window.MMA.Combat && window.MMA.Combat._mmaComboFireTrailHookInstalled) return;
+    if (!window.MMA || !window.MMA.Combat) return;
+
+    function getFireTextures() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.FIRE_TRAIL_TEXTURES) || {};
+    }
+
+    function readComboCount(scene) {
+      return (scene && scene.player && scene.player.comboState && typeof scene.player.comboState.index === 'number') ? scene.player.comboState.index : 0;
+    }
+
+    function spawnFireTrail(scene, actor, comboCount, moveKey, isSpecial) {
+      if (!scene || !scene.add || !scene.tweens || !actor || !actor.active || comboCount < 10) return;
+      var textures = getFireTextures();
+      var heavy = !!(isSpecial || comboCount >= 15);
+      var textureKey = heavy ? (textures.hot || textures.combo) : textures.combo;
+      if (!textureKey) return;
+
+      var dirX = actor.flipX ? -1 : 1;
+      if (actor.body && Math.abs(actor.body.velocity.x) > 6) dirX = Math.sign(actor.body.velocity.x);
+      if (!dirX) dirX = 1;
+      var intensity = Math.min(1, (comboCount - 10) / 10);
+      var flames = 3 + Math.min(7, Math.floor((comboCount - 10) / 2)) + (heavy ? 2 : 0);
+      var anchorX = actor.x - (dirX * (14 + comboCount * 0.25));
+      var anchorY = actor.y - 18;
+
+      for (var i = 0; i < flames; i++) {
+        var flame = scene.add.image(anchorX + Phaser.Math.Between(-4, 4), anchorY + Phaser.Math.Between(-10, 10), textureKey);
+        var scale = Phaser.Math.FloatBetween(0.35, heavy ? 0.95 : 0.75) + intensity * 0.18;
+        flame.setDepth((actor.depth || 0) + 3);
+        flame.setBlendMode(Phaser.BlendModes.ADD);
+        flame.setScale(scale);
+        flame.setAlpha(0.68 + intensity * 0.24);
+        flame.setAngle(dirX < 0 ? Phaser.Math.Between(-25, 8) : Phaser.Math.Between(-8, 25));
+        if (heavy && i % 2 === 0) flame.setTint(0xffb36b);
+        scene.tweens.add({
+          targets: flame,
+          x: flame.x - dirX * Phaser.Math.Between(14, 28),
+          y: flame.y + Phaser.Math.Between(-18, 12),
+          alpha: 0,
+          scaleX: scale * 0.35,
+          scaleY: scale * 0.2,
+          angle: flame.angle + Phaser.Math.Between(-20, 20),
+          duration: Phaser.Math.Between(140, heavy ? 240 : 190),
+          ease: 'Quad.easeOut',
+          onComplete: function(tween, targets) {
+            if (targets && targets[0]) targets[0].destroy();
+          }
+        });
+      }
+
+      if (!actor._mmaComboFireTrailLastLabel || actor._mmaComboFireTrailLastLabel + 900 < (scene.time && scene.time.now || 0)) {
+        if (window.MMA && window.MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+          MMA.UI.showDamageText(scene, actor.x, actor.y - 88, comboCount >= 15 ? 'INFERNO COMBO!' : 'FIRE TRAIL!', heavy ? '#ffcf8a' : '#ff9d57');
+        }
+        actor._mmaComboFireTrailLastLabel = scene.time && typeof scene.time.now === 'number' ? scene.time.now : 0;
+      }
+      actor._mmaComboFireTrailMove = moveKey || null;
+    }
+
+    function wrapCombatMethod(methodName, moveResolver, specialResolver) {
+      var original = window.MMA.Combat[methodName];
+      if (typeof original !== 'function' || original._mmaComboFireTrailWrapped) return;
+      var wrapped = function(scene) {
+        var result = original.apply(this, arguments);
+        var comboCount = readComboCount(scene);
+        spawnFireTrail(scene, scene && scene.player, comboCount, moveResolver ? moveResolver.apply(this, arguments) : methodName, specialResolver ? specialResolver.apply(this, arguments) : false);
+        return result;
+      };
+      wrapped._mmaComboFireTrailWrapped = true;
+      window.MMA.Combat[methodName] = wrapped;
+    }
+
+    wrapCombatMethod('executeMove', function(scene, moveKey) { return moveKey; }, function(scene, moveKey) { return moveKey === 'special'; });
+    wrapCombatMethod('executeSpecialMove', function() { return 'special'; }, function() { return true; });
+    wrapCombatMethod('executeGroundMove', function(scene, moveKey) { return moveKey; }, function(scene, moveKey) { return moveKey === 'special' || moveKey === 'submission'; });
+
+    window.MMA.Combat._mmaComboFireTrailHookInstalled = true;
+  },
+  installArenaFootworkTrailHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaArenaFootworkTrailHookInstalled) return;
+
+    function getFootworkTextures() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.FOOTWORK_TEXTURES) || {};
+    }
+
+    function inferArenaSurface(scene, sprite) {
+      var values = [
+        scene && scene.zoneKey,
+        scene && scene.zoneId,
+        scene && scene.zoneType,
+        scene && scene.roomTheme,
+        scene && scene.roomType,
+        scene && scene.arenaType,
+        sprite && sprite.zoneKey,
+        sprite && sprite.role,
+        sprite && sprite.meta && sprite.meta.zoneKey,
+        sprite && sprite.meta && sprite.meta.roomType
+      ];
+      for (var i = 0; i < values.length; i++) {
+        var token = String(values[i] || '').toLowerCase();
+        if (!token) continue;
+        if (token.indexOf('arena') !== -1 || token.indexOf('cage') !== -1 || token.indexOf('ring') !== -1 || token.indexOf('champion') !== -1 || token.indexOf('underground') !== -1) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function shouldTrail(sprite) {
+      if (!sprite || !sprite.active || !sprite.scene || !sprite.body || !sprite._mmaBaseTextureKey) return false;
+      return inferArenaSurface(sprite.scene, sprite);
+    }
+
+    function spawnDust(scene, sprite, intensity, leftStep) {
+      var textures = getFootworkTextures();
+      var textureKey = intensity > 0.72 ? (textures.heavyDust || textures.dust) : textures.dust;
+      if (!scene || !scene.add || !scene.tweens || !textureKey) return;
+      var dir = sprite.flipX ? -1 : 1;
+      if (sprite.body && Math.abs(sprite.body.velocity.x) > 6) dir = Math.sign(sprite.body.velocity.x) || dir;
+      var footX = sprite.x + (leftStep ? -8 : 8) - dir * 5;
+      var footY = sprite.y + 18;
+      var dust = scene.add.image(footX + Phaser.Math.Between(-2, 2), footY + Phaser.Math.Between(-1, 2), textureKey);
+      dust.setDepth((sprite.depth || 0) - 1);
+      dust.setBlendMode(Phaser.BlendModes.SCREEN);
+      var scale = Phaser.Math.FloatBetween(0.4, 0.68) + intensity * 0.32;
+      dust.setScale(scale);
+      dust.setAlpha(0.24 + intensity * 0.42);
+      dust.setAngle(Phaser.Math.Between(-16, 16));
+      scene.tweens.add({
+        targets: dust,
+        x: dust.x - dir * Phaser.Math.Between(5, 12),
+        y: dust.y - Phaser.Math.Between(6, 12),
+        alpha: 0,
+        scaleX: scale * (1.35 + intensity * 0.4),
+        scaleY: scale * (1.15 + intensity * 0.3),
+        duration: Phaser.Math.Between(220, 360),
+        ease: 'Quad.easeOut',
+        onComplete: function(tween, targets) {
+          if (targets && targets[0]) targets[0].destroy();
+        }
+      });
+    }
+
+    function spawnFootprint(scene, sprite, intensity, leftStep) {
+      var textures = getFootworkTextures();
+      var textureKey = leftStep ? textures.leftPrint : textures.rightPrint;
+      if (!scene || !scene.add || !scene.tweens || !textureKey) return;
+      var print = scene.add.image(sprite.x + (leftStep ? -7 : 7), sprite.y + 21, textureKey);
+      print.setDepth((sprite.depth || 0) - 3);
+      print.setRotation((sprite.flipX ? -1 : 1) * Phaser.Math.FloatBetween(-0.12, 0.12));
+      print.setScale(0.72 + intensity * 0.26);
+      print.setAlpha(0.14 + intensity * 0.2);
+      scene.tweens.add({
+        targets: print,
+        alpha: 0,
+        duration: 2000,
+        ease: 'Sine.easeOut',
+        onComplete: function(tween, targets) {
+          if (targets && targets[0]) targets[0].destroy();
+        }
+      });
+    }
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+
+      if (!shouldTrail(this)) return;
+
+      var speed = Math.sqrt(Math.pow(this.body.velocity.x || 0, 2) + Math.pow(this.body.velocity.y || 0, 2));
+      if (speed < 40) return;
+
+      var now = this.scene && this.scene.time && typeof this.scene.time.now === 'number' ? this.scene.time.now : time;
+      var normalized = Phaser.Math.Clamp((speed - 40) / 180, 0, 1);
+      var cadence = Phaser.Math.Linear(320, 90, normalized);
+      if (this._mmaFootworkTrailNextAt && now < this._mmaFootworkTrailNextAt) return;
+
+      this._mmaFootworkTrailNextAt = now + cadence;
+      this._mmaFootworkLeftStep = !this._mmaFootworkLeftStep;
+      var leftStep = !!this._mmaFootworkLeftStep;
+      spawnDust(this.scene, this, normalized, leftStep);
+      spawnFootprint(this.scene, this, normalized, leftStep);
+      this._mmaLastFootworkSpeed = speed;
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaArenaFootworkTrailHookInstalled = true;
+  },
   installShadowDoubleHook: function() {
     if (Phaser.Physics.Arcade.Sprite.prototype._mmaShadowDoubleHookInstalled) return;
 
@@ -846,5 +1373,539 @@ var BootScene = new Phaser.Class({
     wrapCombatMethod('executeGroundMove', function(scene, moveKey) { return moveKey; });
 
     window.MMA.Combat._mmaShadowDoubleDamageHookInstalled = true;
+  },
+  installSignatureSilhouetteHook: function() {
+    if (window.MMA && window.MMA.Combat && window.MMA.Combat._mmaSignatureSilhouetteHookInstalled) return;
+    if (!window.MMA || !window.MMA.Combat) return;
+
+    function getSilhouetteConfig() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.SIGNATURE_SILHOUETTE_CONFIG) || {};
+    }
+
+    function isSignatureMove(moveKey) {
+      var cfg = getSilhouetteConfig();
+      var keywords = Array.isArray(cfg.moveKeywords) ? cfg.moveKeywords : [];
+      var normalized = String(moveKey || '').toLowerCase();
+      if (!normalized) return false;
+      for (var i = 0; i < keywords.length; i++) {
+        if (normalized.indexOf(String(keywords[i]).toLowerCase()) !== -1) return true;
+      }
+      return normalized === 'special';
+    }
+
+    function resolveSilhouetteBase(sprite) {
+      if (!sprite) return 'player';
+      var baseKey = sprite._mmaVisualBaseKey || sprite._mmaBaseTextureKey || (sprite.texture && sprite.texture.key) || 'player';
+      var set = window.MMA && window.MMA.Sprites && window.MMA.Sprites.SILHOUETTE_TEXTURES;
+      if (set && set[baseKey]) return baseKey;
+      return set && set.player ? 'player' : baseKey;
+    }
+
+    function ensureSilhouette(sprite) {
+      if (!sprite || !sprite.scene || !sprite.active) return null;
+      if (sprite._mmaSignatureSilhouette && sprite._mmaSignatureSilhouette.active) return sprite._mmaSignatureSilhouette;
+      var textureMap = window.MMA && window.MMA.Sprites && window.MMA.Sprites.SILHOUETTE_TEXTURES;
+      if (!textureMap) return null;
+      var baseKey = resolveSilhouetteBase(sprite);
+      var textureKey = textureMap[baseKey] || textureMap.player;
+      if (!textureKey) return null;
+      var image = sprite.scene.add.image(sprite.x, sprite.y, textureKey);
+      image.setVisible(false);
+      image.setBlendMode(Phaser.BlendModes.MULTIPLY);
+      image.setDepth((sprite.depth || 0) - 4);
+      image._mmaOwner = sprite;
+      sprite._mmaSignatureSilhouette = image;
+      return image;
+    }
+
+    function triggerSilhouette(scene, actor, moveKey) {
+      if (!scene || !actor || !actor.active || !actor.scene) return;
+      var now = scene.time && typeof scene.time.now === 'number' ? scene.time.now : 0;
+      if (actor._mmaSignatureSilhouetteLockedUntil && actor._mmaSignatureSilhouetteLockedUntil > now) return;
+      var cfg = getSilhouetteConfig();
+      var silhouette = ensureSilhouette(actor);
+      if (!silhouette) return;
+      var textureMap = window.MMA && window.MMA.Sprites && window.MMA.Sprites.SILHOUETTE_TEXTURES;
+      var baseKey = resolveSilhouetteBase(actor);
+      var textureKey = textureMap[baseKey] || textureMap.player;
+      if (textureKey && silhouette.texture && silhouette.texture.key !== textureKey) silhouette.setTexture(textureKey);
+      var isSpecial = isSignatureMove(moveKey);
+      var duration = isSpecial ? (cfg.specialDuration || 250) : (cfg.duration || 190);
+      var scale = isSpecial ? (cfg.specialScale || 1.42) : (cfg.scale || 1.28);
+      var alpha = isSpecial ? (cfg.specialAlpha || 0.48) : (cfg.alpha || 0.34);
+      silhouette.setVisible(true);
+      silhouette.setPosition(actor.x + (cfg.offsetX || 0), actor.y + (cfg.offsetY || -2));
+      silhouette.setScale((actor.scaleX || 1) * scale, (actor.scaleY || 1) * scale);
+      silhouette.setFlipX(!!actor.flipX);
+      silhouette.setDepth((actor.depth || 0) - 4);
+      silhouette.setTint(isSpecial ? (cfg.specialTint || 0x2b1250) : (cfg.tint || 0x180c2d));
+      silhouette.setAlpha(alpha);
+      silhouette.setAngle(actor.flipX ? -4 : 4);
+      actor._mmaSignatureSilhouetteLockedUntil = now + (cfg.procCooldown || 420);
+      actor._mmaSignatureSilhouetteLastMove = moveKey || null;
+      actor._mmaSignatureSilhouetteTimer = duration;
+      if (scene.tweens) {
+        scene.tweens.killTweensOf(silhouette);
+        scene.tweens.add({
+          targets: silhouette,
+          alpha: 0,
+          scaleX: (actor.scaleX || 1) * (scale + 0.18),
+          scaleY: (actor.scaleY || 1) * (scale + 0.12),
+          y: actor.y + (cfg.offsetY || -2) - (isSpecial ? 12 : 8),
+          angle: actor.flipX ? -9 : 9,
+          duration: duration,
+          ease: 'Cubic.easeOut',
+          onComplete: function() {
+            if (silhouette && silhouette.active) silhouette.setVisible(false);
+          }
+        });
+      }
+      if (window.MMA && window.MMA.VFX) {
+        if (typeof MMA.VFX.flashEnemyHit === 'function' && actor !== scene.player) {
+          MMA.VFX.flashEnemyHit(scene, actor, 60, cfg.glowTint || 0xbfa2ff);
+        } else if (typeof MMA.VFX.showImpactSpark === 'function') {
+          MMA.VFX.showImpactSpark(scene, actor.x, actor.y - 8, isSpecial);
+        }
+      }
+      if (window.MMA && window.MMA.UI && typeof MMA.UI.showDamageText === 'function' && isSpecial) {
+        MMA.UI.showDamageText(scene, actor.x, actor.y - 82, 'SIGNATURE!', '#d8c0ff');
+      }
+    }
+
+    function wrapCombatMethod(methodName, actorResolver, moveResolver) {
+      var original = window.MMA.Combat[methodName];
+      if (typeof original !== 'function' || original._mmaSignatureSilhouetteWrapped) return;
+      var wrapped = function(scene) {
+        var result = original.apply(this, arguments);
+        var actor = actorResolver ? actorResolver.apply(this, arguments) : (scene && scene.player);
+        var moveKey = moveResolver ? moveResolver.apply(this, arguments) : methodName;
+        if (isSignatureMove(moveKey)) triggerSilhouette(scene, actor, moveKey);
+        return result;
+      };
+      wrapped._mmaSignatureSilhouetteWrapped = true;
+      window.MMA.Combat[methodName] = wrapped;
+    }
+
+    wrapCombatMethod('executeMove', function(scene) { return scene && scene.player; }, function(scene, moveKey) { return moveKey; });
+    wrapCombatMethod('executeSpecialMove', function(scene) { return scene && scene.player; }, function() { return 'special'; });
+    wrapCombatMethod('executeGroundMove', function(scene) { return scene && scene.player; }, function(scene, moveKey) { return moveKey; });
+
+    if (!Phaser.Physics.Arcade.Sprite.prototype._mmaSignatureSilhouetteCleanupInstalled) {
+      var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+      Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+        if (this._mmaSignatureSilhouette) {
+          this._mmaSignatureSilhouette.destroy();
+          this._mmaSignatureSilhouette = null;
+        }
+        return originalDestroy.call(this, fromScene);
+      };
+      Phaser.Physics.Arcade.Sprite.prototype._mmaSignatureSilhouetteCleanupInstalled = true;
+    }
+
+    window.MMA.Combat._mmaSignatureSilhouetteHookInstalled = true;
+  },
+  installMuscleTensionHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaMuscleTensionHookInstalled) return;
+
+    function getTensionConfig() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.MUSCLE_TENSION_CONFIG) || {};
+    }
+
+    function getSceneNow(sprite) {
+      return sprite && sprite.scene && sprite.scene.time && typeof sprite.scene.time.now === 'number' ? sprite.scene.time.now : 0;
+    }
+
+    function isChargedMove(moveKey) {
+      var cfg = getTensionConfig();
+      var keywords = Array.isArray(cfg.moveKeywords) ? cfg.moveKeywords : [];
+      var normalized = String(moveKey || '').toLowerCase();
+      if (!normalized) return false;
+      for (var i = 0; i < keywords.length; i++) {
+        if (normalized.indexOf(String(keywords[i]).toLowerCase()) !== -1) return true;
+      }
+      return false;
+    }
+
+    function getSpeed(sprite) {
+      if (!sprite || !sprite.body) return 0;
+      return Math.abs(sprite.body.velocity.x || 0) + Math.abs(sprite.body.velocity.y || 0);
+    }
+
+    function ensureOverlay(sprite) {
+      if (!sprite || !sprite.scene || !sprite.active) return null;
+      if (sprite._mmaMuscleTensionOverlay && sprite._mmaMuscleTensionOverlay.active) return sprite._mmaMuscleTensionOverlay;
+      var textureKey = (sprite.texture && sprite.texture.key) || sprite._mmaCurrentVisualKey || sprite._mmaBaseTextureKey || 'player';
+      var overlay = sprite.scene.add.image(sprite.x, sprite.y, textureKey);
+      overlay.setBlendMode(Phaser.BlendModes.ADD);
+      overlay.setVisible(false);
+      overlay.setDepth((sprite.depth || 0) + 2);
+      overlay._mmaOwner = sprite;
+      sprite._mmaMuscleTensionOverlay = overlay;
+      return overlay;
+    }
+
+    Phaser.Physics.Arcade.Sprite.prototype.triggerMuscleTension = function(moveKey, forceCharged) {
+      var cfg = getTensionConfig();
+      var now = getSceneNow(this);
+      var charged = !!forceCharged || isChargedMove(moveKey) || getSpeed(this) >= (cfg.speedThreshold || 155);
+      var linger = charged ? (cfg.chargedLingerMs || 420) : (cfg.lingerMs || 240);
+      this._mmaMuscleTensionState = charged ? 'charged' : 'active';
+      this._mmaMuscleTensionUntil = now + linger;
+      this._mmaMuscleTensionMove = moveKey || null;
+      return this._mmaMuscleTensionUntil;
+    };
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+
+      if (!this.active || !this.scene || !this._mmaBaseTextureKey) {
+        if (this._mmaMuscleTensionOverlay) this._mmaMuscleTensionOverlay.setVisible(false);
+        return;
+      }
+
+      var cfg = getTensionConfig();
+      var overlay = ensureOverlay(this);
+      if (!overlay) return;
+      var now = getSceneNow(this);
+      var state = this._mmaMuscleTensionUntil && this._mmaMuscleTensionUntil > now ? (this._mmaMuscleTensionState || 'active') : null;
+      if (!state) {
+        overlay.setVisible(false);
+        return;
+      }
+
+      var textureKey = (this.texture && this.texture.key) || this._mmaCurrentVisualKey || this._mmaBaseTextureKey;
+      if (textureKey && overlay.texture && overlay.texture.key !== textureKey) overlay.setTexture(textureKey);
+      var remaining = Math.max(0, this._mmaMuscleTensionUntil - now);
+      var total = state === 'charged' ? (cfg.chargedLingerMs || 420) : (cfg.lingerMs || 240);
+      var life = total > 0 ? Phaser.Math.Clamp(remaining / total, 0, 1) : 0;
+      var pulse = 0.72 + Math.abs(Math.sin(time * (cfg.pulseRate || 0.018))) * 0.28;
+      var scaleX = state === 'charged' ? (cfg.chargedScaleX || 1.16) : (cfg.scaleX || 1.1);
+      var scaleY = state === 'charged' ? (cfg.chargedScaleY || 0.9) : (cfg.scaleY || 0.94);
+      var tint = state === 'charged' ? (cfg.chargedTint || 0xfff0a6) : (cfg.tint || 0xffd0d0);
+      var alpha = (state === 'charged' ? (cfg.chargedAlpha || 0.42) : (cfg.alpha || 0.28)) * life;
+
+      overlay.setVisible(true);
+      overlay.setPosition(this.x, this.y + (cfg.offsetY || -6));
+      overlay.setDepth((this.depth || 0) + 2);
+      overlay.setScale((this.scaleX || 1) * (scaleX + pulse * 0.03), (this.scaleY || 1) * (scaleY + pulse * 0.02));
+      overlay.setFlipX(!!this.flipX);
+      overlay.setAlpha(alpha);
+      overlay.setTint(tint);
+      overlay.setAngle(this.angle || 0);
+    };
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      if (this._mmaMuscleTensionOverlay) {
+        this._mmaMuscleTensionOverlay.destroy();
+        this._mmaMuscleTensionOverlay = null;
+      }
+      return originalDestroy.call(this, fromScene);
+    };
+
+    function wrapCombatMethod(methodName, actorResolver, moveResolver, chargeResolver) {
+      var original = window.MMA && window.MMA.Combat && window.MMA.Combat[methodName];
+      if (typeof original !== 'function' || original._mmaMuscleTensionWrapped) return;
+      var wrapped = function(scene) {
+        var actor = actorResolver ? actorResolver.apply(this, arguments) : (scene && scene.player);
+        var moveKey = moveResolver ? moveResolver.apply(this, arguments) : methodName;
+        var charged = chargeResolver ? chargeResolver.apply(this, arguments) : false;
+        if (actor && typeof actor.triggerMuscleTension === 'function') actor.triggerMuscleTension(moveKey, charged);
+        return original.apply(this, arguments);
+      };
+      wrapped._mmaMuscleTensionWrapped = true;
+      window.MMA.Combat[methodName] = wrapped;
+    }
+
+    if (window.MMA && window.MMA.Combat) {
+      wrapCombatMethod('executeMove', function(scene) { return scene && scene.player; }, function(scene, moveKey) { return moveKey; }, function(scene, moveKey) { return isChargedMove(moveKey); });
+      wrapCombatMethod('executeSpecialMove', function(scene) { return scene && scene.player; }, function() { return 'special'; }, function() { return true; });
+      wrapCombatMethod('executeGroundMove', function(scene) { return scene && scene.player; }, function(scene, moveKey) { return moveKey; }, function(scene, moveKey) { return isChargedMove(moveKey); });
+    }
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaMuscleTensionHookInstalled = true;
+  },
+  installExertionCueHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaExertionCueHookInstalled) return;
+
+    function getExertionConfig() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.EXERTION_CONFIG) || {};
+    }
+
+    function getExertionTextures() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.EXERTION_TEXTURES) || {};
+    }
+
+    function getRatio(value, maxValue, fallback) {
+      if (typeof value !== 'number' || typeof maxValue !== 'number' || maxValue <= 0) return fallback;
+      return Phaser.Math.Clamp(value / maxValue, 0, 1);
+    }
+
+    function inferExertionState(sprite) {
+      var cfg = getExertionConfig();
+      var stats = sprite && sprite.stats ? sprite.stats : {};
+      var staminaRatio = getRatio(stats.stamina, stats.maxStamina, 1);
+      var hpRatio = getRatio(stats.hp, stats.maxHp, 1);
+      var speed = sprite && sprite.body ? Math.abs(sprite.body.velocity.x || 0) + Math.abs(sprite.body.velocity.y || 0) : 0;
+      var heavyThreshold = typeof cfg.heavyThreshold === 'number' ? cfg.heavyThreshold : 0.3;
+      var exhaustedThreshold = typeof cfg.exhaustedThreshold === 'number' ? cfg.exhaustedThreshold : 0.08;
+      var recoveryThreshold = typeof cfg.recoveryThreshold === 'number' ? cfg.recoveryThreshold : 0.36;
+      if (staminaRatio <= exhaustedThreshold) return 'exhausted';
+      if (staminaRatio <= heavyThreshold) return speed > 8 ? 'heavy' : 'recovery';
+      if (staminaRatio <= recoveryThreshold && (sprite._mmaLastExertionState === 'exhausted' || sprite._mmaLastExertionState === 'heavy' || hpRatio <= 0.5)) return 'recovery';
+      return null;
+    }
+
+    function ensureBreathPuff(sprite) {
+      if (!sprite || !sprite.scene || !sprite.active) return null;
+      if (sprite._mmaBreathPuff && sprite._mmaBreathPuff.active) return sprite._mmaBreathPuff;
+      var textures = getExertionTextures();
+      var puff = sprite.scene.add.image(sprite.x, sprite.y, textures.heavyBreath || 'exertion_breath_heavy');
+      puff.setBlendMode(Phaser.BlendModes.SCREEN);
+      puff.setVisible(false);
+      puff.setDepth((sprite.depth || 0) + 5);
+      sprite._mmaBreathPuff = puff;
+      return puff;
+    }
+
+    function ensureStumbleSpark(sprite) {
+      if (!sprite || !sprite.scene || !sprite.active) return null;
+      if (sprite._mmaStumbleSpark && sprite._mmaStumbleSpark.active) return sprite._mmaStumbleSpark;
+      var textures = getExertionTextures();
+      var spark = sprite.scene.add.image(sprite.x, sprite.y, textures.stumble || 'exertion_stumble');
+      spark.setBlendMode(Phaser.BlendModes.ADD);
+      spark.setVisible(false);
+      spark.setDepth((sprite.depth || 0) + 6);
+      sprite._mmaStumbleSpark = spark;
+      return spark;
+    }
+
+    function triggerBreathPuff(sprite, state, time) {
+      var puff = ensureBreathPuff(sprite);
+      if (!puff || !sprite.scene || !sprite.scene.tweens) return;
+      var cfg = getExertionConfig();
+      var textures = getExertionTextures();
+      var heavy = state === 'heavy' || state === 'exhausted';
+      var textureKey = heavy ? (textures.heavyBreath || 'exertion_breath_heavy') : (textures.recoveryBreath || 'exertion_breath_recovery');
+      var tint = state === 'exhausted' ? (cfg.exhaustedTint || 0xffd3a6) : (heavy ? (cfg.heavyTint || 0xe7f8ff) : (cfg.recoveryTint || 0xa8f0ff));
+      var offsetY = heavy ? (cfg.breathOffsetY || -18) : (cfg.recoveryOffsetY || -14);
+      if (puff.texture && puff.texture.key !== textureKey) puff.setTexture(textureKey);
+      puff.setVisible(true);
+      puff.setPosition(sprite.x + (sprite.flipX ? -8 : 8), sprite.y + offsetY);
+      puff.setScale(heavy ? 0.42 : 0.34);
+      puff.setAlpha(heavy ? 0.72 : 0.56);
+      puff.setTint(tint);
+      puff.setAngle(sprite.flipX ? -10 : 10);
+      sprite.scene.tweens.killTweensOf(puff);
+      sprite.scene.tweens.add({
+        targets: puff,
+        x: puff.x + (sprite.flipX ? -10 : 10),
+        y: puff.y - (heavy ? 10 : 7),
+        alpha: 0,
+        scaleX: heavy ? 1.14 : 0.9,
+        scaleY: heavy ? 1.14 : 0.9,
+        duration: heavy ? 320 : 420,
+        ease: 'Quad.easeOut',
+        onComplete: function() {
+          if (puff && puff.active) puff.setVisible(false);
+        }
+      });
+      sprite._mmaNextBreathPuffAt = time + (heavy ? (cfg.puffCooldown || 320) : (cfg.recoveryPuffCooldown || 520));
+    }
+
+    function triggerStumbleSpark(sprite, time) {
+      var spark = ensureStumbleSpark(sprite);
+      if (!spark || !sprite.scene || !sprite.scene.tweens) return;
+      var cfg = getExertionConfig();
+      spark.setVisible(true);
+      spark.setPosition(sprite.x + Phaser.Math.Between(-4, 4), sprite.y - 34 + Phaser.Math.Between(-2, 2));
+      spark.setScale(0.32);
+      spark.setAlpha(0.95);
+      spark.setAngle(Phaser.Math.Between(-20, 20));
+      spark.setTint(cfg.exhaustedTint || 0xffd3a6);
+      sprite.scene.tweens.killTweensOf(spark);
+      sprite.scene.tweens.add({
+        targets: spark,
+        y: spark.y - 6,
+        alpha: 0,
+        scaleX: 0.9,
+        scaleY: 0.9,
+        angle: spark.angle + Phaser.Math.Between(-25, 25),
+        duration: 220,
+        ease: 'Cubic.easeOut',
+        onComplete: function() {
+          if (spark && spark.active) spark.setVisible(false);
+        }
+      });
+      sprite._mmaNextStumbleAt = time + (cfg.stumbleCooldown || 520);
+    }
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+
+      if (!this.active || !this.scene || !this._mmaBaseTextureKey || !this.stats || !this.stats.maxStamina) {
+        if (this._mmaBreathPuff) this._mmaBreathPuff.setVisible(false);
+        if (this._mmaStumbleSpark) this._mmaStumbleSpark.setVisible(false);
+        return;
+      }
+
+      var cfg = getExertionConfig();
+      var state = inferExertionState(this);
+      var staminaRatio = getRatio(this.stats.stamina, this.stats.maxStamina, 1);
+      var now = this.scene && this.scene.time && typeof this.scene.time.now === 'number' ? this.scene.time.now : time;
+      this._mmaLastExertionState = state;
+
+      if (!state) {
+        if (this._mmaBreathPuff) this._mmaBreathPuff.setVisible(false);
+        if (this._mmaStumbleSpark) this._mmaStumbleSpark.setVisible(false);
+        this.setAngle(0);
+        return;
+      }
+
+      if (!this._mmaBreathPuff || !this._mmaBreathPuff.visible) ensureBreathPuff(this);
+      if (state === 'exhausted' && (!this._mmaNextStumbleAt || now >= this._mmaNextStumbleAt)) {
+        triggerStumbleSpark(this, now);
+      }
+      if (!this._mmaNextBreathPuffAt || now >= this._mmaNextBreathPuffAt) {
+        triggerBreathPuff(this, state, now);
+      }
+
+      var wobble = state === 'exhausted' ? Math.sin(time * (cfg.wobbleSpeed || 0.015)) * (cfg.wobbleAngle || 4) * (1 - staminaRatio) : 0;
+      this.setAngle(wobble);
+    };
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      if (this._mmaBreathPuff) {
+        this._mmaBreathPuff.destroy();
+        this._mmaBreathPuff = null;
+      }
+      if (this._mmaStumbleSpark) {
+        this._mmaStumbleSpark.destroy();
+        this._mmaStumbleSpark = null;
+      }
+      return originalDestroy.call(this, fromScene);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaExertionCueHookInstalled = true;
+  },
+  installLastChancePulseHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaLastChancePulseHookInstalled) return;
+
+    function getLastChanceConfig() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.LAST_CHANCE_CONFIG) || {};
+    }
+
+    function getLastChanceTextures() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.LAST_CHANCE_TEXTURES) || {};
+    }
+
+    function ensureLastChancePulse(sprite) {
+      if (!sprite || !sprite.scene || !sprite.active) return null;
+      if (sprite._mmaLastChancePulse && sprite._mmaLastChancePulse.core && sprite._mmaLastChancePulse.core.active) return sprite._mmaLastChancePulse;
+      var textures = getLastChanceTextures();
+      if (!textures.core || !textures.ring || !textures.flare) return null;
+      var pulse = {
+        core: sprite.scene.add.image(sprite.x, sprite.y, textures.core),
+        ring: sprite.scene.add.image(sprite.x, sprite.y, textures.ring),
+        flare: sprite.scene.add.image(sprite.x, sprite.y, textures.flare)
+      };
+      pulse.core.setBlendMode(Phaser.BlendModes.ADD);
+      pulse.ring.setBlendMode(Phaser.BlendModes.SCREEN);
+      pulse.flare.setBlendMode(Phaser.BlendModes.ADD);
+      pulse.core.setVisible(false);
+      pulse.ring.setVisible(false);
+      pulse.flare.setVisible(false);
+      sprite._mmaLastChancePulse = pulse;
+      return pulse;
+    }
+
+    function setPulseVisible(pulse, visible) {
+      if (!pulse) return;
+      pulse.core.setVisible(visible);
+      pulse.ring.setVisible(visible);
+      pulse.flare.setVisible(visible);
+    }
+
+    function isPlayerLowHp(sprite) {
+      if (!sprite || !sprite.scene || sprite.scene.player !== sprite || !sprite.stats || !sprite.stats.maxHp) return false;
+      var cfg = getLastChanceConfig();
+      var threshold = typeof cfg.healthThreshold === 'number' ? cfg.healthThreshold : 0.1;
+      return Phaser.Math.Clamp(sprite.stats.hp / sprite.stats.maxHp, 0, 1) <= threshold;
+    }
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+
+      if (!this.active || !this.scene || !this._mmaBaseTextureKey) {
+        if (this._mmaLastChancePulse) setPulseVisible(this._mmaLastChancePulse, false);
+        return;
+      }
+
+      if (!isPlayerLowHp(this)) {
+        if (this._mmaLastChancePulse) setPulseVisible(this._mmaLastChancePulse, false);
+        return;
+      }
+
+      var cfg = getLastChanceConfig();
+      var textures = getLastChanceTextures();
+      if (!textures.core) return;
+      var pulse = ensureLastChancePulse(this);
+      if (!pulse) return;
+      setPulseVisible(pulse, true);
+
+      var hpRatio = Phaser.Math.Clamp(this.stats.hp / this.stats.maxHp, 0, 1);
+      var danger = Phaser.Math.Clamp(1 - (hpRatio / Math.max(0.001, cfg.healthThreshold || 0.1)), 0, 1);
+      var pulseSpeed = (cfg.pulseSpeed || 0.012) + danger * (cfg.pulseSpeedBoost || 0.02);
+      var beat = 0.72 + Math.abs(Math.sin(time * pulseSpeed)) * (0.28 + danger * 0.16);
+      var wobble = Math.sin(time * pulseSpeed * 0.5) * (1 + danger * 2.5);
+      var baseDepth = (this.depth || 0) + 1;
+      var baseScaleX = this.scaleX || 1;
+      var baseScaleY = this.scaleY || 1;
+
+      pulse.core.setPosition(this.x, this.y + 1);
+      pulse.ring.setPosition(this.x, this.y + Math.sin(time * pulseSpeed * 0.4) * 1.5);
+      pulse.flare.setPosition(this.x, this.y - 2 - Math.abs(Math.sin(time * pulseSpeed * 0.9)) * 2);
+      pulse.core.setDepth(baseDepth);
+      pulse.ring.setDepth(baseDepth - 1);
+      pulse.flare.setDepth(baseDepth - 2);
+      pulse.core.setFlipX(!!this.flipX);
+      pulse.ring.setFlipX(!!this.flipX);
+      pulse.flare.setFlipX(!!this.flipX);
+      pulse.core.setTint(cfg.tint || 0xff3b30);
+      pulse.ring.setTint(cfg.glow || 0xffb0aa);
+      pulse.flare.setTint(cfg.tint || 0xff3b30);
+      pulse.core.setScale(baseScaleX * ((cfg.scale || 1.26) + beat * 0.08), baseScaleY * (((cfg.scale || 1.26) - 0.12) + beat * 0.05));
+      pulse.ring.setScale(baseScaleX * ((cfg.ringScale || 1.36) + beat * 0.12), baseScaleY * (((cfg.ringScale || 1.36) - 0.16) + beat * 0.08));
+      pulse.flare.setScale(baseScaleX * ((cfg.flareScale || 1.18) + danger * 0.12), baseScaleY * (((cfg.flareScale || 1.18) - 0.1) + beat * 0.06));
+      pulse.core.setAlpha((cfg.alpha || 0.24) + beat * 0.18 + danger * 0.18);
+      pulse.ring.setAlpha((cfg.ringAlpha || 0.18) + beat * 0.12 + danger * 0.16);
+      pulse.flare.setAlpha((cfg.flareAlpha || 0.14) + beat * 0.08 + danger * 0.12);
+      pulse.ring.setAngle(wobble * 3.5);
+      pulse.flare.setAngle(-wobble * 5.5);
+
+      var now = this.scene && this.scene.time && typeof this.scene.time.now === 'number' ? this.scene.time.now : 0;
+      var labelCooldown = typeof cfg.labelCooldown === 'number' ? cfg.labelCooldown : 1800;
+      if (window.MMA && window.MMA.UI && typeof MMA.UI.showDamageText === 'function' && (!this._mmaLastChanceLabelAt || now - this._mmaLastChanceLabelAt >= labelCooldown)) {
+        MMA.UI.showDamageText(this.scene, this.x, this.y - 82, 'LAST CHANCE!', '#ff8a80');
+        this._mmaLastChanceLabelAt = now;
+      }
+    };
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      if (this._mmaLastChancePulse) {
+        this._mmaLastChancePulse.core.destroy();
+        this._mmaLastChancePulse.ring.destroy();
+        this._mmaLastChancePulse.flare.destroy();
+        this._mmaLastChancePulse = null;
+      }
+      return originalDestroy.call(this, fromScene);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaLastChancePulseHookInstalled = true;
   }
 });

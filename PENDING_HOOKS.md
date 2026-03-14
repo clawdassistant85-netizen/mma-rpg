@@ -10,6 +10,33 @@ document it here. The Reviewer agent will integrate these.
 
 ## Pending
 
+### Progress Log — Feature Implementation Logging
+- **Module**: Enemies (js/enemies.js)
+- **Target file**: progress.log
+- **Description**: Each feature implementation should append a line to progress.log with timestamp and description of what was done. Per task restriction, I was not allowed to modify js/enemies.js only, but logging to progress.log is required for audit trail.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented (file out of scope for this task)
+- **Added**: 2026-03-13
+
+### Rapid Fire Room — Wave + Timer Logic
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/scenes/GameScene.js, js/enemies.js, js/combat.js
+- **Description**: New Rapid Fire Room (rapid1) exposes `rapidFire*` registry keys (duration, spawn interval, score multiplier, room label). GameScene/combat/enemies should:
+  - On entering a rapidFireMode room, start a 15s timer and schedule enemy spawns at `rapidFireSpawnIntervalSeconds` (2s default) using the room's enemyPool.
+  - Track and apply `rapidFireScoreMultiplier` to room score/XP or post-room rewards.
+  - Stop spawning when timer expires, then either open the exit door or trigger a results summary.
+- **Priority**: P1
+- **Status**: ✅ Implemented in reviewer pass — GameScene now runs the rapid-fire timer/spawn loop and enemies.js applies rapid-fire reward/room-clear behavior.
+- **Added**: 2026-03-14
+
+### Gang Up Coordination Feature
+- **Module**: Enemies (js/enemies.js)
+- **Target file**: N/A (self-contained in enemies.js)
+- **Description**: Implemented new feature - when 3+ enemies are alive, they can trigger coordinated attacks. One enemy acts as distracter (stuns player), others flank and attack from sides with +35% damage bonus. Visual warning circle appears 1s before attack. 8s cooldown between gang up attempts.
+- **Priority**: P1
+- **Status**: ✅ Implemented in js/enemies.js
+- **Added**: 2026-03-13
+
 ### Adaptive Tactics — Player Attack Tracking
 - **Module**: Enemies (js/enemies.js)
 - **Target file**: js/combat.js
@@ -30,3 +57,267 @@ document it here. The Reviewer agent will integrate these.
 
 - ✅ Crowd Dynamics — Combat Integration (P2) - Implemented in js/combat.js lines 240-242
 - ✅ Weather hooks (P0/P1) - Implemented rain movement slowdown in js/player.js handleMovement(); visibility/projectile drift set in js/zones.js
+
+### Boss Chroma-Aura Feature
+- **Module**: Sprites (js/sprites.js)
+- **Target file**: js/scenes/BootScene.js, js/sprites.js
+- **Description**: Unique pulsing chromatic aura system for boss enemies, including champion/underground/shadow variants plus low-HP pulse escalation.
+- **Priority**: P2
+- **Status**: ✅ Implemented in js/scenes/BootScene.js + js/sprites.js
+- **Added**: 2026-03-14
+
+### Arena Footwork Trails Feature
+- **Module**: Sprites (js/sprites.js)
+- **Target file**: js/player.js, js/enemies.js
+- **Description**: Dust particle trails behind fighters in arena/cage zones. Requires player.js and enemies.js to spawn trail particles based on movement speed and zone type check.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Move Input Display Feature
+- **Module**: UI (js/ui.js)
+- **Target file**: js/ui.js, js/combat.js, index.html
+- **Description**: Real-time HUD showing the last 6 button inputs with icons, plus a Settings toggle.
+- **Priority**: P2
+- **Status**: ✅ Implemented in js/ui.js + js/combat.js + index.html
+- **Added**: 2026-03-14
+
+### Rage Distortion VFX Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/combat.js, js/enemies.js
+- **Description**: Heat-shimmer distortion during Rage Mode. Requires combat.js and enemies.js to trigger distortion effect when rage activates.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Ring Gear Customization Feature
+- **Module**: Items (js/items.js)
+- **Target file**: js/sprites.js, js/player.js
+- **Description**: Ring-specific gear items (corner wraps, mouth guard, color-coded hand wraps) that provide small passive bonuses and appear visually on fighter sprite. Requires sprites.js to render equipped gear overlay and player.js to apply stat bonuses.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Arena Wall Tech Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/player.js, js/combat.js, js/sprites.js
+- **Description**: Environmental interaction system allowing players to use walls/ropes/corners strategically — bounce dodge off corner posts, vault over ropes for aerial attacks, trip grappled enemies using ring ropes. Zones now exposes `arenaWallTech*` registry keys with rope segments, corner post coordinates, and damage/stamina multipliers; player/combat/sprites should consume these instead of hardcoding geometry.
+- **Priority**: P1
+- **Status**: 🟡 Partially implemented – zones.js wiring complete; needs player/combat/sprites hooks for movement/combat interactions
+- **Added**: 2026-03-14
+
+### Dynamic Camera Distance Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/scenes/GameScene.js
+- **Description**: Camera dynamically adjusts distance based on combat situation — pulls back for multi-enemy fights, zooms in for 1v1 boss duels, responds to room size. Requires GameScene.js camera management integration.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Screen Flash Color Coding Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/combat.js
+- **Description**: Attack types trigger different colored screen flashes (strikes=white, grapples=blue, criticals=gold, finishing=red with longer fade). Requires combat.js to pass attack type to vfx.js when triggering flash.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Zone-Specific Ambient Audio Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/scenes/GameScene.js
+- **Description**: Each zone has layered ambient sound that dynamically shifts based on combat intensity. Requires GameScene.js to manage audio zone transitions and combat intensity hooks.
+- **Priority**: P3
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Zone Transition Pulse Feature
+- **Module**: Sprites (js/sprites.js)
+- **Target file**: js/scenes/GameScene.js, js/player.js
+- **Description**: Zone transition pulse effect when entering new rooms — color matches zone theme. Requires GameScene.js to trigger pulse on room entry and player.js to hook into zone change events.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Exertion Visual Cues Feature
+- **Module**: Sprites (js/sprites.js)
+- **Target file**: js/player.js, js/combat.js
+- **Description**: Fighter sprites show visible exhaustion states — heavy breathing at low stamina, stumble frames at zero stamina, recovery breathing when regening past 30%. Requires player.js stamina state hooks and sprites.js to render appropriate animation frames.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Weapon Clash Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/vfx.js, js/sprites.js
+- **Description**: Attack clash triggers spark animation and lockup state. Requires combat.js to detect mid-frame intersection, vfx.js for spark/shockwave effects, sprites.js for lockup pose.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Enemy Role Call Feature
+- **Module**: Enemies (js/enemies.js)
+- **Target file**: js/ui.js, js/sprites.js
+- **Description**: Enemy type icons (fist/striker, chain/grappler, shield/defender) display above enemy heads. Requires enemies.js to assign icons, ui.js or sprites.js to render above-sprite indicators.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Flickering Power Zones Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/scenes/GameScene.js, js/enemies.js
+- **Description**: Underground/industrial zones have flickering lights (8-12s intervals) creating 1-second visibility blackout with AI behavior changes. Requires zones.js to flag flickering rooms, GameScene.js to control light timing, enemies.js for blackout behavior modifications.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Predator Patience Feature
+- **Module**: Enemies (js/enemies.js)
+- **Target file**: js/combat.js, js/scenes/GameScene.js
+- **Description**: Elite+ enemies wait 3 seconds before attacking to "size up" player — free preemptive strike window during wait phase. Requires enemies.js to flag patience behavior, combat.js to apply preemptive bonus damage, GameScene.js for timing.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Ring Rust Mechanic Feature
+- **Module**: Player (js/player.js)
+- **Target file**: js/scenes/GameScene.js, js/main.js
+- **Description**: Track last play timestamp in localStorage. On game load, if 3+ real-time days since last play, apply ring rust debuffs (-10% speed, -5% accuracy). First fight landing 5+ hits clears rust and removes debuffs. Requires GameScene.js to check on load, main.js to persist timestamp.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Clash Commentary System Feature
+- **Module**: UI (js/ui.js)
+- **Target file**: js/combat.js, js/scenes/GameScene.js
+- **Description**: Dynamic announcer system that calls out combat events (combos, near-misses, dramatic moments). Requires combat.js to emit events (combo milestones, critical hits, finishing moves), ui.js to play voice/display text overlay, GameScene.js to manage audio. Different voice packs per zone.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Crowd Funding System Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/combat.js, js/items.js, js/ui.js
+- **Description**: Arena zones accumulate crowd donations between rooms based on hype earned. Player can cash in mid-fight for boosts (+30% damage, stamina refill, enemy distraction). Requires zones.js to flag arena zones, combat.js to allow boost activation, items.js for boost effects, ui.js for donation counter display.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Signature Finisher Repertoire Feature
+- **Module**: Player (js/player.js)
+- **Target file**: js/combat.js, js/ui.js
+- **Description**: Track top 3 most-used finishing moves. Using #1 finisher grants "Signature Mastery" bonus (+20% damage, visual flair). Requires combat.js to record finishing moves, player.js to track usage stats, ui.js to display current signature finisher and mastery bonus.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Fight IQ Aura Read Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/sprites.js, js/enemies.js, js/ui.js
+- **Description**: Enemy attack telegraphing system with colored halos around enemy limbs 300ms before attack (yellow=jabs, orange=crosses, red=haymakers, blue=grapples). Requires enemies.js to assign attack types, combat.js to trigger telegraph timing, sprites.js to render halo overlays, ui.js for optional tutorial hints.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Clash Spark Veins Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/combat.js, js/sprites.js
+- **Description**: Mid-attack clashes trigger electric blue spark veins that spider across screen from impact point. Requires combat.js to detect clash state, vfx.js to render vein particle system, sprites.js for lockup pose during clash.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Signature Color Splash Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/player.js, js/combat.js
+- **Description**: Persistent color tint on screen edges based on fighting style (striker=red, grappler=blue, balanced=purple). Intensity grows with Style Gauge. Requires player.js to report dominant style, combat.js to update gauge, vfx.js to render edge tint.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Last Chance Pulse Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/player.js, js/combat.js
+- **Description**: When player HP below 10%, screen gains heartbeat-synced red pulse effect accelerating as HP approaches critical. Requires player.js HP threshold monitoring, combat.js to trigger effect, vfx.js for pulse animation.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Combo Counter Shatter Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/combat.js, js/sprites.js
+- **Description**: 15+ hit combos trigger screen-crack glass effect behind enemy that spreads with each hit and shatters on combo end. Requires combat.js combo tracking, vfx.js for crack particle system, sprites.js for impact effects.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Bloodlust Mode Visual Feature
+- **Module**: Sprites (js/sprites.js)
+- **Target file**: js/combat.js, js/player.js
+- **Description**: At maximum Momentum (5 stacks), player gains red double-image pulse with each attack signaling MOMENTUM SURGE readiness. Requires player.js momentum tracking, combat.js to apply effect, sprites.js to render duplicate sprite with pulse animation.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Footwork Audio Cues Feature
+- **Module**: Audio (js/audio.js - new or integrate)
+- **Target file**: js/player.js, js/scenes/GameScene.js
+- **Description**: Distinct footstep sounds based on movement type (quick shuffle for dodge, heavy thud for roll, squeak for pivot). Requires new audio assets, player.js to trigger on movement types, GameScene.js audio management.
+- **Priority**: P3
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Mood Lighting System Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/scenes/GameScene.js, js/combat.js
+- **Description**: Ambient arena lights shift color based on combat state (neutral=exploration, orange= friendly, blue=intense, red=boss). Requires GameScene.js room state tracking, combat.js combat intensity monitoring, vfx.js for light color transitions.
+- **Priority**: P3
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Knockdown Dust Cloud Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/combat.js, js/sprites.js
+- **Description**: When enemies hit the mat from takedowns/knockdowns, dust cloud erupts from impact point scaling with enemy size. Requires combat.js knockdown detection, vfx.js for dust particle burst, sprites.js for impact sprite.
+- **Priority**: P3
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Training Flashback System Feature
+- **Module**: Player (js/player.js)
+- **Target file**: js/scenes/GameScene.js, js/combat.js, js/vfx.js
+- **Description**: Before boss fights, trigger QTEs showing training flashbacks — success grants temporary buffs (damage, stamina regen, Focus). Requires player.js to store buff state, GameScene.js to detect boss room entry and trigger flashback scene, combat.js to apply buffs during fight, vfx.js for silhouette flashback visuals.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Signature Combo Deck Builder Feature
+- **Module**: Player (js/player.js)
+- **Target file**: js/combat.js, js/ui.js, js/main.js
+- **Description**: Build/save combo decks of 5-6 moves, select before zone entry. Requires player.js to store deck configurations, combat.js to cycle through deck moves during normal attacks, ui.js for deck builder UI, main.js for save/load.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Gym Sponsorship System Feature
+- **Module**: Items (js/items.js)
+- **Target file**: js/player.js, js/zones.js, js/ui.js
+- **Description**: Earn zone-specific gym reputation through wins, unlock free gear sponsorships. Requires items.js for sponsorship gear, player.js to track reputation per zone and apply gear stats, zones.js to flag sponsor availability, ui.js for sponsorship notification UI.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Weight Class Transition Challenge Feature
+- **Module**: Player (js/player.js)
+- **Target file**: js/scenes/GameScene.js, js/ui.js
+- **Description**: Stat upgrades that shift weight class trigger weight cut minigame — success = +10% power, failure = -15% HP. Requires player.js to detect weight class shift, GameScene.js to trigger minigame on stat confirm, ui.js for cutscene and result display.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Corner Cutscene Director Feature
+- **Module**: UI (js/ui.js)
+- **Target file**: js/scenes/GameScene.js, js/player.js, js/combat.js
+- **Description**: Between arena rooms, play tactical cutscene with three advice paths granting buffs. Requires ui.js for cutscene scene and choice selection, GameScene.js to trigger between rooms, player.js to apply chosen buff, combat.js to track buff duration.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
