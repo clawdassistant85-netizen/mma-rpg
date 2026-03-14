@@ -3489,6 +3489,14 @@ window.MMA.UI = {
   showDamageText: function(scene, x, y, text, color) {
     var t = scene.add.text(x, y, text, { fontSize: '16px', color: color || '#ff4444', stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5).setDepth(10);
     scene.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 600, onComplete: function() { t.destroy(); } });
+    // Play hit sound
+    try {
+      if (window.sfx) {
+        var dmgNum = parseInt(text.replace(/[^0-9]/g, ''), 10) || 0;
+        if (dmgNum > 25) { window.sfx.thud(); }
+        else if (dmgNum > 0) { window.sfx.punch(); }
+      }
+    } catch(e) {}
   },
   // Move Input Display functions
   moveInputIcons: {

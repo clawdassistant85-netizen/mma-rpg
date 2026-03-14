@@ -2804,6 +2804,7 @@ window.MMA.Enemies = {
   killEnemy: function(scene, enemy) {
     scene.enemiesDefeated = (scene.enemiesDefeated || 0) + 1;
     enemy.state = 'dead';
+    try { if (window.sfx) window.sfx.thud(); } catch(e) {}
 
     // Ring Rust: record fight time whenever an enemy is defeated
     this.recordFightTime();

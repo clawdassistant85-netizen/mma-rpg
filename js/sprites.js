@@ -692,144 +692,185 @@ window.MMA.Sprites = {
     };
 
     var outfitDamageKeys = {};
-    
-    // Get the textureHuman and textureDamageSet functions from the closure
-    // We need to recreate similar logic for outfits
-    
+    var idleRegistry = window.MMA.Sprites.IDLE_TEXTURES || {};
+
+    function darkenColor(color, amount) {
+      var r = Math.max(0, ((color >> 16) & 0xff) - amount);
+      var g = Math.max(0, ((color >> 8) & 0xff) - amount);
+      var b = Math.max(0, (color & 0xff) - amount);
+      return (r << 16) | (g << 8) | b;
+    }
+
+    function buildIdleFrames(baseOpts) {
+      var armShift = typeof baseOpts.armShift === 'number' ? baseOpts.armShift : 1;
+      return [
+        { suffix: '', opts: {} },
+        { suffix: '_idle_1', opts: { armShift: armShift - 1, torsoBob: -1, leftLegLift: 1, gloveBob: -1 } },
+        { suffix: '_idle_2', opts: { armShift: armShift + 1, torsoBob: 0, rightLegLift: 1, gloveBob: 1 } },
+        { suffix: '_idle_3', opts: { armShift: armShift, torsoBob: 1, leftLegLift: 0, rightLegLift: 0, gloveBob: 0 } }
+      ];
+    }
+
     function generateOutfitTexture(key, colors, opts) {
+      opts = opts || {};
       var g = self.make.graphics({ x: 0, y: 0, add: false });
       var s = 3;
-      var armShift = opts.armShift || 1;
+      var armShift = typeof opts.armShift === 'number' ? opts.armShift : 1;
       var bodyW = opts.bodyW || 6;
       var bodyX = Math.floor((16 - bodyW) / 2);
-      
-      var torsoBob = 0;
-      var leftArmDrop = 0;
-      var rightArmDrop = 0;
-      var headTilt = 0;
-      var bodyLean = 0;
-      var leftLegLift = 0;
-      var rightLegLift = 0;
-      var gloveBob = 0;
-      var hasHeadband = opts.hasHeadband || false;
-      var hasMask = opts.hasMask || false;
-      var hasGiCollar = opts.hasGiCollar || false;
-      var hasRobe = opts.hasRobe || false;
-      
+      var torsoBob = typeof opts.torsoBob === 'number' ? opts.torsoBob : 0;
+      var leftArmDrop = typeof opts.leftArmDrop === 'number' ? opts.leftArmDrop : 0;
+      var rightArmDrop = typeof opts.rightArmDrop === 'number' ? opts.rightArmDrop : 0;
+      var headTilt = typeof opts.headTilt === 'number' ? opts.headTilt : 0;
+      var bodyLean = typeof opts.bodyLean === 'number' ? opts.bodyLean : 0;
+      var leftLegLift = typeof opts.leftLegLift === 'number' ? opts.leftLegLift : 0;
+      var rightLegLift = typeof opts.rightLegLift === 'number' ? opts.rightLegLift : 0;
+      var gloveBob = typeof opts.gloveBob === 'number' ? opts.gloveBob : 0;
+      var damageLevel = typeof opts.damageLevel === 'number' ? opts.damageLevel : 0;
+      var hasHeadband = !!opts.hasHeadband;
+      var hasMask = !!opts.hasMask;
+      var hasGiCollar = !!opts.hasGiCollar;
+      var hasRobe = !!opts.hasRobe;
+
       function px(x, y, w, h, color) {
         g.fillStyle(color, 1);
         g.fillRect(x * s, y * s, w * s, h * s);
       }
-      
-      // Head
+
       px(5 + headTilt, 1 + torsoBob, 6, 5, colors.skin);
       px(4 + headTilt, 0 + torsoBob, 8, 2, colors.hair);
       px(4 + headTilt, 2 + torsoBob, 1, 2, colors.hair);
       px(11 + headTilt, 2 + torsoBob, 1, 2, colors.hair);
       px(6 + headTilt, 5 + torsoBob, 4, 1, colors.skinDark);
-      
-      // Mask for ninja
+
       if (hasMask) {
         px(5 + headTilt, 3 + torsoBob, 6, 2, 0x111111);
         px(5 + headTilt, 2 + torsoBob, 2, 1, 0x8800ff);
         px(9 + headTilt, 2 + torsoBob, 2, 1, 0x8800ff);
       }
-      
-      // Headband
+
       if (hasHeadband) {
         px(4 + headTilt, 1 + torsoBob, 8, 1, colors.headband || 0xd92b2b);
         px(4 + headTilt, 2 + torsoBob, 1, 1, colors.headband || 0xd92b2b);
         px(11 + headTilt, 2 + torsoBob, 1, 1, colors.headband || 0xd92b2b);
       }
-      
-      // Gi collar
+
       if (hasGiCollar) {
         px(5 + headTilt, 5 + torsoBob, 6, 1, 0xcccccc);
         px(bodyX + bodyLean, 7 + torsoBob, bodyW, 1, 0xdddddd);
       }
-      
-      // Torso
+
       px(bodyX + bodyLean, 7 + torsoBob, bodyW, 8, colors.torso);
       px(bodyX + 1 + bodyLean, 8 + torsoBob, bodyW - 2, 1, colors.torsoLight);
-      
-      // Robe overlay
+
       if (hasRobe) {
         px(bodyX - 1 + bodyLean, 7 + torsoBob, 1, 8, colors.torsoLight);
         px(bodyX + bodyW + bodyLean, 7 + torsoBob, 1, 8, colors.torsoLight);
       }
-      
-      // Belt
+
       px(7 + bodyLean, 11 + torsoBob, 2, 4, colors.belt);
       px(bodyX + bodyLean, 15 + torsoBob, bodyW, 1, colors.belt);
-      
-      // Arms
+
       px(bodyX - 2 + armShift + bodyLean, 8 + torsoBob + leftArmDrop, 2, 5 - Math.min(leftArmDrop, 2), colors.skin);
       px(bodyX + bodyW + armShift + bodyLean, 8 + torsoBob + rightArmDrop, 2, 5 - Math.min(rightArmDrop, 2), colors.skin);
-      
-      // Gloves
+
       var fistSize = 2;
       var fistY = 9 + torsoBob + gloveBob;
       px(bodyX - 1 + armShift + bodyLean, fistY + leftArmDrop, fistSize, fistSize, colors.glove);
       px(bodyX + bodyW - 1 + armShift + bodyLean, fistY + rightArmDrop, fistSize, fistSize, colors.glove);
-      
-      // Legs
+
       px(bodyX + 1 + bodyLean, 16 + leftLegLift, 2, 6 - leftLegLift, colors.legs);
       px(bodyX + bodyW - 3 + bodyLean, 16 + rightLegLift, 2, 6 - rightLegLift, colors.legs);
-      
       px(bodyX + 1 + bodyLean, 21, 2, 1, colors.bootDetail);
       px(bodyX + bodyW - 3 + bodyLean, 21, 2, 1, colors.bootDetail);
-      
       px(bodyX + 1 + bodyLean, 22, 2, 2, colors.shoes);
       px(bodyX + bodyW - 3 + bodyLean, 22, 2, 2, colors.shoes);
-      
       px(bodyX + 1 + bodyLean, 23, 2, 1, colors.shoeAccent);
       px(bodyX + bodyW - 3 + bodyLean, 23, 2, 1, colors.shoeAccent);
-      
-      // Outline
+
+      if (damageLevel >= 1) {
+        px(4 + headTilt, 4 + torsoBob, 1, 1, 0x6a2d7c);
+        px(11 + headTilt, 5 + torsoBob, 1, 1, 0x6a2d7c);
+        px(bodyX - 1 + armShift + bodyLean, 13 + torsoBob + leftArmDrop, 2, 1, 0x6a2d7c);
+        px(bodyX + bodyW - 1 + armShift + bodyLean, 13 + torsoBob + rightArmDrop, 2, 1, 0x6a2d7c);
+        px(bodyX + 1 + bodyLean, 10 + torsoBob, Math.max(2, bodyW - 2), 1, 0x5e364f);
+      }
+      if (damageLevel >= 2) {
+        px(7 + headTilt, 4 + torsoBob, 1, 2, 0x9b1c1c);
+        px(8 + headTilt, 5 + torsoBob, 2, 1, 0x9b1c1c);
+        px(bodyX + 2 + bodyLean, 12 + torsoBob, Math.max(2, bodyW - 4), 1, 0x9b1c1c);
+        px(bodyX + 1 + bodyLean, 19, 2, 1, 0x9b1c1c);
+        px(bodyX + bodyW - 3 + bodyLean, 19, 2, 1, 0x9b1c1c);
+      }
+
       px(bodyX - 2 + bodyLean, 7 + torsoBob + leftArmDrop, 1, 9 - Math.min(leftArmDrop, 2), colors.outline);
       px(bodyX + bodyW + 2 + bodyLean, 7 + torsoBob + rightArmDrop, 1, 9 - Math.min(rightArmDrop, 2), colors.outline);
       px(5 + headTilt, 1 + torsoBob, 1, 6, colors.outline);
       px(10 + headTilt, 1 + torsoBob, 1, 6, colors.outline);
-      
-      var texKey = 'player_' + key;
-      g.generateTexture(texKey, 48, 72);
+
+      g.generateTexture(key, 48, 72);
       g.destroy();
-      return texKey;
+      return key;
     }
-    
-    // Generate textures for each outfit
+
+    function registerIdleSet(baseKey, colors, baseOpts) {
+      var frames = buildIdleFrames(baseOpts || {});
+      var keys = [];
+      for (var i = 0; i < frames.length; i++) {
+        var frameKey = i === 0 ? baseKey : (baseKey + frames[i].suffix);
+        generateOutfitTexture(frameKey, colors, Object.assign({}, baseOpts, frames[i].opts));
+        keys.push(frameKey);
+      }
+      idleRegistry[baseKey] = keys;
+      return keys[0];
+    }
+
     Object.keys(outfitConfigs).forEach(function(outfitKey) {
       var config = outfitConfigs[outfitKey];
       var colors = Object.assign({}, baseColors, config);
-      
-      // Generate damage states for this outfit
       var baseKey = 'player_' + outfitKey;
-      var healthyKey = generateOutfitTexture(baseKey, colors, { armShift: 1, bodyW: 6, hasHeadband: config.hasHeadband, hasMask: config.hasMask, hasGiCollar: config.hasGiCollar, hasRobe: config.hasRobe });
-      
-      // Hurt state
-      var hurtColors = Object.assign({}, colors);
-      colors.torso = Math.max(0, colors.torso - 0x202020);
-      var hurtKey = generateOutfitTexture(baseKey + '_hurt_1', colors, { 
-        armShift: 1, bodyW: 6, bodyLean: -1, leftArmDrop: 1, rightLegLift: 2,
-        hasHeadband: config.hasHeadband, hasMask: config.hasMask, hasGiCollar: config.hasGiCollar, hasRobe: config.hasRobe 
-      });
-      
-      // Bloodied state
-      var bloodiedColors = Object.assign({}, colors);
-      bloodiedColors.torso = Math.max(0, bloodiedColors.torso - 0x303030);
-      var bloodiedKey = generateOutfitTexture(baseKey + '_hurt_2', bloodiedColors, { 
-        armShift: 0, bodyW: 6, bodyLean: -2, leftArmDrop: 2, rightLegLift: 3,
-        hasHeadband: config.hasHeadband, hasMask: config.hasMask, hasGiCollar: config.hasGiCollar, hasRobe: config.hasRobe 
-      });
-      
+      var sharedOpts = {
+        armShift: 1,
+        bodyW: 6,
+        hasHeadband: config.hasHeadband,
+        hasMask: config.hasMask,
+        hasGiCollar: config.hasGiCollar,
+        hasRobe: config.hasRobe
+      };
+
+      registerIdleSet(baseKey, colors, Object.assign({}, sharedOpts, { damageLevel: 0 }));
+      registerIdleSet(baseKey + '_hurt_1', Object.assign({}, colors, {
+        torso: darkenColor(colors.torso, 26),
+        torsoLight: darkenColor(colors.torsoLight, 18)
+      }), Object.assign({}, sharedOpts, {
+        damageLevel: 1,
+        bodyLean: -1,
+        leftArmDrop: 1,
+        rightLegLift: 2,
+        headTilt: -1
+      }));
+      registerIdleSet(baseKey + '_hurt_2', Object.assign({}, colors, {
+        torso: darkenColor(colors.torso, 42),
+        torsoLight: darkenColor(colors.torsoLight, 30)
+      }), Object.assign({}, sharedOpts, {
+        damageLevel: 2,
+        armShift: 0,
+        bodyLean: -2,
+        leftArmDrop: 2,
+        rightArmDrop: 1,
+        rightLegLift: 3,
+        torsoBob: 1,
+        headTilt: -1
+      }));
+
       outfitDamageKeys[outfitKey] = {
-        healthy: healthyKey,
-        bruised: hurtKey,
-        bloodied: bloodiedKey
+        healthy: baseKey,
+        bruised: baseKey + '_hurt_1',
+        bloodied: baseKey + '_hurt_2'
       };
     });
-    
-    // Store outfit damage textures
+
+    window.MMA.Sprites.IDLE_TEXTURES = idleRegistry;
     window.MMA.Sprites.OUTFIT_TEXTURES = outfitDamageKeys;
     try {
       this.generateEquipmentTextures(self, baseColors, outfitDamageKeys);
@@ -846,6 +887,7 @@ window.MMA.Sprites = {
       champions_belt: { glove: 0xffd54f, belt: 0xffd54f, headband: 0xfff0a6, accent: 0xfff4c2 }
     };
     var equipmentTextures = {};
+    var idleRegistry = this.IDLE_TEXTURES || {};
 
     function tintColor(color, delta) {
       var r = (color >> 16) & 0xff;
@@ -855,6 +897,16 @@ window.MMA.Sprites = {
       g = Phaser.Math.Clamp(g + delta, 0, 255);
       b = Phaser.Math.Clamp(b + delta, 0, 255);
       return Phaser.Display.Color.GetColor(r, g, b);
+    }
+
+    function buildIdleFrames(baseOpts) {
+      var armShift = typeof baseOpts.armShift === 'number' ? baseOpts.armShift : 1;
+      return [
+        { suffix: '', opts: {} },
+        { suffix: '_idle_1', opts: { armShift: armShift - 1, torsoBob: -1, leftLegLift: 1, gloveBob: -1 } },
+        { suffix: '_idle_2', opts: { armShift: armShift + 1, torsoBob: 0, rightLegLift: 1, gloveBob: 1 } },
+        { suffix: '_idle_3', opts: { armShift: armShift, torsoBob: 1, leftLegLift: 0, rightLegLift: 0, gloveBob: 0 } }
+      ];
     }
 
     Object.keys(outfitDamageKeys || {}).forEach(function(outfitKey) {
@@ -881,15 +933,27 @@ window.MMA.Sprites = {
           equipmentAccent: gear.accent || gear.glove || gear.belt || 0xffffff,
           equipmentType: gearKey
         };
+        function registerIdleSet(baseKey, stateOpts) {
+          var frames = buildIdleFrames(stateOpts || {});
+          var keys = [];
+          for (var i = 0; i < frames.length; i++) {
+            var frameKey = i === 0 ? baseKey : (baseKey + frames[i].suffix);
+            this.generateEquipmentVariantTexture(self, frameKey, colors, Object.assign({}, stateOpts, frames[i].opts));
+            keys.push(frameKey);
+          }
+          idleRegistry[baseKey] = keys;
+          return baseKey;
+        }
         var prefix = 'player_' + outfitKey + '_' + gearKey;
         equipmentTextures[outfitKey][gearKey] = {
-          healthy: this.generateEquipmentVariantTexture(self, prefix, colors, Object.assign({}, opts, { damageLevel: 0 })),
-          bruised: this.generateEquipmentVariantTexture(self, prefix + '_hurt_1', colors, Object.assign({}, opts, { damageLevel: 1, bodyLean: -1, leftArmDrop: 1, rightLegLift: 2, headTilt: -1 })),
-          bloodied: this.generateEquipmentVariantTexture(self, prefix + '_hurt_2', colors, Object.assign({}, opts, { damageLevel: 2, bodyLean: -2, leftArmDrop: 2, rightArmDrop: 1, rightLegLift: 3, torsoBob: 1, headTilt: -1 }))
+          healthy: registerIdleSet.call(this, prefix, Object.assign({}, opts, { damageLevel: 0 })),
+          bruised: registerIdleSet.call(this, prefix + '_hurt_1', Object.assign({}, opts, { damageLevel: 1, bodyLean: -1, leftArmDrop: 1, rightLegLift: 2, headTilt: -1 })),
+          bloodied: registerIdleSet.call(this, prefix + '_hurt_2', Object.assign({}, opts, { damageLevel: 2, bodyLean: -2, leftArmDrop: 2, rightArmDrop: 1, rightLegLift: 3, torsoBob: 1, headTilt: -1 }))
         };
       }, this);
     }, this);
 
+    this.IDLE_TEXTURES = idleRegistry;
     this.EQUIPMENT_TEXTURES = equipmentTextures;
   },
 

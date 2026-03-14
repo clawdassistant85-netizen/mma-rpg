@@ -256,6 +256,7 @@ window.MMA.Player = {
       // Show level up notification
       var styleName = styleType.charAt(0).toUpperCase() + styleType.slice(1);
       MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 50, styleName + ' LV ' + currentLevel + '!', '#ff66ff');
+      try { if (window.sfx) window.sfx.levelup(); } catch(e) {}
       
       // Check for new moves unlocked
       this.checkMoveUnlocksByStyle(scene);
