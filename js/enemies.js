@@ -3265,8 +3265,16 @@ window.MMA.Enemies = {
     var hpBarColor = self.getHealthBarColor(e);
     var hpBg = scene.add.rectangle(0, -e.displayHeight/2 - 8, 36, 5, 0x333333).setOrigin(0.5);
     var hpFill = scene.add.rectangle(0, -e.displayHeight/2 - 8, 36, 5, hpBarColor).setOrigin(0.5);
+    // Health Bar Damage Trail: shows recent damage taken as a fading red trail behind the HP bar
+    var damageTrail = scene.add.rectangle(0, -e.displayHeight/2 - 8, 36, 5, 0xaa0000).setOrigin(0.5);
+    damageTrail.setAlpha(0.7);
     e._hpBarBg = hpBg;
     e._hpBarFill = hpFill;
+    e._hpDamageTrail = damageTrail;
+    // Damage trail history: array of { damage: number, maxHp: number, timestamp: number }
+    e._damageTrailHistory = [];
+    // Store maxHp for trail calculations
+    e._trailMaxHp = e.stats.maxHp || e.stats.hp || 60;
 
     if (!opts.silent && window.narrate) window.narrate('combatStart', { enemy: { name: type.name || typeKey } }).then(function(msg){ if (msg) scene.registry.set('gameMessage', msg); scene.time.delayedCall(3000, function(){ scene.registry.set('gameMessage', ''); }); });
 
@@ -3561,6 +3569,47 @@ window.MMA.Enemies = {
         e._hpBarFill.y = e.y - e.displayHeight/2 - 8;
         var ratio = Math.max(0, e.stats.hp / e.stats.maxHp);
         e._hpBarFill.width = 36 * ratio;
+        
+        // Health Bar Damage Trail: update trail bar showing recent damage
+        if (e._hpDamageTrail) {
+          e._hpDamageTrail.x = e.x;
+          e._hpDamageTrail.y = e.y - e.displayHeight/2 - 8;
+          
+          // Calculate total damage in trail (damage that hasn't healed)
+          var trailHistory = e._damageTrailHistory || [];
+          var now = Date.now();
+          var maxHp = e._trailMaxHp || e.stats.maxHp || 60;
+          
+          // Filter out old entries (older than 3 seconds) and calculate trail width
+          var recentDamage = 0;
+          trailHistory = trailHistory.filter(function(entry) {
+            var age = now - entry.timestamp;
+            if (age > 3000) return false; // Remove entries older than 3 seconds
+            recentDamage += entry.damage;
+            return true;
+          });
+          e._damageTrailHistory = trailHistory;
+          
+          // Trail shows damage recently taken but not yet faded - sits behind current HP
+          // The trail extends from current HP up to the highest point of recent damage
+          var currentHp = e.stats.hp;
+          var trailEnd = Math.min(maxHp, currentHp + recentDamage);
+          var trailRatio = Math.max(0, trailEnd / maxHp);
+          var trailWidth = 36 * trailRatio;
+          
+          // Only show trail if there's actual damage in the window
+          if (recentDamage > 0 && trailRatio > ratio) {
+            e._hpDamageTrail.width = trailWidth;
+            e._hpDamageTrail.setAlpha(0.7);
+            // Color fades from bright red (recent) to dark red (fading)
+            var ageFactor = trailHistory.length > 0 ? (now - trailHistory[0].timestamp) / 3000 : 1;
+            var alpha = 0.7 * (1 - ageFactor * 0.5);
+            e._hpDamageTrail.setAlpha(Math.max(0.3, alpha));
+          } else {
+            e._hpDamageTrail.width = 0;
+            e._hpDamageTrail.setAlpha(0);
+          }
+        }
       }
 
       // Update Role Icon position each frame
@@ -3937,6 +3986,22 @@ window.MMA.Enemies = {
       (ai || self.AI.chase)(e, targetPlayer, scene, delta);
     });
   },
+  // Health Bar Damage Trail: record damage for visual trail effect
+  recordDamageTrail: function(enemy, damage) {
+    if (!enemy || !enemy._damageTrailHistory) return;
+    var maxHp = enemy._trailMaxHp || enemy.stats.maxHp || 60;
+    // Cap damage at maxHp to prevent trail overflow
+    var cappedDamage = Math.min(damage, maxHp);
+    enemy._damageTrailHistory.push({
+      damage: cappedDamage,
+      maxHp: maxHp,
+      timestamp: Date.now()
+    });
+    // Limit history to prevent memory issues - max 20 entries
+    if (enemy._damageTrailHistory.length > 20) {
+      enemy._damageTrailHistory = enemy._damageTrailHistory.slice(-20);
+    }
+  },
   killEnemy: function(scene, enemy) {
     if (window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient()) return;
     scene.enemiesDefeated = (scene.enemiesDefeated || 0) + 1;
@@ -3944,6 +4009,14 @@ window.MMA.Enemies = {
     enemy.aiState = 'dead';
     enemy.setVelocity(0, 0);
     if (enemy.body) enemy.body.enable = false;
+    
+    // Clean up damage trail
+    if (enemy._hpDamageTrail) {
+      enemy._hpDamageTrail.destroy();
+      enemy._hpDamageTrail = null;
+    }
+    enemy._damageTrailHistory = [];
+    
     this._playEnemyAnimation(scene, enemy, 'deathFrames');
 
     // Rival Echo System: clean up ghost aura on death
@@ -4206,6 +4279,9 @@ window.MMA.Enemies = {
       if (!(window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient()) && window.saveGame) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);
     }
     if (enemy._hpBarBg) { enemy._hpBarBg.destroy(); enemy._hpBarFill.destroy(); }
+    // Health Bar Damage Trail: clean up trail bar
+    if (enemy._hpDamageTrail) { enemy._hpDamageTrail.destroy(); enemy._hpDamageTrail = null; }
+    enemy._damageTrailHistory = [];
     // Destroy role icon on death
     if (enemy._roleIcon) { enemy._roleIcon.destroy(); enemy._roleIcon = null; }
     MMA.Items.spawnDropsForEnemy(scene, enemy);

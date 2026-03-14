@@ -200,6 +200,7 @@ var GameScene = new Phaser.Class({
       MMA.Network.send('game_over');
     }
 
+    this.scene.stop('HUDScene');
     this.scene.start('DefeatScene');
   },
   _setupNetworkHandlers: function() {

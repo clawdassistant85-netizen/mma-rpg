@@ -1157,6 +1157,8 @@ window.MMA.Combat = {
 
     var dmg = gm.damage + (scene.player.attackBonus || 0);
     enemy.stats.hp -= dmg;
+    // Health Bar Damage Trail: record damage for visual effect
+    if (MMA.Enemies.recordDamageTrail) MMA.Enemies.recordDamageTrail(enemy, dmg);
     MMA.UI.recordHitDealt(dmg, false, 1);
     MMA.UI.recordMoveUsage(moveKey, scene); // Track move for Style DNA
     MMA.Player.awardStyleXP(scene, moveKey); // Award style XP
@@ -1308,6 +1310,8 @@ window.MMA.Combat = {
       var injuryAdjusted = this.applyInjuryDamageBonus(enemy, baseSubDamage);
       var dmg = injuryAdjusted.damage;
       enemy.stats.hp -= dmg;
+      // Health Bar Damage Trail: record damage for visual effect
+      if (MMA.Enemies.recordDamageTrail) MMA.Enemies.recordDamageTrail(enemy, dmg);
       // Track swarm damage for split detection
       if (MMA.Enemies.recordSwarmDamage) {
         MMA.Enemies.recordSwarmDamage(enemy, dmg);
@@ -1329,6 +1333,8 @@ window.MMA.Combat = {
       MMA.UI.showDamageText(scene, enemy.x, enemy.y - 24, 'ESCAPED!', '#ffaa66');
       // Small damage from failed attempt
       enemy.stats.hp -= 5;
+      // Health Bar Damage Trail: record damage for visual effect
+      if (MMA.Enemies.recordDamageTrail) MMA.Enemies.recordDamageTrail(enemy, 5);
       if (enemy.stats.hp <= 0) {
         MMA.Enemies.killEnemy(scene, enemy);
         scene.endGroundState('enemy-dead');
@@ -1629,6 +1635,8 @@ window.MMA.Combat = {
         var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
+        // Health Bar Damage Trail: record damage for visual effect
+        if (MMA.Enemies.recordDamageTrail) MMA.Enemies.recordDamageTrail(enemy, dmg);
         this.resetMomentumShiftHits(scene);
         this.onComboBreakerHit(scene);
         // Track swarm damage for split detection
@@ -1794,6 +1802,8 @@ window.MMA.Combat = {
         var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
+        // Health Bar Damage Trail: record damage for visual effect
+        if (MMA.Enemies.recordDamageTrail) MMA.Enemies.recordDamageTrail(enemy, dmg);
         this.resetMomentumShiftHits(scene);
         this.onComboBreakerHit(scene);
         // Track swarm damage for split detection
