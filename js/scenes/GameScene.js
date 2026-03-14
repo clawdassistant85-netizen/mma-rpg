@@ -138,6 +138,7 @@ var GameScene = new Phaser.Class({
       this.player.x -= 30;
     }
     MMA.UI.setActionButtonLabels(false, this);
+    MMA.UI.updateGroundHUD(this); // Hide ground overlay
     MMA.UI.showGroundBanner('STAND UP');
     this.registry.set('gameMessage', reason === 'submission' ? 'SUBMISSION WIN!' : 'STAND UP');
     this.time.delayedCall(800, function(){ this.registry.set('gameMessage', ''); }, [], this);
@@ -293,6 +294,7 @@ var GameScene = new Phaser.Class({
     if (this.paused || this.roomTransitioning) return;
 
     if (this.groundState.active) {
+      MMA.UI.updateGroundHUD(this); // Update ground overlay + timer each frame
       this.player.body.setVelocity(0, 0);
       if (this.groundState.enemy && this.groundState.enemy.active && this.groundState.enemy.state !== 'dead') {
         this.groundState.timer -= delta;

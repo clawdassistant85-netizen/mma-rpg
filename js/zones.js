@@ -85,6 +85,10 @@ window.MMA.Zones = {
         { id:'hypeGain', label:'+15% hype gain (3 rooms)' },
         { id:'stamina', label:'+20% stamina regen (3 rooms)' }
       ],
+      preFightBetting:true,
+      bettingMinWager:100,
+      bettingMaxWager:1000,
+      bettingPayoutMultipliers:{ lowRisk:1.2, mediumRisk:1.6, highRisk:2.2 },
       doors:{left:{col:0,row:5}},connections:{left:'oct1'},
       spawnPositions:[{col:3,row:3},{col:3,row:8}],enemyPool:['bjjBlackBelt','bjjBlackBelt'],name:'Prelim Cage',narratorStyle:'arenaPrelims'},
     oct3:{id:'oct3',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:500,baseHype:0.7,maxHype:1.0,crowdLabel:'Electric Main Cage Crowd',
@@ -94,6 +98,10 @@ window.MMA.Zones = {
         { id:'hypeGain', label:'+15% hype gain (3 rooms)' },
         { id:'stamina', label:'+20% stamina regen (3 rooms)' }
       ],
+      preFightBetting:true,
+      bettingMinWager:200,
+      bettingMaxWager:1500,
+      bettingPayoutMultipliers:{ lowRisk:1.3, mediumRisk:1.8, highRisk:2.5 },
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct1',up:'oct4'},
       spawnPositions:[{col:5,row:5},{col:9,row:5}],enemyPool:['bjjBlackBelt'],name:'Main Cage',narratorStyle:'arenaMain'},
     oct4:{id:'oct4',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:800,baseHype:0.9,maxHype:1.0,crowdLabel:'Championship Crowd',
@@ -464,6 +472,28 @@ window.MMA.Zones = {
       buffs: (room.crowdHypemanBuffs || []).slice()
     };
   },
+  // Pre-Fight Betting helpers
+  // Certain high-profile arena rooms support a lightweight betting layer
+  // before combat begins. Zones only define metadata here – UI and combat
+  // systems are responsible for presenting wager options and resolving
+  // payouts. This keeps betting optional and data-driven.
+  getPreFightBettingConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.preFightBetting) return null;
+    var min = room.bettingMinWager != null ? room.bettingMinWager : 100;
+    var max = room.bettingMaxWager != null ? room.bettingMaxWager : 1000;
+    var multipliers = room.bettingPayoutMultipliers || { lowRisk:1.2, mediumRisk:1.6, highRisk:2.2 };
+    return {
+      active: true,
+      minWager: min,
+      maxWager: max,
+      payoutMultipliers: {
+        lowRisk: multipliers.lowRisk || 1.2,
+        mediumRisk: multipliers.mediumRisk || 1.6,
+        highRisk: multipliers.highRisk || 2.2
+      }
+    };
+  },
   // Crowd Funding System helpers
   // Arena zones with crowdFunding:true can accumulate a between-rooms
   // "donation" pool based on fight performance and current hype. Combat
@@ -653,6 +683,25 @@ window.MMA.Zones = {
         scene.registry.set('crowdMaxBonus', 0);
         scene.registry.set('crowdDamageBonus', 0);
         scene.registry.set('crowdLabel', '');
+      }
+      // Pre-Fight Betting metadata: optional wager layer for select arena rooms.
+      // When active, UI can surface bet choices and combat systems can
+      // resolve payouts after the room is cleared.
+      var bettingCfg = this.getPreFightBettingConfig(room.id);
+      if (bettingCfg && bettingCfg.active) {
+        scene.registry.set('bettingActive', true);
+        scene.registry.set('bettingMinWager', bettingCfg.minWager);
+        scene.registry.set('bettingMaxWager', bettingCfg.maxWager);
+        scene.registry.set('bettingPayoutMultipliers', bettingCfg.payoutMultipliers);
+        scene.time.delayedCall(2100, function(){
+          scene.registry.set('gameMessage', 'Pre-Fight Betting: place wagers before the bell for bonus rewards.');
+          scene.time.delayedCall(2300, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('bettingActive', false);
+        scene.registry.set('bettingMinWager', 0);
+        scene.registry.set('bettingMaxWager', 0);
+        scene.registry.set('bettingPayoutMultipliers', { lowRisk:1.0, mediumRisk:1.0, highRisk:1.0 });
       }
       // Crowd Funding System metadata: arena-only donation pool based on
       // fight performance and hype. This is intentionally light-touch –

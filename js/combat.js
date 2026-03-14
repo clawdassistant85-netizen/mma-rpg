@@ -64,6 +64,12 @@ window.MMA.Combat = {
   GUARD_CRUSH_WINDOW_MS: 2000,
   GUARD_CRUSH_RELEASE_MS: 1000,
   GUARD_CRUSH_CHIP_PER_SECOND: 4,
+  BREAKTHROUGH_BLOCKS_REQUIRED: 5,
+  BREAKTHROUGH_WINDOW_MS: 3000,
+  BREAKTHROUGH_DURATION_MS: 3000,
+  BREAKTHROUGH_DAMAGE_MULTIPLIER: 1.25,
+  BREAKTHROUGH_MOVE_SPEED_MULTIPLIER: 1.1,
+  BREAKTHROUGH_FOCUS_BONUS: 10,
   WHIFF_SHIFT_MISSES_REQUIRED: 2,
   WHIFF_SHIFT_DAMAGE_MULTIPLIER: 1.25,
   MOMENTUM_SHIFT_HITS_REQUIRED: 3,
@@ -386,12 +392,59 @@ window.MMA.Combat = {
   },
   isBlocking: function(scene) {
     if (!scene || !scene.player) return false;
+    if (this.isBreakthroughActive(scene)) return false;
     if (scene.blockKey && scene.blockKey.isDown) return true;
     if (scene.guardKey && scene.guardKey.isDown) return true;
     if (scene.player.isBlocking || scene.player.blocking) return true;
     if (scene.player.blockState && scene.player.blockState.active) return true;
     if (scene.movementState && scene.movementState.isBlocking) return true;
     return false;
+  },
+  ensureBreakthroughState: function(scene) {
+    scene.player.breakthroughState = scene.player.breakthroughState || {
+      activeUntil: 0,
+      awardedFocusAt: 0
+    };
+    return scene.player.breakthroughState;
+  },
+  isBreakthroughActive: function(scene) {
+    if (!scene || !scene.player) return false;
+    var state = this.ensureBreakthroughState(scene);
+    return scene.time.now < (state.activeUntil || 0);
+  },
+  triggerBreakthrough: function(scene) {
+    if (!scene || !scene.player) return false;
+    var state = this.ensureBreakthroughState(scene);
+    state.activeUntil = scene.time.now + this.BREAKTHROUGH_DURATION_MS;
+    state.awardedFocusAt = 0;
+    scene.player.combatMoveSpeedMultiplier = this.BREAKTHROUGH_MOVE_SPEED_MULTIPLIER;
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 128, 'GUARD BROKEN!', '#ff7b7b');
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 146, 'BREAKTHROUGH x1.25 DMG', '#ffd6a5');
+    return true;
+  },
+  refreshBreakthroughState: function(scene) {
+    if (!scene || !scene.player) return null;
+    var state = this.ensureBreakthroughState(scene);
+    if (scene.time.now < (state.activeUntil || 0)) {
+      scene.player.combatMoveSpeedMultiplier = this.BREAKTHROUGH_MOVE_SPEED_MULTIPLIER;
+      return state;
+    }
+    if (state.activeUntil && !state.awardedFocusAt) {
+      state.awardedFocusAt = scene.time.now;
+      scene.player.combatMoveSpeedMultiplier = 1;
+      this.gainFocus(scene, this.BREAKTHROUGH_FOCUS_BONUS);
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 128, 'BREAKTHROUGH END +10 FOCUS', '#9be7ff');
+    } else if (!state.activeUntil) {
+      scene.player.combatMoveSpeedMultiplier = 1;
+    }
+    return state;
+  },
+  applyBreakthroughDamageIfActive: function(scene, damage) {
+    if (!this.isBreakthroughActive(scene)) return { damage: damage, active: false };
+    return {
+      damage: Math.round(damage * this.BREAKTHROUGH_DAMAGE_MULTIPLIER),
+      active: true
+    };
   },
   ensureGuardCrushState: function(scene) {
     scene.player.guardCrushState = scene.player.guardCrushState || {
@@ -419,10 +472,13 @@ window.MMA.Combat = {
       state.lastSeenBlockAt = lastBlockAt;
     }
 
-    if (!state.active && state.blocksInWindow >= this.GUARD_CRUSH_BLOCKS_REQUIRED && now - state.firstBlockAt <= this.GUARD_CRUSH_WINDOW_MS) {
-      state.active = true;
+    if (!state.active && state.blocksInWindow >= this.BREAKTHROUGH_BLOCKS_REQUIRED && now - state.firstBlockAt <= this.BREAKTHROUGH_WINDOW_MS) {
+      this.triggerBreakthrough(scene);
+      state.active = false;
+      state.blocksInWindow = 0;
+      state.firstBlockAt = 0;
       state.releaseStartedAt = 0;
-      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 122, 'GUARD CRUSHED!', '#ff7b7b');
+      state.chipCarry = 0;
     }
 
     if (state.active) {
@@ -447,6 +503,7 @@ window.MMA.Combat = {
   },
   applyGuardCrushChip: function(scene, delta) {
     var state = this.refreshGuardCrushState(scene);
+    if (this.isBreakthroughActive(scene)) return state;
     if (!state.active || !this.isBlocking(scene) || !scene.player || !scene.player.stats) return state;
 
     var chipPerMs = this.GUARD_CRUSH_CHIP_PER_SECOND / 1000;
@@ -1356,8 +1413,9 @@ window.MMA.Combat = {
         var baseDamage = Math.round((move.damage + attackBonus) * 1.2);
         var intuitionDamage = intuitionPrimed ? Math.round(baseDamage * this.INTUITION_DAMAGE_MULTIPLIER) : baseDamage;
         var adrenalineDamage = adrenalinePrimed ? Math.round(intuitionDamage * this.ADRENALINE_DAMAGE_MULTIPLIER) : intuitionDamage;
+        var breakthroughAdjusted = this.applyBreakthroughDamageIfActive(scene, adrenalineDamage);
         this.maybeTriggerMomentumShift(scene, counterAttack);
-        var momentumShiftAdjusted = this.applyMomentumShiftIfActive(scene, adrenalineDamage);
+        var momentumShiftAdjusted = this.applyMomentumShiftIfActive(scene, breakthroughAdjusted.damage);
         var momentum = this.getMomentumModifiers(scene, momentumShiftAdjusted.damage);
         var momentumDamage = momentum.surgeReady ? Math.round(momentum.damage * this.MOMENTUM_SURGE_DAMAGE_MULTIPLIER) : momentum.damage;
         var exploitRecovery = this.applyExploitRecoveryIfActive(scene, momentumDamage);
@@ -1427,8 +1485,9 @@ window.MMA.Combat = {
         if (breakingPointAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 120, 'BREAKING POINT OPEN!', '#ff8fab');
         if (exploitRecovery.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 112, 'EXPLOIT WINDOW x1.3', '#44d6ff');
         if (whiffShift.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 136, 'WHIFF SHIFT x1.25', '#8be9fd');
-        if (momentumShiftAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 148, 'MOMENTUM SHIFT x1.2', '#66f2ff');
-        if (styleMasteryApplied.consumed) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 156, 'STYLE MASTERY x1.4', '#c8b6ff');
+        if (breakthroughAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 148, 'BREAKTHROUGH x1.25', '#ffd6a5');
+        if (momentumShiftAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 160, 'MOMENTUM SHIFT x1.2', '#66f2ff');
+        if (styleMasteryApplied.consumed) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 168, 'STYLE MASTERY x1.4', '#c8b6ff');
         if (staminaBreakDamage.staminaBreakActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 92, 'STAMINA BREAK x1.5', '#ffd166');
         var staminaState = this.onEnemyStaminaHit(scene, enemy, move);
         if (staminaState.brokeNow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 110, 'STAMINA BROKEN!', '#ff9f1c');
@@ -1506,8 +1565,9 @@ window.MMA.Combat = {
         var baseDamage = Math.round((move.damage + attackBonus) * 1.2);
         var intuitionDamage = intuitionPrimed ? Math.round(baseDamage * this.INTUITION_DAMAGE_MULTIPLIER) : baseDamage;
         var adrenalineDamage = adrenalinePrimed ? Math.round(intuitionDamage * this.ADRENALINE_DAMAGE_MULTIPLIER) : intuitionDamage;
+        var breakthroughAdjusted = this.applyBreakthroughDamageIfActive(scene, adrenalineDamage);
         this.maybeTriggerMomentumShift(scene, counterAttack);
-        var momentumShiftAdjusted = this.applyMomentumShiftIfActive(scene, adrenalineDamage);
+        var momentumShiftAdjusted = this.applyMomentumShiftIfActive(scene, breakthroughAdjusted.damage);
         var momentum = this.getMomentumModifiers(scene, momentumShiftAdjusted.damage);
         var momentumDamage = momentum.surgeReady ? Math.round(momentum.damage * this.MOMENTUM_SURGE_DAMAGE_MULTIPLIER) : momentum.damage;
         var exploitRecovery = this.applyExploitRecoveryIfActive(scene, momentumDamage);
@@ -1572,8 +1632,9 @@ window.MMA.Combat = {
         if (breakingPointAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 122, 'BREAKING POINT OPEN!', '#ff8fab');
         if (exploitRecovery.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 114, 'EXPLOIT WINDOW x1.3', '#44d6ff');
         if (whiffShift.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 132, 'WHIFF SHIFT x1.25', '#8be9fd');
-        if (momentumShiftAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 144, 'MOMENTUM SHIFT x1.2', '#66f2ff');
-        if (styleMasteryApplied.consumed) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 152, 'STYLE MASTERY x1.4', '#c8b6ff');
+        if (breakthroughAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 144, 'BREAKTHROUGH x1.25', '#ffd6a5');
+        if (momentumShiftAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 156, 'MOMENTUM SHIFT x1.2', '#66f2ff');
+        if (styleMasteryApplied.consumed) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 164, 'STYLE MASTERY x1.4', '#c8b6ff');
         if (staminaBreakDamage.staminaBreakActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 84, 'STAMINA BREAK x1.5', '#ffd166');
         var staminaState = this.onEnemyStaminaHit(scene, enemy, move);
         if (staminaState.brokeNow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 102, 'STAMINA BROKEN!', '#ff9f1c');
@@ -1664,6 +1725,7 @@ window.MMA.Combat = {
   handleInput: function(scene, delta) {
     this.refreshChainCounterState(scene);
     this.refreshMomentumShiftState(scene);
+    this.refreshBreakthroughState(scene);
     this.applyGuardCrushChip(scene, delta);
     if (scene.player.stunnedUntil && scene.time.now < scene.player.stunnedUntil) {
       var attemptedRecoveryTech =

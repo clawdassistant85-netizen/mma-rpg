@@ -24,6 +24,7 @@ var BootScene = new Phaser.Class({
     this.installMuscleTensionHook();
     this.installExertionCueHook();
     this.installLastChancePulseHook();
+    this.installFightIqAuraReadHook();
     this.scene.start('GameScene');
     this.scene.stop('BootScene');
   },
@@ -1907,5 +1908,136 @@ var BootScene = new Phaser.Class({
     };
 
     Phaser.Physics.Arcade.Sprite.prototype._mmaLastChancePulseHookInstalled = true;
+  },
+  installFightIqAuraReadHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaFightIqAuraReadHookInstalled) return;
+
+    function getReadConfig() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.ATTACK_READ_CONFIG) || {};
+    }
+
+    function getReadTextures() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.ATTACK_READ_TEXTURES) || {};
+    }
+
+    function ensureReadAura(sprite, side) {
+      if (!sprite || !sprite.scene || !sprite.active) return null;
+      sprite._mmaAttackReadAura = sprite._mmaAttackReadAura || {};
+      if (sprite._mmaAttackReadAura[side] && sprite._mmaAttackReadAura[side].active) return sprite._mmaAttackReadAura[side];
+      var textures = getReadTextures();
+      var aura = sprite.scene.add.image(sprite.x, sprite.y, textures.default || 'attack_read_default');
+      aura.setBlendMode(Phaser.BlendModes.ADD);
+      aura.setVisible(false);
+      aura.setDepth((sprite.depth || 0) + 3);
+      sprite._mmaAttackReadAura[side] = aura;
+      return aura;
+    }
+
+    function hideReadAuras(sprite) {
+      if (!sprite || !sprite._mmaAttackReadAura) return;
+      Object.keys(sprite._mmaAttackReadAura).forEach(function(side) {
+        if (sprite._mmaAttackReadAura[side]) sprite._mmaAttackReadAura[side].setVisible(false);
+      });
+    }
+
+    function inferAttackType(key) {
+      var token = String(key || '').toLowerCase();
+      if (!token) return 'default';
+      if (token.indexOf('grapple') !== -1 || token.indexOf('throw') !== -1 || token.indexOf('clinch') !== -1 || token.indexOf('slam') !== -1 || token.indexOf('take') !== -1 || token.indexOf('submission') !== -1) return 'grapple';
+      if (token.indexOf('haymaker') !== -1 || token.indexOf('overhand') !== -1 || token.indexOf('power') !== -1) return 'haymaker';
+      if (token.indexOf('hook') !== -1) return 'hook';
+      if (token.indexOf('cross') !== -1 || token.indexOf('straight') !== -1) return 'cross';
+      if (token.indexOf('jab') !== -1) return 'jab';
+      return 'default';
+    }
+
+    function inferAttackSide(key) {
+      var token = String(key || '').toLowerCase();
+      if (token.indexOf('left') !== -1) return 'left';
+      if (token.indexOf('right') !== -1) return 'right';
+      if (token.indexOf('hook') !== -1) return 'left';
+      if (token.indexOf('cross') !== -1 || token.indexOf('overhand') !== -1) return 'right';
+      return 'right';
+    }
+
+    function updateCooldownSnapshot(sprite, time) {
+      if (!sprite || !sprite.cooldowns) return;
+      var cfg = getReadConfig();
+      var threshold = typeof cfg.cooldownThreshold === 'number' ? cfg.cooldownThreshold : 180;
+      var prev = sprite._mmaAttackReadCooldowns || {};
+      Object.keys(sprite.cooldowns).forEach(function(key) {
+        var nextValue = sprite.cooldowns[key] || 0;
+        var prevValue = prev[key] || 0;
+        if (nextValue > prevValue + threshold) {
+          sprite._mmaAttackReadType = inferAttackType(key);
+          sprite._mmaAttackReadSide = inferAttackSide(key);
+          sprite._mmaAttackReadUntil = time + (cfg.telegraphMs || 300);
+        }
+        prev[key] = nextValue;
+      });
+      sprite._mmaAttackReadCooldowns = prev;
+    }
+
+    function drawReadAura(sprite, time) {
+      if (!sprite || !sprite.active || !sprite.scene || sprite.scene.player === sprite) {
+        hideReadAuras(sprite);
+        return;
+      }
+      updateCooldownSnapshot(sprite, time);
+      if (!sprite._mmaAttackReadUntil || sprite._mmaAttackReadUntil <= time) {
+        hideReadAuras(sprite);
+        return;
+      }
+      var cfg = getReadConfig();
+      var textures = getReadTextures();
+      var type = sprite._mmaAttackReadType || 'default';
+      var side = sprite._mmaAttackReadSide || 'right';
+      var alphaLife = Phaser.Math.Clamp((sprite._mmaAttackReadUntil - time) / Math.max(1, cfg.telegraphMs || 300), 0, 1);
+      var bob = Math.sin(time * 0.02) * (cfg.bob || 1.4);
+      var primary = ensureReadAura(sprite, side);
+      var secondary = ensureReadAura(sprite, side === 'left' ? 'right' : 'left');
+      if (!primary) return;
+      if (secondary) secondary.setVisible(type === 'grapple');
+      var textureKey = textures[type] || textures.default;
+      if (primary.texture && primary.texture.key !== textureKey) primary.setTexture(textureKey);
+      var sideDir = side === 'left' ? -1 : 1;
+      primary.setVisible(true);
+      primary.setPosition(sprite.x + sideDir * 14, sprite.y - 18 + bob);
+      primary.setDepth((sprite.depth || 0) + 3);
+      primary.setScale((cfg.scale || 0.82) + (1 - alphaLife) * 0.18);
+      primary.setAlpha((cfg.alpha || 0.76) * alphaLife);
+      primary.setTint((cfg.colors && cfg.colors[type]) || (cfg.colors && cfg.colors.default) || 0xd7c8ff);
+      if (secondary && type === 'grapple') {
+        if (secondary.texture && secondary.texture.key !== textureKey) secondary.setTexture(textureKey);
+        secondary.setPosition(sprite.x - sideDir * 14, sprite.y - 18 - bob);
+        secondary.setDepth((sprite.depth || 0) + 3);
+        secondary.setScale((cfg.ringScale || 1.08) - (1 - alphaLife) * 0.12);
+        secondary.setAlpha((cfg.ringAlpha || 0.56) * alphaLife);
+        secondary.setTint((cfg.colors && cfg.colors.grapple) || 0x4d88ff);
+      }
+    }
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+      if (!this.active || !this.scene || !this._mmaBaseTextureKey) {
+        hideReadAuras(this);
+        return;
+      }
+      drawReadAura(this, time);
+    };
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      if (this._mmaAttackReadAura) {
+        Object.keys(this._mmaAttackReadAura).forEach(function(side) {
+          if (this._mmaAttackReadAura[side]) this._mmaAttackReadAura[side].destroy();
+        }, this);
+        this._mmaAttackReadAura = null;
+      }
+      return originalDestroy.call(this, fromScene);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaFightIqAuraReadHookInstalled = true;
   }
 });

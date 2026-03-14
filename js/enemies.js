@@ -614,6 +614,11 @@ window.MMA.Enemies = {
 
     var adaptiveDef = this.getAdaptiveDefense(enemy, scene);
     var styleCounterDef = this.getStyleCounterDefenseMult(enemy, moveKey);
+    
+    // Show ADAPTED! feedback when enemy adapts to player's style
+    if (adaptiveDef > 1) {
+      this.showAdaptiveFeedback(scene, enemy);
+    }
 
     // Apply vengeance defense penalty (player hits harder)
     var vengeanceDef = this.getVengeanceDefenseMult(enemy);
@@ -1100,7 +1105,11 @@ window.MMA.Enemies = {
     echo:{name:'Echo',hp:110,maxHp:110,speed:88,attackDamage:16,attackCooldownMax:1000,attackRange:60,chaseRange:250,color:0x9933ff,xpReward:65,teachesMove:null,zone:3,aiPattern:'echo',groundDefense:0.35,groundEscape:0.25},
 
     // Temperamental Enforcer: heavy enemy that enrages when allies are defeated — gains +30% attack speed but loses 10% accuracy
-    enforcer:{name:'Enforcer',hp:130,maxHp:130,speed:55,attackDamage:20,attackCooldownMax:1600,attackRange:65,chaseRange:220,color:0xff4444,xpReward:60,teachesMove:null,zone:2,aiPattern:'enforcer',groundDefense:0.5,groundEscape:0.4}
+    enforcer:{name:'Enforcer',hp:130,maxHp:130,speed:55,attackDamage:20,attackCooldownMax:1600,attackRange:65,chaseRange:220,color:0xff4444,xpReward:60,teachesMove:null,zone:2,aiPattern:'enforcer',groundDefense:0.5,groundEscape:0.4},
+
+    // Tank: slow, heavily armored enemy that absorbs hits and delivers slow but powerful strikes
+    // Designed to be a "wall" that players must work around - high defense, slow attacks, punishing to focus fire on
+    tank:{name:'Tank',hp:150,maxHp:150,speed:45,attackDamage:18,attackCooldownMax:1800,attackRange:55,chaseRange:200,color:0x555555,xpReward:50,teachesMove:null,zone:2,aiPattern:'tank',groundDefense:0.75,groundEscape:0.3}
   },
 
   // Temperamental Enforcer Config: triggers when allies die nearby
@@ -1325,7 +1334,8 @@ window.MMA.Enemies = {
     eliteGroundNPounder:{baseType:'groundNPounder',name:'Elite Ground Pounder',hpMultiplier:2,attackMultiplier:1.5,speedBonus:8,color:0xffaa66,colorGlow:0xff8800,xpMultiplier:2.5,dropChance:0.2,rareItem:'kneePads'},
     eliteBJJ:{baseType:'bjjBlackBelt',name:'Elite BJJ Master',hpMultiplier:2,attackMultiplier:1.7,speedBonus:18,color:0x444444,colorGlow:0x222222,xpMultiplier:3,dropChance:0.3,rareItem:'submissionGloves'},
     eliteStriker:{baseType:'striker',name:'Elite Striker',hpMultiplier:2,attackMultiplier:1.6,speedBonus:20,color:0xff6699,colorGlow:0xff0066,xpMultiplier:2.5,dropChance:0.22,rareItem:'speedPotion'},
-    eliteKickboxer:{baseType:'kickboxer',name:'Elite Kickboxer',hpMultiplier:2,attackMultiplier:1.6,speedBonus:22,color:0x00ffff,colorGlow:0x00cccc,xpMultiplier:2.5,dropChance:0.22,rareItem:'speedPotion'}
+    eliteKickboxer:{baseType:'kickboxer',name:'Elite Kickboxer',hpMultiplier:2,attackMultiplier:1.6,speedBonus:22,color:0x00ffff,colorGlow:0x00cccc,xpMultiplier:2.5,dropChance:0.22,rareItem:'speedPotion'},
+    eliteTank:{baseType:'tank',name:'Heavy Tank',hpMultiplier:2.2,attackMultiplier:1.7,speedBonus:8,color:0x666666,colorGlow:0x444444,xpMultiplier:2.8,dropChance:0.25,rareItem:'armorPlating'}
   },
   // Chance to spawn elite instead of regular (15%)
   ELITE_SPAWN_CHANCE: 0.15,
@@ -1338,7 +1348,8 @@ window.MMA.Enemies = {
     wrestlingBoots:{name:'Wrestling Boots',stat:'speed',value:8,duration:30000,color:0x0088ff,description:'+8 Speed for 30s'},
     giBelt:{name:'Gi Belt',stat:'defense',value:5,duration:30000,color:0xff8800,description:'+5 Defense for 30s'},
     kneePads:{name:'Knee Pads',stat:'hp',value:20,duration:0,color:0xaa8800,description:'+20 Max HP (permanent)'},
-    submissionGloves:{name:'Submission Gloves',stat:'attackDamage',value:8,duration:45000,color:0x8800ff,description:'+8 Attack for 45s'}
+    submissionGloves:{name:'Submission Gloves',stat:'attackDamage',value:8,duration:45000,color:0x8800ff,description:'+8 Attack for 45s'},
+    armorPlating:{name:'Armor Plating',stat:'defense',value:8,duration:60000,color:0x888888,description:'+8 Defense for 60s'}
   },
   
   // Spawn a rare item pickup
@@ -2072,6 +2083,9 @@ window.MMA.Enemies = {
     // Enforcer
     if (ai === 'enforcer') return '🐂';
 
+    // Tank
+    if (ai === 'tank') return '🛡';
+
     return '⚔';
   },
 
@@ -2444,6 +2458,18 @@ window.MMA.Enemies = {
         var currentType = pool[replaceIdx];
         if (currentType !== 'mmaChamp' && currentType !== 'shadowRival' && currentType !== 'coach' && currentType !== 'tutor' && currentType !== 'glitcher' && currentType !== 'echo') {
           pool[replaceIdx] = 'enforcer';
+        }
+      }
+    }
+
+    // Tank: uncommon spawn in zone 2+ (slow heavy hitter, high defense)
+    if (z >= 2 && positions && positions.length && pool && pool.length) {
+      var tankChance = 0.05 + (z - 2) * 0.015; // 5% in zone2 → up to ~8%
+      if (Math.random() < tankChance) {
+        var replaceIdx = Math.floor(Math.random() * pool.length);
+        var currentType = pool[replaceIdx];
+        if (currentType !== 'mmaChamp' && currentType !== 'shadowRival' && currentType !== 'coach' && currentType !== 'tutor' && currentType !== 'glitcher' && currentType !== 'echo' && currentType !== 'enforcer') {
+          pool[replaceIdx] = 'tank';
         }
       }
     }
@@ -3182,6 +3208,84 @@ window.MMA.Enemies.AI = {
     } else enemy.setVelocity(0,0); 
     if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt; 
   },
+
+  // Tank AI: slow, methodical, heavy hitter with long windup telegraph
+  // Designed as a "wall" - high defense, slow attacks that punish players who focus fire
+  tank: function(enemy, player, scene, dt) {
+    var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+    var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
+
+    // Tank has special states: windup -> strike -> recovery
+    if (enemy.aiState === 'windup') {
+      // Standing still, preparing heavy strike - telegraph to player
+      enemy.setVelocity(0, 0);
+      enemy.windupTimer -= dt;
+      if (enemy.windupTimer <= 0) {
+        // Execute heavy strike
+        enemy.aiState = 'striking';
+        enemy.strikeTimer = 150;
+        var baseDmg = enemy.type.attackDamage * 1.5; // Heavy hit bonus
+        var dmg = Math.round(baseDmg * vulnMult * 
+          (window.MMA.Enemies.getPackDamageMultiplier ? window.MMA.Enemies.getPackDamageMultiplier(enemy, scene) : 1) * 
+          (window.MMA.Enemies.getVengeanceDamageMult ? window.MMA.Enemies.getVengeanceDamageMult(enemy) : 1) * 
+          (window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(enemy, scene) : 1));
+        
+        if (!window.MMA.Enemies.startTelegraphAttack(enemy, player, scene, dmg, 0, 'HEAVY STRIKE!', '#888888', 'SHOULDER DIP')) {
+          window.MMA.Enemies.damagePlayer(enemy, scene, dmg);
+        }
+        MMA.UI.showDamageText(scene, enemy.x, enemy.y - 35, 'SMASH!', '#888888');
+      }
+      return;
+    }
+
+    if (enemy.aiState === 'striking') {
+      enemy.setVelocity(0, 0);
+      enemy.strikeTimer -= dt;
+      if (enemy.strikeTimer <= 0) {
+        enemy.aiState = 'recovering';
+        enemy.recoveryTimer = 1200 * attackMod; // Long recovery after heavy hit
+      }
+      return;
+    }
+
+    if (enemy.aiState === 'recovering') {
+      // Slowly back away during recovery
+      enemy.setVelocity(-(dx/dist) * enemy.type.speed * 0.3 * speedMod, -(dy/dist) * enemy.type.speed * 0.3 * speedMod);
+      enemy.recoveryTimer -= dt;
+      if (enemy.recoveryTimer <= 0) {
+        enemy.aiState = null;
+      }
+      return;
+    }
+
+    // Normal behavior: approach slowly
+    if (dist < enemy.type.chaseRange) {
+      if (dist < enemy.type.attackRange) {
+        // In range - start windup
+        enemy.setVelocity(0, 0);
+        var isEliteBreaker = window.MMA.Enemies.canEliteBreakCoordination(enemy);
+        if ((enemy.hasAttackToken || enemy.isBoss || isEliteBreaker) && enemy.attackCooldown <= 0) {
+          enemy.aiState = 'windup';
+          enemy.windupTimer = 500; // 500ms windup gives player time to react
+          enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod;
+          
+          // Show telegraph
+          if (!window.MMA.Enemies.startTelegraphAttack(enemy, player, scene, 0, 450, 'BRACING...', '#aaaaaa', 'SHOULDER DIP')) {
+            // If telegraph fails, attack immediately
+          }
+        }
+      } else {
+        // Approach slowly - tanks don't rush
+        enemy.setVelocity((dx/dist) * enemy.type.speed * 0.5 * speedMod, (dy/dist) * enemy.type.speed * 0.5 * speedMod);
+      }
+    } else {
+      enemy.setVelocity(0, 0);
+    }
+    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
+  },
+
   kicker: function(enemy, player, scene, dt){ 
     var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1; 
     var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);

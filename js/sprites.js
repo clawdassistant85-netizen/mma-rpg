@@ -138,6 +138,24 @@ window.MMA.Sprites = {
     labelCooldown: 1800
   },
   LAST_CHANCE_TEXTURES: {},
+  ATTACK_READ_CONFIG: {
+    telegraphMs: 300,
+    cooldownThreshold: 180,
+    alpha: 0.76,
+    ringAlpha: 0.56,
+    scale: 0.82,
+    ringScale: 1.08,
+    bob: 1.4,
+    colors: {
+      jab: 0xffe066,
+      cross: 0xff9f1c,
+      hook: 0xff5a36,
+      haymaker: 0xff3b30,
+      grapple: 0x4d88ff,
+      default: 0xd7c8ff
+    }
+  },
+  ATTACK_READ_TEXTURES: {},
   VISUAL_VARIANTS: {},
   EQUIPMENT_TEXTURES: {},
   STYLE_AURA_COLORS: {
@@ -530,6 +548,16 @@ window.MMA.Sprites = {
       g.fillStyle(0xffffff, alpha * 0.42); g.fillCircle(12, 12, 4);
       g.generateTexture(key, 24, 24); g.destroy();
     }
+    function textureAttackReadHalo(key, opts) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var color = (opts && opts.color) || 0xd7c8ff;
+      var alpha = (opts && typeof opts.alpha === 'number') ? opts.alpha : 0.78;
+      g.fillStyle(color, alpha * 0.22); g.fillEllipse(16, 16, 22, 22);
+      g.fillStyle(color, alpha * 0.42); g.fillEllipse(16, 16, 14, 14);
+      g.lineStyle(2, color, alpha); g.strokeEllipse(16, 16, 18, 18);
+      g.lineStyle(1, 0xffffff, alpha * 0.4); g.strokeEllipse(16, 16, 26, 26);
+      g.generateTexture(key, 32, 32); g.destroy();
+    }
 
     textureFloorStreet('floor'); textureWallStreet('wall'); textureGymFloor('gymFloor'); textureGymWall('gymWalls');
     textureCageFloor('cageFloor'); textureCageWall('cageWall'); textureCrate('crateProp'); textureDebris('debrisProp'); textureLamp('lampProp');
@@ -656,6 +684,14 @@ window.MMA.Sprites = {
     textureBreathPuff('exertion_breath_heavy', { color: 0xe7f8ff, alpha: 0.88 });
     textureBreathPuff('exertion_breath_recovery', { color: 0xa8f0ff, alpha: 0.8 });
     textureStumbleSpark('exertion_stumble', { color: 0xffd3a6, alpha: 0.96 });
+    var attackReadCfg = window.MMA.Sprites.ATTACK_READ_CONFIG || {};
+    var attackReadColors = attackReadCfg.colors || {};
+    textureAttackReadHalo('attack_read_jab', { color: attackReadColors.jab || 0xffe066, alpha: attackReadCfg.alpha || 0.76 });
+    textureAttackReadHalo('attack_read_cross', { color: attackReadColors.cross || 0xff9f1c, alpha: attackReadCfg.alpha || 0.76 });
+    textureAttackReadHalo('attack_read_hook', { color: attackReadColors.hook || 0xff5a36, alpha: attackReadCfg.alpha || 0.76 });
+    textureAttackReadHalo('attack_read_haymaker', { color: attackReadColors.haymaker || 0xff3b30, alpha: attackReadCfg.alpha || 0.76 });
+    textureAttackReadHalo('attack_read_grapple', { color: attackReadColors.grapple || 0x4d88ff, alpha: attackReadCfg.alpha || 0.76 });
+    textureAttackReadHalo('attack_read_default', { color: attackReadColors.default || 0xd7c8ff, alpha: attackReadCfg.alpha || 0.76 });
     window.MMA.Sprites.IMPACT_PARTICLE_TEXTURES = {
       sweat: 'impact_sweat',
       heavySweat: 'impact_sweat_heavy'
@@ -674,6 +710,14 @@ window.MMA.Sprites = {
       heavyBreath: 'exertion_breath_heavy',
       recoveryBreath: 'exertion_breath_recovery',
       stumble: 'exertion_stumble'
+    };
+    window.MMA.Sprites.ATTACK_READ_TEXTURES = {
+      jab: 'attack_read_jab',
+      cross: 'attack_read_cross',
+      hook: 'attack_read_hook',
+      haymaker: 'attack_read_haymaker',
+      grapple: 'attack_read_grapple',
+      default: 'attack_read_default'
     };
     textureHitbox('hitbox');
   },
