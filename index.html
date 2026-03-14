@@ -10,16 +10,69 @@
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 
-    /* Shell so UI overlays can anchor to the same centered area */
-    #game-shell { position: relative; display: inline-block; max-width: 100vw; max-height: 100vh; }
+    #game-shell {
+      position: relative;
+      display: flex;
+      max-width: 100vw;
+      max-height: 100vh;
+    }
+    /* Portrait: controls below canvas */
+    @media (orientation: portrait) {
+      #game-shell {
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: center;
+      }
+      #game-container {
+        width: 100%;
+        max-height: 55vh;
+        flex-shrink: 0;
+      }
+      #controls-container {
+        flex: 1;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding: 10px;
+        width: 100%;
+        max-height: 45vh;
+      }
+    }
+    /* Landscape: controls on sides of canvas */
+    @media (orientation: landscape) {
+      #game-shell {
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+      }
+      #game-container {
+        max-width: 55vw;
+        max-height: 100vh;
+        flex-shrink: 0;
+      }
+      #controls-container {
+        flex: 1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 100%;
+        padding: 10px;
+      }
+    }
     #game-container { max-width: 100vw; max-height: 100vh; }
     #game-container canvas { display: block; max-width: 100vw; max-height: 100vh; width: 100%; height: auto; -webkit-tap-highlight-color: transparent; }
 
     /* UI layer (DOM) */
-    #ui-layer { position: absolute; inset: 0; pointer-events: none; }
+    #ui-layer { pointer-events: none; }
+
+    /* Controls wrapper for flex layout */
+    #controls-container {
+      pointer-events: auto;
+      touch-action: none;
+    }
 
     /* D-pad (bottom-left) */
-    #dpad { position: absolute; left: 18px; bottom: 18px; width: 100px; height: 100px; pointer-events: auto; touch-action: none; }
+    #dpad { width: 100px; height: 100px; }
     #dpad .dpad-base {
       position: absolute; inset: 0;
       border-radius: 50%;
@@ -54,11 +107,35 @@
     #dpad .dpad-left { left: 6px; top: 31px; }
     #dpad .dpad-right { right: 6px; top: 31px; }
 
-    /* Action buttons (bottom-right diamond layout) */
+    /* Stand Up button - separate utility button near d-pad */
+    #standup-btn {
+      width: 50px;
+      height: 32px;
+      border-radius: 8px;
+      border: 0;
+      background: rgba(255, 180, 0, 0.85);
+      color: #1a1a1a;
+      font: 700 10px/32px system-ui, sans-serif;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      transform: translateZ(0) scale(1);
+      transition: transform 80ms ease, background 80ms ease;
+      margin-left: 8px;
+      margin-bottom: 50px;
+    }
+    #standup-btn:active, #standup-btn.active {
+      transform: translateZ(0) scale(0.92);
+      background: rgba(255, 200, 50, 0.95);
+    }
+    #standup-btn:disabled {
+      background: rgba(100, 100, 100, 0.5);
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    /* Action buttons (right side in flex layout) */
     #action-cluster {
-      position: absolute;
-      right: 18px;
-      bottom: 24px;
       width: 176px;
       height: 154px;
       pointer-events: auto;
@@ -140,29 +217,29 @@
     }
     #mobile-pause-btn:active { transform: scale(0.95); }
 
-    #ground-overlay {
+    #health-pulse-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(0, 0, 0, 0.45);
-      display: none;
       pointer-events: none;
+      opacity: 0;
+      z-index: 25;
+      box-shadow: inset 0 0 0 0 rgba(255, 0, 0, 0);
+      transition: box-shadow 300ms ease;
     }
-    #ground-overlay .ground-text {
-      position: absolute;
-      top: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: #f3d36b;
-      font: 800 24px/1.2 system-ui, sans-serif;
-      letter-spacing: 0.08em;
-      text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+    #health-pulse-overlay.active {
+      animation: healthPulse 800ms ease-in-out infinite;
     }
+    @keyframes healthPulse {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+    
     #ground-timer {
       position: absolute;
       left: 50%;
       transform: translateX(-50%);
-      top: 50px;
-      width: 220px;
+      top: 85px;
+      width: 180px;
       height: 10px;
       background: rgba(255,255,255,0.2);
       border-radius: 8px;
@@ -183,24 +260,6 @@
     }
     #ground-banner.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
     
-    /* Health Pulse Warning - red vignette when HP < 25% */
-    #health-pulse-overlay {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      opacity: 0;
-      z-index: 25;
-      box-shadow: inset 0 0 0 0 rgba(255, 0, 0, 0);
-      transition: box-shadow 300ms ease;
-    }
-    #health-pulse-overlay.active {
-      animation: healthPulse 800ms ease-in-out infinite;
-    }
-    @keyframes healthPulse {
-      0%, 100% { opacity: 0; }
-      50% { opacity: 1; }
-    }
-    
     #dom-restart-btn {
       position: absolute;
       left: 50%;
@@ -216,29 +275,31 @@
       font-weight: 800;
     }
 
-    @media (orientation: landscape) {
-      #dpad { left: 10px; bottom: 10px; width: 88px; height: 88px; }
-      #action-cluster { right: 10px; bottom: 10px; width: 152px; height: 128px; }
-    }
-
     @media (pointer: fine) {
       /* Hide touch controls on desktop */
-      #dpad { display: none; }
-      #action-cluster { display: none; }
+      #controls-container { display: none !important; }
     }
   </style>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div id="game-shell">
-    <div id="game-container"></div>
-    <!-- UI layer (mobile touch controls) -->
-    <div id="ui-layer" aria-hidden="true">
-      <div id="health-pulse-overlay"></div>
-      <div id="ground-overlay"><div class="ground-text">GROUND GAME</div><div id="ground-timer"><div id="ground-timer-fill"></div></div></div>
-      <button id="mobile-pause-btn" type="button" aria-label="Pause menu">⚙️</button>
-      <div id="ground-banner">TAKEDOWN!</div>
-      <button id="dom-restart-btn" type="button">RESTART (ENTER)</button>
+    <div id="game-container">
+      <!-- UI layer (mobile touch controls) - positioned relative to game-container -->
+      <div id="ui-layer" aria-hidden="true">
+        <div id="health-pulse-overlay"></div>
+        <div id="ground-overlay">
+          <div class="ground-text">GROUND GAME</div>
+          <div class="position-text">FULL GUARD</div>
+          <div id="ground-timer"><div id="ground-timer-fill"></div></div>
+        </div>
+        <button id="mobile-pause-btn" type="button" aria-label="Pause menu">⚙️</button>
+        <div id="ground-banner">TAKEDOWN!</div>
+        <button id="dom-restart-btn" type="button">RESTART (ENTER)</button>
+      </div>
+    </div>
+    <!-- Controls container: d-pad on left, action buttons on right -->
+    <div id="controls-container">
       <div id="dpad" class="touch-control" aria-label="D-pad">
         <div class="dpad-base"></div>
         <button class="dpad-btn dpad-up" data-dir="up" aria-label="Up">▲</button>
@@ -246,6 +307,8 @@
         <button class="dpad-btn dpad-left" data-dir="left" aria-label="Left">◀</button>
         <button class="dpad-btn dpad-right" data-dir="right" aria-label="Right">▶</button>
       </div>
+      <!-- Stand Up button - separate from action cluster -->
+      <button id="standup-btn" type="button" aria-label="Stand Up">STAND</button>
       <!-- Action buttons cluster -->
       <div id="action-cluster" class="touch-control" aria-label="Action Buttons">
         <button class="action-btn" data-action="jab" aria-label="Jab">Jab</button>
@@ -256,17 +319,17 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=16"></script>
-  <script src="js/sprites.js?v=16"></script>
-  <script src="js/combat.js?v=16"></script>
-  <script src="js/enemies.js?v=16"></script>
-  <script src="js/zones.js?v=16"></script>
-  <script src="js/player.js?v=16"></script>
-  <script src="js/items.js?v=16"></script>
-  <script src="js/outfits.js?v=16"></script>
-  <script src="js/vfx.js?v=16"></script>
-  <script src="js/ui.js?v=16"></script>
-  <script src="js/progression.js?v=16"></script>
+  <script src="js/config.js?v=17"></script>
+  <script src="js/sprites.js?v=17"></script>
+  <script src="js/combat.js?v=17"></script>
+  <script src="js/enemies.js?v=17"></script>
+  <script src="js/zones.js?v=17"></script>
+  <script src="js/player.js?v=17"></script>
+  <script src="js/items.js?v=17"></script>
+  <script src="js/outfits.js?v=17"></script>
+  <script src="js/vfx.js?v=17"></script>
+  <script src="js/ui.js?v=17"></script>
+  <script src="js/progression.js?v=17"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -336,6 +399,12 @@
         } else {
           gameScene.activeFighterDiary = window.MMA.UI.showFighterDiary(gameScene);
         }
+      }
+    }
+    // M key = Mini-map toggle
+    if (e.key === 'm' || e.key === 'M') {
+      if (isGameActive && gameScene.player && !gameScene.paused && !gameScene.gameOver) {
+        window.MMA.UI.showMiniMap(gameScene);
       }
     }
   });
@@ -510,19 +579,59 @@
       window.MMA_ACTION.jab = window.MMA_ACTION.heavy = window.MMA_ACTION.grapple = window.MMA_ACTION.special = false;
     });
   })();
+
+  // Stand Up button handling - separate from action cluster
+  (function setupStandUp(){
+    var btn = document.getElementById('standup-btn');
+    if (!btn) return;
+    if (!window.MMA_ACTION) window.MMA_ACTION = {};
+    window.MMA_ACTION.standup = false;
+    
+    function setStandUp(on){
+      window.MMA_ACTION.standup = !!on;
+    }
+    
+    btn.addEventListener('touchstart', function(e){
+      e.preventDefault();
+      setStandUp(true);
+      btn.classList.add('active');
+    }, {passive:false});
+    btn.addEventListener('touchend', function(e){
+      e.preventDefault();
+      setStandUp(false);
+      btn.classList.remove('active');
+    }, {passive:false});
+    btn.addEventListener('touchcancel', function(){
+      setStandUp(false);
+      btn.classList.remove('active');
+    });
+    btn.addEventListener('mousedown', function(e){
+      e.preventDefault();
+      setStandUp(true);
+      btn.classList.add('active');
+    });
+    window.addEventListener('mouseup', function(){
+      setStandUp(false);
+      btn.classList.remove('active');
+    });
+    window.addEventListener('blur', function(){
+      setStandUp(false);
+      btn.classList.remove('active');
+    });
+  })();
 </script>
 
-<script src="js/sounds.js?v=16"></script>
-  <script src="js/saveSystem.js?v=16"></script>
-  <script src="js/narrator.js?v=16"></script>
-  <script src="js/scenes/TitleScene.js?v=16"></script>
-  <script src="js/scenes/BootScene.js?v=16"></script>
-  <script src="js/scenes/GameScene.js?v=16"></script>
-  <script src="js/scenes/HUDScene.js?v=16"></script>
-  <script src="js/scenes/PauseScene.js?v=16"></script>
-  <script src="js/scenes/OutfitScene.js?v=16"></script>
-  <script src="js/scenes/UnlockScene.js?v=16"></script>
-  <script src="js/scenes/VictoryScene.js?v=16"></script>
-  <script src="js/main.js?v=16"></script>
+<script src="js/sounds.js?v=17"></script>
+  <script src="js/saveSystem.js?v=17"></script>
+  <script src="js/narrator.js?v=17"></script>
+  <script src="js/scenes/TitleScene.js?v=17"></script>
+  <script src="js/scenes/BootScene.js?v=17"></script>
+  <script src="js/scenes/GameScene.js?v=17"></script>
+  <script src="js/scenes/HUDScene.js?v=17"></script>
+  <script src="js/scenes/PauseScene.js?v=17"></script>
+  <script src="js/scenes/OutfitScene.js?v=17"></script>
+  <script src="js/scenes/UnlockScene.js?v=17"></script>
+  <script src="js/scenes/VictoryScene.js?v=17"></script>
+  <script src="js/main.js?v=17"></script>
 </body>
 </html>

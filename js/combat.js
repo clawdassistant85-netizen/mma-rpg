@@ -355,23 +355,148 @@ window.MMA.Combat = {
     var chance = Phaser.Math.Clamp(baseChance - (defense * 0.55), 0.1, 0.95);
     return Math.random() < chance;
   },
+  // Get submissions available for a given ground position
+  getSubmissionsForPosition: function(scene, position) {
+    var unlockedSubs = [];
+    if (scene && scene.player && scene.player.unlockedSubmissions) {
+      unlockedSubs = scene.player.unlockedSubmissions;
+    } else {
+      unlockedSubs = ['rnc']; // default
+    }
+    
+    // Position-based submission availability
+    var positionSubs = {
+      fullGuard: ['triangleChoke', 'armbar'],
+      halfGuard: ['kimura', 'americana'],
+      sideControl: ['americana', 'kimura'],
+      mount: ['armbar', 'americana', 'rnc'],
+      backControl: ['rnc', 'kimura', 'americana']
+    };
+    
+    var allowed = positionSubs[position] || positionSubs.fullGuard;
+    
+    // Return only unlocked submissions that are valid for this position
+    return allowed.filter(function(sub) {
+      return unlockedSubs.indexOf(sub) !== -1;
+    });
+  },
+  // Try to improve ground position
+  tryImprovePosition: function(scene, currentPosition) {
+    var s = scene.player.stats;
+    var skillLevel = s.grapplingLevel || 1;
+    
+    // Position improvement paths
+    var improvePaths = {
+      fullGuard: { halfGuard: 0.5, backControl: 0.25 },
+      halfGuard: { sideControl: 0.4, fullGuard: 0.3 },
+      sideControl: { mount: 0.35, halfGuard: 0.3 },
+      mount: { backControl: 0.4 },
+      backControl: { mount: 0.3 }
+    };
+    
+    var paths = improvePaths[currentPosition] || {};
+    var possiblePositions = Object.keys(paths);
+    
+    if (possiblePositions.length === 0) return false;
+    
+    // Higher skill = better chance
+    var skillBonus = Math.min(0.3, (skillLevel - 1) * 0.05);
+    
+    // Try each possible position in order of preference
+    for (var i = 0; i < possiblePositions.length; i++) {
+      var newPos = possiblePositions[i];
+      var chance = (paths[newPos] || 0.2) + skillBonus;
+      
+      if (Math.random() < chance) {
+        scene.groundState.position = newPos;
+        return true;
+      }
+    }
+    
+    // Failed to improve - small chance to at least transition to a worse position
+    if (Math.random() < 0.15) {
+      var fallback = { fullGuard: 'halfGuard', halfGuard: 'fullGuard', sideControl: 'halfGuard', mount: 'sideControl', backControl: 'mount' };
+      if (fallback[currentPosition]) {
+        scene.groundState.position = fallback[currentPosition];
+        return true;
+      }
+    }
+    
+    return false;
+  },
+  // Show filtered submission picker based on position
+  showSubmissionPickerFiltered: function(scene, validSubs) {
+    if (scene.groundState.submissionPickerShown) return;
+    scene.groundState.submissionPickerShown = true;
+    
+    var enemy = scene.groundState.enemy;
+    
+    // Show prompt
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 60, 'SELECT SUBMISSION', '#ff66ff');
+    
+    // Set up for next input to select submission
+    scene.groundState.waitingForSubmission = true;
+    scene.groundState.showingSubmissionPicker = true;
+  },
   executeGroundMove: function(scene, moveKey) {
     if (!scene.groundState || !scene.groundState.active || scene.gameOver) return;
     var map = { heavy: 'cross', grapple: 'takedown' };
     moveKey = map[moveKey] || moveKey;
-    if (moveKey === 'special') return scene.endGroundState('player-standup');
+    
+    // Handle stand up from the new standup button
+    if (moveKey === 'standup') {
+      var position = scene.groundState.position || 'fullGuard';
+      // Can only stand up from full guard or half guard
+      if (position === 'fullGuard' || position === 'halfGuard') {
+        return scene.endGroundState('player-standup');
+      }
+      return;
+    }
+    
+    // Handle position improvement (special button on ground)
+    if (moveKey === 'special') {
+      var pos = scene.groundState.position || 'fullGuard';
+      var improveSuccess = this.tryImprovePosition(scene, pos);
+      if (improveSuccess) {
+        // Show position change
+        var newPos = scene.groundState.position;
+        var posNames = { fullGuard: 'HALF GUARD', halfGuard: 'SIDE CONTROL', sideControl: 'MOUNT', mount: 'MOUNT', backControl: 'BACK CONTROL' };
+        MMA.UI.showGroundBanner(posNames[newPos] || 'POSITION UP!');
+      }
+      // Update UI to show new position
+      MMA.UI.setActionButtonLabels(true, scene);
+      MMA.UI.updateGroundHUD(scene);
+      return;
+    }
     
     // Handle submission selection - show submission picker if not already showing
     if (moveKey === 'takedown') {
-      // Check if we have unlocked submissions - show the submission picker
+      // Check if we have unlock submissions - show the submission picker
+      var position = scene.groundState.position || 'fullGuard';
+      var posSubs = this.getSubmissionsForPosition(scene, position);
+      
+      if (posSubs.length === 0) {
+        // No submissions available for this position, try to improve position instead
+        MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 60, 'NO SUBS! IMPROVE POSITION', '#ffaa33');
+        return;
+      }
+      
+      // Filter unlocked submissions to only those valid for current position
       var unlockedSubs = scene.player.unlockedSubmissions || ['rnc'];
+      var validSubs = posSubs.filter(function(sub) { return unlockedSubs.indexOf(sub) !== -1; });
+      
+      if (validSubs.length === 0) {
+        MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 60, 'NO SUBS FOR POS!', '#ffaa33');
+        return;
+      }
+      
       if (!scene.groundState.showingSubmissionPicker) {
-        this.showSubmissionPicker(scene);
+        this.showSubmissionPickerFiltered(scene, validSubs);
         return;
       }
       // If picker was shown and user selected, execute that submission
       var selectedSub = scene.groundState.selectedSubmission;
-      if (selectedSub) {
+      if (selectedSub && validSubs.indexOf(selectedSub) !== -1) {
         var subMove = this.MOVE_ROSTER[selectedSub];
         if (subMove) {
           this.executeSubmission(scene, selectedSub, subMove);
@@ -960,6 +1085,13 @@ window.MMA.Combat = {
       if (window.MMA_ACTION.heavy) { window.MMA_ACTION.heavy = false; this.executeAttack(scene, 'cross'); }
       if (window.MMA_ACTION.grapple) { window.MMA_ACTION.grapple = false; this.executeAttack(scene, 'takedown'); }
       if (window.MMA_ACTION.special) { window.MMA_ACTION.special = false; this.executeSpecialMove(scene); }
+      // Handle stand up button (separate utility button)
+      if (window.MMA_ACTION.standup) { 
+        window.MMA_ACTION.standup = false; 
+        if (scene.groundState && scene.groundState.active) {
+          this.executeGroundMove(scene, 'standup');
+        }
+      }
     }
     var cdMap = scene.player.cooldowns; Object.keys(cdMap).forEach(function(k){ if (cdMap[k] > 0) cdMap[k] = Math.max(0, cdMap[k] - delta); });
   }

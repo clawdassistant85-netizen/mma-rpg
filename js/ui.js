@@ -562,6 +562,240 @@ window.MMA.UI = {
       'health_potion': { name: 'Health Potion', type: 'consumable', rarity: 'bronze', icon: '🧪' }
     }
   },
+  // Mini-map for zone navigation
+  miniMap: {
+    exploredRooms: [], // {x, y, type, cleared} - explored room positions
+    currentRoom: null, // {x, y, type}
+    gridSize: 40 // pixels per room cell
+  },
+  // Initialize mini-map with room data
+  initMiniMap: function() {
+    this.miniMap.exploredRooms = [];
+    this.miniMap.currentRoom = null;
+  },
+  // Record room exploration
+  recordRoomExplored: function(roomX, roomY, roomType) {
+    // Check if already recorded
+    for (var i = 0; i < this.miniMap.exploredRooms.length; i++) {
+      var r = this.miniMap.exploredRooms[i];
+      if (r.x === roomX && r.y === roomY) return; // Already explored
+    }
+    this.miniMap.exploredRooms.push({
+      x: roomX,
+      y: roomY,
+      type: roomType || 'enemy',
+      cleared: false
+    });
+  },
+  // Mark current room position
+  setCurrentRoom: function(roomX, roomY, roomType) {
+    this.miniMap.currentRoom = { x: roomX, y: roomY, type: roomType || 'enemy' };
+    this.recordRoomExplored(roomX, roomY, roomType);
+  },
+  // Mark room as cleared
+  markRoomCleared: function(roomX, roomY) {
+    for (var i = 0; i < this.miniMap.exploredRooms.length; i++) {
+      var r = this.miniMap.exploredRooms[i];
+      if (r.x === roomX && r.y === roomY) {
+        r.cleared = true;
+        return;
+      }
+    }
+  },
+  // Get room type color
+  getRoomColor: function(room, isCurrent) {
+    if (isCurrent) return 0x00ff00; // Green for current
+    if (!room.cleared) {
+      if (room.type === 'boss') return 0xff0000; // Red for boss
+      if (room.type === 'elite') return 0xff8800; // Orange for elite
+      if (room.type === 'treasure') return 0xffff00; // Yellow for treasure
+      if (room.type === 'shop') return 0x00ffff; // Cyan for shop
+      if (room.type === 'secret') return 0xff00ff; // Purple for secret
+      return 0xff4444; // Red for uncleared enemy
+    }
+    return 0x444444; // Gray for cleared
+  },
+  // Show mini-map overlay
+  showMiniMap: function(scene) {
+    var self = this;
+    var W = scene.cameras.main.width;
+    var H = scene.cameras.main.height;
+    
+    // Check if already open
+    if (scene.activeMiniMap && scene.activeMiniMap.close) {
+      scene.activeMiniMap.close();
+      return;
+    }
+    
+    var cw = Math.min(280, W - 40);
+    var ch = cw + 60;
+    var cx = (W - cw) / 2;
+    var cy = (H - ch) / 2;
+    var con = scene.add.container(cx, cy);
+    con.setDepth(200);
+    
+    // Background
+    var g = scene.add.graphics();
+    g.fillStyle(0x000000, 0.92);
+    g.fillRoundedRect(0, 0, cw, ch, 16);
+    g.lineStyle(3, 0x44aaff, 1);
+    g.strokeRoundedRect(0, 0, cw, ch, 16);
+    con.add(g);
+    
+    // Header
+    var hdr = scene.add.graphics();
+    hdr.fillStyle(0x1a2a4a, 1);
+    hdr.fillRoundedRect(4, 4, cw - 8, 36, 12);
+    con.add(hdr);
+    
+    var title = scene.add.text(cw / 2, 24, '🗺️ ZONE MAP', { fontFamily: 'Arial Black, sans-serif', fontSize: '15px', color: '#44aaff' }).setOrigin(0.5);
+    con.add(title);
+    
+    // Map area
+    var mapY = 50;
+    var mapSize = cw - 30;
+    var cellSize = mapSize / 9;
+    var mapX = 15;
+    
+    // Draw grid background
+    var mapBg = scene.add.graphics();
+    mapBg.fillStyle(0x111122, 1);
+    mapBg.fillRoundedRect(mapX, mapY, mapSize, mapSize, 8);
+    con.add(mapBg);
+    
+    // Draw grid lines
+    var gridLines = scene.add.graphics();
+    gridLines.lineStyle(1, 0x333355, 0.5);
+    for (var i = 0; i <= 9; i++) {
+      var pos = i * cellSize;
+      gridLines.lineBetween(mapX + pos, mapY, mapX + pos, mapY + mapSize);
+      gridLines.lineBetween(mapX, mapY + pos, mapX + mapSize, mapY + pos);
+    }
+    con.add(gridLines);
+    
+    // Get current room coordinates
+    var currX = this.miniMap.currentRoom ? this.miniMap.currentRoom.x : 0;
+    var currY = this.miniMap.currentRoom ? this.miniMap.currentRoom.y : 0;
+    
+    // Draw explored rooms
+    var explored = this.miniMap.exploredRooms;
+    var offset = 4;
+    
+    for (var j = 0; j < explored.length; j++) {
+      var room = explored[j];
+      var relX = room.x - currX + offset;
+      var relY = room.y - currY + offset;
+      
+      if (relX >= 0 && relX < 9 && relY >= 0 && relY < 9) {
+        var isCurrent = room.x === currX && room.y === currY;
+        var color = this.getRoomColor(room, isCurrent);
+        
+        var rx = mapX + relX * cellSize + 2;
+        var ry = mapY + relY * cellSize + 2;
+        var rs = cellSize - 4;
+        
+        var roomGfx = scene.add.graphics();
+        roomGfx.fillStyle(color, isCurrent ? 1 : 0.8);
+        roomGfx.fillRoundedRect(rx, ry, rs, rs, 3);
+        
+        if (isCurrent) {
+          roomGfx.lineStyle(2, 0xffffff, 1);
+          roomGfx.strokeRoundedRect(rx, ry, rs, rs, 3);
+        }
+        con.add(roomGfx);
+        
+        // Icons for special rooms
+        if (room.type === 'boss') {
+          var icon = scene.add.text(rx + rs/2, ry + rs/2, '👹', { fontSize: Math.floor(cellSize * 0.5) + 'px' }).setOrigin(0.5);
+          con.add(icon);
+        } else if (room.type === 'elite') {
+          var icon = scene.add.text(rx + rs/2, ry + rs/2, '⭐', { fontSize: Math.floor(cellSize * 0.5) + 'px' }).setOrigin(0.5);
+          con.add(icon);
+        } else if (room.type === 'treasure') {
+          var icon = scene.add.text(rx + rs/2, ry + rs/2, '💎', { fontSize: Math.floor(cellSize * 0.5) + 'px' }).setOrigin(0.5);
+          con.add(icon);
+        } else if (room.type === 'shop') {
+          var icon = scene.add.text(rx + rs/2, ry + rs/2, '🛒', { fontSize: Math.floor(cellSize * 0.5) + 'px' }).setOrigin(0.5);
+          con.add(icon);
+        }
+      }
+    }
+    
+    // Legend
+    var legendY = mapY + mapSize + 8;
+    var legendItems = [
+      { color: 0x00ff00, label: 'Current' },
+      { color: 0xff4444, label: 'Enemy' },
+      { color: 0xff0000, label: 'Boss' },
+      { color: 0xffff00, label: 'Loot' },
+      { color: 0x444444, label: 'Cleared' }
+    ];
+    
+    legendItems.forEach(function(item, idx) {
+      var lx = mapX + idx * (mapSize / legendItems.length);
+      var box = scene.add.graphics();
+      box.fillStyle(item.color, 1);
+      box.fillRect(lx, legendY, 10, 10);
+      con.add(box);
+      var lbl = scene.add.text(lx + 12, legendY + 1, item.label, { fontSize: '9px', color: '#aaaaaa' }).setOrigin(0, 0);
+      con.add(lbl);
+    });
+    
+    // Room count
+    var countText = scene.add.text(cw / 2, ch - 18, 'Rooms: ' + explored.length, { fontSize: '11px', color: '#44aaff' }).setOrigin(0.5);
+    con.add(countText);
+    
+    // Close button
+    var closeBtn = scene.add.text(cw / 2, ch - 38, 'CLOSE', {
+      fontSize: '11px',
+      color: '#ffffff',
+      backgroundColor: '#335577',
+      padding: { left: 12, right: 12, top: 4, bottom: 4 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    con.add(closeBtn);
+    
+    con.close = function() {
+      scene.tweens.add({
+        targets: con,
+        alpha: 0,
+        scaleX: 0.9,
+        scaleY: 0.9,
+        duration: 150,
+        onComplete: function() { 
+          scene.activeMiniMap = null;
+          con.destroy(); 
+        }
+      });
+    };
+    closeBtn.on('pointerdown', function() { con.close(); });
+    
+    // Click outside to close
+    var closeArea = scene.add.rectangle(W/2, H/2, W, H).setInteractive({ useHandCursor: false });
+    closeArea.on('pointerdown', function() { con.close(); });
+    closeArea.setDepth(199);
+    closeArea.setAlpha(0);
+    con.add(closeArea);
+    
+    scene.activeMiniMap = con;
+    
+    con.setAlpha(0);
+    con.setScale(0.9);
+    scene.tweens.add({
+      targets: con,
+      alpha: 1,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 200,
+      ease: 'Back.easeOut'
+    });
+    
+    return con;
+  },
+  // Destroy mini-map data
+  destroyMiniMap: function() {
+    this.miniMap.exploredRooms = [];
+    this.miniMap.currentRoom = null;
+  },
   // Stamina warning indicator
   staminaWarning: {
     active: false,
@@ -1701,18 +1935,36 @@ window.MMA.UI = {
     // Map actions to loadout slots
     var slotMap = { jab: 0, heavy: 1, grapple: 2, special: 3 };
     
-    if (groundActive) {
-      // Ground game - show G&P, Elbow, Submissions, Stand Up
-      var labels = {
-        jab: 'G&P',
-        heavy: 'Elbow',
-        grapple: 'Submit',
-        special: 'Stand Up'
+    if (groundActive && scene && scene.groundState && scene.groundState.active) {
+      // Ground game - show position-based moves
+      var position = scene.groundState.position || 'fullGuard';
+      var positionLabels = {
+        fullGuard: { jab: 'G&P', heavy: 'Elbow', grapple: 'Submit', special: 'Improve' },
+        halfGuard: { jab: 'G&P', heavy: 'Elbow', grapple: 'Submit', special: 'Improve' },
+        sideControl: { jab: 'G&P', heavy: 'Elbow', grapple: 'Submit', special: 'Mount' },
+        mount: { jab: 'G&P', heavy: 'Pound', grapple: 'Submit', special: 'Back' },
+        backControl: { jab: 'Choke', heavy: 'Choke', grapple: 'Submit', special: 'Escape' }
       };
+      
+      // Get valid submissions for current position
+      var posSubs = this.getSubmissionsForPosition(position, scene);
+      
+      // Show the first available submission name on the grapple button
+      var subName = 'Submit';
+      if (posSubs && posSubs.length > 0 && roster[posSubs[0]]) {
+        subName = roster[posSubs[0]].name;
+      }
+      
+      var labels = positionLabels[position] || positionLabels.fullGuard;
+      labels.grapple = subName;  // Show actual submission name
+      
       Object.keys(labels).forEach(function(action) {
         var btn = document.querySelector('.action-btn[data-action="' + action + '"]');
         if (btn) btn.textContent = labels[action];
       });
+      
+      // Update stand up button visibility
+      this.updateStandUpButton(scene);
     } else {
       // Standing - use loadout to show moves
       var actionToSlot = { jab: 0, heavy: 1, grapple: 2, special: 3 };
@@ -1729,6 +1981,48 @@ window.MMA.UI = {
       });
     }
     this.updateSpecialButton(scene || null, !!groundActive);
+  },
+  // Get submissions available for a given ground position
+  getSubmissionsForPosition: function(position, scene) {
+    var unlockedSubs = [];
+    if (scene && scene.player && scene.player.unlockedSubmissions) {
+      unlockedSubs = scene.player.unlockedSubmissions;
+    } else {
+      unlockedSubs = ['rnc']; // default
+    }
+    
+    // Position-based submission availability
+    var positionSubs = {
+      fullGuard: ['triangleChoke', 'armbar'],
+      halfGuard: ['kimura', 'americana'],
+      sideControl: ['americana', 'kimura'],
+      mount: ['armbar', 'americana', 'rnc'],
+      backControl: ['rnc', 'kimura', 'americana']
+    };
+    
+    var allowed = positionSubs[position] || positionSubs.fullGuard;
+    
+    // Return only unlocked submissions that are valid for this position
+    return allowed.filter(function(sub) {
+      return unlockedSubs.indexOf(sub) !== -1;
+    });
+  },
+  // Update stand up button based on ground state
+  updateStandUpButton: function(scene) {
+    var btn = document.getElementById('standup-btn');
+    if (!btn) return;
+    
+    if (scene && scene.groundState && scene.groundState.active) {
+      btn.style.display = '';
+      // Position determines if can stand up
+      var position = scene.groundState.position || 'fullGuard';
+      // Can only stand up from full guard or half guard
+      var canStandUp = (position === 'fullGuard' || position === 'halfGuard');
+      btn.disabled = !canStandUp;
+      btn.style.opacity = canStandUp ? '1' : '0.5';
+    } else {
+      btn.style.display = 'none';
+    }
   },
   getBestSpecialMoveKey: function(scene) {
     if (!scene || !scene.player || !scene.player.unlockedMoves || !window.MMA || !MMA.Combat || !MMA.Combat.MOVE_ROSTER) return null;
@@ -1797,12 +2091,29 @@ window.MMA.UI = {
   updateGroundHUD: function(scene) {
     var overlay = document.getElementById('ground-overlay');
     var timerFill = document.getElementById('ground-timer-fill');
+    var positionText = overlay ? overlay.querySelector('.position-text') : null;
     if (!overlay || !timerFill) return;
     var active = !!(scene.groundState && scene.groundState.active);
     overlay.style.display = active ? 'block' : 'none';
     if (active) {
       var pct = Math.max(0, Math.min(1, scene.groundState.timer / 10000));
       timerFill.style.width = (pct * 100) + '%';
+      
+      // Show position text
+      if (positionText) {
+        var position = scene.groundState.position || 'fullGuard';
+        var positionLabels = {
+          fullGuard: 'FULL GUARD',
+          halfGuard: 'HALF GUARD',
+          sideControl: 'SIDE CONTROL',
+          mount: 'MOUNT',
+          backControl: 'BACK CONTROL'
+        };
+        positionText.textContent = positionLabels[position] || 'GROUND';
+        positionText.style.display = '';
+      }
+    } else if (positionText) {
+      positionText.style.display = 'none';
     }
   },
   handleResponsiveLayout: function() {

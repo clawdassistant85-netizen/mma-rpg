@@ -99,8 +99,18 @@ var GameScene = new Phaser.Class({
   },
   enterGroundState: function(enemy) {
     if (!enemy || !enemy.active) return;
-    this.groundState = { active: true, enemy: enemy, timer: 10000, escapeTick: 2000, waitingForSubmission: false, showingSubmissionPicker: false, submissionPickerShown: false };
-    MMA.UI.setActionButtonLabels(true);
+    this.groundState = { 
+      active: true, 
+      enemy: enemy, 
+      timer: 10000, 
+      escapeTick: 2000, 
+      waitingForSubmission: false, 
+      showingSubmissionPicker: false, 
+      submissionPickerShown: false,
+      position: 'fullGuard',  // Start in full guard
+      improveTick: 0
+    };
+    MMA.UI.setActionButtonLabels(true, this);
     MMA.UI.showGroundBanner('TAKEDOWN!');
     this.registry.set('gameMessage', 'GROUND GAME');
     var midX = (this.player.x + enemy.x) / 2;
@@ -118,11 +128,13 @@ var GameScene = new Phaser.Class({
     this.groundState.showingSubmissionPicker = false;
     this.groundState.submissionPickerShown = false;
     this.groundState.selectedSubmission = null;
+    this.groundState.position = 'fullGuard';
+    this.groundState.improveTick = 0;
     if (enemy && enemy.active) {
       enemy.x += 30;
       this.player.x -= 30;
     }
-    MMA.UI.setActionButtonLabels(false);
+    MMA.UI.setActionButtonLabels(false, this);
     MMA.UI.showGroundBanner('STAND UP');
     this.registry.set('gameMessage', reason === 'submission' ? 'SUBMISSION WIN!' : 'STAND UP');
     this.time.delayedCall(800, function(){ this.registry.set('gameMessage', ''); }, [], this);
