@@ -243,6 +243,138 @@ window.MMA.Enemies = {
     return 1;
   },
 
+  // Enemy Combo Memory: enemies track player attack patterns over 45+ seconds
+  // and adapt by gaining +20% defense against most-used combos
+  ENEMY_COMBO_MEMORY: {
+    ADAPTATION_TIME_MS: 45000,    // 45 seconds to trigger adaptation
+    DEFENSE_BONUS: 0.20,          // +20% defense against player's favorite combos
+    TRACK_WINDOW_MS: 12000,       // Track attacks within last 12 seconds for pattern
+    MIN_ATTACKS_TO_TRACK: 8,      // Minimum attacks needed to establish pattern
+    ADAPTED_TEXT: 'MEMORY ADAPTED!',
+    ADAPTED_COLOR: '#ff66ff'
+  },
+
+  // Initialize combo memory tracking for an enemy
+  initComboMemory: function(enemy) {
+    if (!enemy) return;
+    enemy._comboMemoryAttacks = [];
+    enemy._comboMemoryStartTime = Date.now();
+    enemy._comboMemoryAdapted = false;
+    enemy._comboMemoryPattern = null;
+  },
+
+  // Record player attack for combo memory (called from onPlayerAttack)
+  recordComboMemoryAttack: function(scene, enemy, moveKey) {
+    if (!enemy || enemy._comboMemoryAdapted || enemy.isBoss) return;
+    
+    // Initialize if not present
+    if (!enemy._comboMemoryAttacks) {
+      this.initComboMemory(enemy);
+    }
+    
+    var now = Date.now();
+    var config = this.ENEMY_COMBO_MEMORY;
+    
+    // Add attack with timestamp
+    enemy._comboMemoryAttacks.push({
+      move: moveKey,
+      time: now
+    });
+    
+    // Clean old attacks outside the tracking window
+    var cutoffTime = now - config.TRACK_WINDOW_MS;
+    enemy._comboMemoryAttacks = enemy._comboMemoryAttacks.filter(function(a) {
+      return a.time > cutoffTime;
+    });
+  },
+
+  // Check if enemy should adapt based on combo memory (called in update)
+  checkComboMemoryAdaptation: function(enemy, scene) {
+    if (!enemy || enemy._comboMemoryAdapted || enemy.isBoss) return false;
+    if (!enemy._comboMemoryAttacks || enemy._comboMemoryAttacks.length === 0) return false;
+    
+    var config = this.ENEMY_COMBO_MEMORY;
+    var now = Date.now();
+    var elapsed = now - enemy._comboMemoryStartTime;
+    
+    // Check if enough time has passed and enough attacks recorded
+    if (elapsed < config.ADAPTATION_TIME_MS) return false;
+    if (enemy._comboMemoryAttacks.length < config.MIN_ATTACKS_TO_TRACK) return false;
+    
+    // Analyze the player's most frequent combo pattern
+    var pattern = this._analyzeComboPattern(enemy._comboMemoryAttacks);
+    if (!pattern) return false;
+    
+    // Mark as adapted and store the pattern
+    enemy._comboMemoryAdapted = true;
+    enemy._comboMemoryPattern = pattern;
+    
+    // Show adaptation feedback
+    if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      var patternName = this._getPatternName(pattern);
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 55, config.ADAPTED_TEXT, config.ADAPTED_COLOR);
+      scene.time.delayedCall(800, function() {
+        MMA.UI.showDamageText(scene, enemy.x, enemy.y - 40, 'READS: ' + patternName, '#ff99ff');
+      });
+    }
+    
+    return true;
+  },
+
+  // Analyze player's combo pattern from recorded attacks
+  _analyzeComboPattern: function(attacks) {
+    if (!attacks || attacks.length < this.ENEMY_COMBO_MEMORY.MIN_ATTACKS_TO_TRACK) return null;
+    
+    // Group attacks by move type
+    var moveCounts = {};
+    var self = this;
+    attacks.forEach(function(a) {
+      var type = self.ADAPTIVE_TACTICS.MOVE_TYPE_GROUPS[a.move] || 'unknown';
+      moveCounts[type] = (moveCounts[type] || 0) + 1;
+    });
+    
+    // Find most frequent move type
+    var maxType = null, maxCount = 0;
+    Object.keys(moveCounts).forEach(function(type) {
+      if (moveCounts[type] > maxCount) {
+        maxCount = moveCounts[type];
+        maxType = type;
+      }
+    });
+    
+    if (maxType && maxCount >= this.ENEMY_COMBO_MEMORY.MIN_ATTACKS_TO_TRACK) {
+      return { type: maxType, count: maxCount };
+    }
+    
+    return null;
+  },
+
+  // Get human-readable name for the pattern
+  _getPatternName: function(pattern) {
+    if (!pattern) return '???';
+    var type = pattern.type;
+    if (type === 'striker') return 'STRIKER';
+    if (type === 'grappler') return 'GRAPPLER';
+    if (type === 'kicker') return 'KICKER';
+    return type.toUpperCase();
+  },
+
+  // Get defense bonus from combo memory adaptation
+  getComboMemoryDefenseMult: function(enemy, moveKey) {
+    if (!enemy || !enemy._comboMemoryAdapted || !enemy._comboMemoryPattern) return 1;
+    if (!moveKey) return 1;
+    
+    var pattern = enemy._comboMemoryPattern;
+    var moveType = this.ADAPTIVE_TACTICS.MOVE_TYPE_GROUPS[moveKey] || 'unknown';
+    
+    // If player's current move matches the adapted pattern, apply defense bonus
+    if (moveType === pattern.type) {
+      return 1 + this.ENEMY_COMBO_MEMORY.DEFENSE_BONUS;
+    }
+    
+    return 1;
+  },
+
   // Fighter Type Counter: enemies have a hidden style affinity.
   // Elite variant multiplier
   getEliteMultiplier: function(enemy) {
@@ -731,6 +863,11 @@ window.MMA.Enemies = {
     // Ring Rust: record landed hit to potentially shake off rust
     this.recordRingRustHit(scene);
 
+    // Enemy Combo Memory: record attack for long-term pattern learning
+    this.recordComboMemoryAttack(scene, enemy, moveKey);
+    // Check if combo memory should trigger adaptation
+    this.checkComboMemoryAdaptation(enemy, scene);
+
     var adaptiveDef = this.getAdaptiveDefense(enemy, scene);
     var styleCounterDef = this.getStyleCounterDefenseMult(enemy, moveKey);
     
@@ -748,6 +885,9 @@ window.MMA.Enemies = {
     // Predator Patience: preemptive strike bonus during elite "size up" window.
     var predatorDef = (this.getPredatorPatienceDefenseMult) ? this.getPredatorPatienceDefenseMult(enemy) : 1;
 
+    // Enemy Combo Memory: defense bonus against player's learned patterns
+    var comboMemoryDef = this.getComboMemoryDefenseMult(enemy, moveKey);
+
     // Track damage for Enemy Fear Tremble intensity scaling
     if (enemy && damageDealt > 0) {
       if (!enemy._recentDamage) enemy._recentDamage = 0;
@@ -756,7 +896,7 @@ window.MMA.Enemies = {
       enemy._recentDamage = Math.min(enemy._recentDamage, 50);
     }
 
-    return adaptiveDef * styleCounterDef * vengeanceDef * territoryDef * predatorDef;
+    return adaptiveDef * styleCounterDef * vengeanceDef * territoryDef * predatorDef * comboMemoryDef;
   },
 
   // Show adaptive feedback text
@@ -1211,6 +1351,9 @@ window.MMA.Enemies = {
     mmaChamp:{name:'MMA Champ',hp:200,maxHp:200,speed:85,attackDamage:25,attackCooldownMax:1100,attackRange:70,chaseRange:260,color:0xffd700,xpReward:100,teachesMove:'spinningBackFist',zone:3,aiPattern:'chase'},
     kickboxer:{name:'Kickboxer',hp:70,maxHp:70,speed:100,attackDamage:16,attackCooldownMax:900,attackRange:90,chaseRange:280,color:0x00cccc,xpReward:35,teachesMove:'roundhouseKick',zone:2,aiPattern:'kickboxer',groundDefense:0.2,groundEscape:0.1},
     striker:{name:'Striker',hp:55,maxHp:55,speed:95,attackDamage:10,attackCooldownMax:600,attackRange:50,chaseRange:260,color:0xff3366,xpReward:32,teachesMove:'jab',zone:2,aiPattern:'combo',groundDefense:0.2,groundEscape:0.1},
+    boxer:{name:'Boxer',hp:68,maxHp:68,speed:108,attackDamage:12,attackCooldownMax:700,attackRange:58,chaseRange:260,color:0xcc4444,xpReward:38,teachesMove:'jab',zone:2,aiPattern:'boxer',groundDefense:0.25,groundEscape:0.2},
+    karateka:{name:'Karateka',hp:82,maxHp:82,speed:78,attackDamage:18,attackCooldownMax:1400,attackRange:82,chaseRange:230,color:0xf1f1f1,xpReward:42,teachesMove:'roundhouseKick',zone:2,aiPattern:'karateka',groundDefense:0.3,groundEscape:0.2},
+    streetFighter:{name:'Street Fighter',hp:92,maxHp:92,speed:92,attackDamage:17,attackCooldownMax:1150,attackRange:68,chaseRange:270,color:0xff9922,xpReward:55,teachesMove:'bodyShot',zone:3,aiPattern:'streetFighter',groundDefense:0.35,groundEscape:0.3},
     stunner:{name:'Stunner',hp:80,maxHp:80,speed:70,attackDamage:12,attackCooldownMax:1200,attackRange:60,chaseRange:250,color:0x8800ff,xpReward:45,teachesMove:null,zone:2,aiPattern:'stunner',groundDefense:0.3,groundEscape:0.2},
     // Coach Enemy: support-type that boosts nearby allies (+15% attack speed per Coach in radius)
     coach:{name:'Coach',hp:60,maxHp:60,speed:88,attackDamage:6,attackCooldownMax:1800,attackRange:40,chaseRange:260,color:0x33ffcc,xpReward:45,teachesMove:null,zone:2,aiPattern:'coach'},
@@ -1585,7 +1728,10 @@ window.MMA.Enemies = {
     eliteBJJ:{baseType:'bjjBlackBelt',name:'Elite BJJ Master',hpMultiplier:2,attackMultiplier:1.7,speedBonus:18,color:0x444444,colorGlow:0x222222,xpMultiplier:3,dropChance:0.3,rareItem:'submissionGloves'},
     eliteStriker:{baseType:'striker',name:'Elite Striker',hpMultiplier:2,attackMultiplier:1.6,speedBonus:20,color:0xff6699,colorGlow:0xff0066,xpMultiplier:2.5,dropChance:0.22,rareItem:'speedPotion'},
     eliteKickboxer:{baseType:'kickboxer',name:'Elite Kickboxer',hpMultiplier:2,attackMultiplier:1.6,speedBonus:22,color:0x00ffff,colorGlow:0x00cccc,xpMultiplier:2.5,dropChance:0.22,rareItem:'speedPotion'},
-    eliteTank:{baseType:'tank',name:'Heavy Tank',hpMultiplier:2.2,attackMultiplier:1.7,speedBonus:8,color:0x666666,colorGlow:0x444444,xpMultiplier:2.8,dropChance:0.25,rareItem:'armorPlating'}
+    eliteTank:{baseType:'tank',name:'Heavy Tank',hpMultiplier:2.2,attackMultiplier:1.7,speedBonus:8,color:0x666666,colorGlow:0x444444,xpMultiplier:2.8,dropChance:0.25,rareItem:'armorPlating'},
+    eliteBoxer:{baseType:'boxer',name:'Elite Boxer',hpMultiplier:2,attackMultiplier:1.5,speedBonus:18,color:0xff6666,colorGlow:0xff0000,xpMultiplier:2.6,dropChance:0.24,rareItem:'speedPotion',specialAbility:'counterStance'},
+    eliteKarateka:{baseType:'karateka',name:'Sensei',hpMultiplier:2.4,attackMultiplier:1.75,speedBonus:14,color:0xffffff,colorGlow:0x00ffff,xpMultiplier:3,dropChance:0.28,rareItem:'giBelt',specialAbility:'focusStrike'},
+    eliteStreetFighter:{baseType:'streetFighter',name:'Chaos King',hpMultiplier:2.2,attackMultiplier:1.65,speedBonus:16,color:0xffaa44,colorGlow:0xff5500,xpMultiplier:2.8,dropChance:0.26,rareItem:'powerGloves',specialAbility:'chaosRush'}
   },
   // Chance to spawn elite instead of regular (15%)
   ELITE_SPAWN_CHANCE: 0.15,
@@ -1642,466 +1788,22 @@ window.MMA.Enemies = {
     return item;
   },
 
-  // Swarm Behavior: multiple weak enemies (3+) can merge into a temporary "Swarm" entity —
-  // combined HP, faster attacks, but can be split apart by high-damage attacks.
-  // Visual: enemies converge into larger sprite.
-  SWARM_CONFIG: {
-    MIN_ENEMIES: 3,              // Minimum alive enemies to trigger swarm
-    MERGE_CHANCE: 0.003,        // Per-frame chance when conditions met (~3% per second at 60fps)
-    MERGE_TIME: 800,            // Time to merge (ms)
-    SWARM_DURATION: 10000,      // How long swarm stays active (ms)
-    HP_MULT: 2.5,               // Combined HP multiplier
-    SPEED_MULT: 1.5,            // Speed multiplier when merged
-    ATTACK_SPEED_MULT: 1.3,     // Attack speed multiplier when merged
-    ATTACK_DAMAGE_MULT: 1.8,    // Damage multiplier when merged
-    SPLIT_DAMAGE_THRESH: 25,    // Damage threshold to break swarm (instant if single hit > this)
-    SPLIT_COOLDOWN: 5000,       // Cooldown after swarm breaks
-    MERGE_WARNING: 'SWARMING!', // Warning text when merging
-    SPLIT_TEXT: 'SPLIT!',       // Text when swarm is broken
-    MERGE_COLOR: 0xff00ff       // Magenta tint for swarm enemies
-  },
-
-  // Check and execute swarm behavior
-  checkSwarmBehavior: function(scene, delta) {
-    var config = this.SWARM_CONFIG;
-    var enemies = scene.enemies || [];
-    // Only allow "weak" archetypes to form a swarm (keeps it readable and prevents weird boss/special merges).
-    // NOTE: Previously this checked `!e.typeKey` which is never true (every spawned enemy has typeKey),
-    // so Swarm never triggered. This fixes that.
-    var swarmable = {
-      streetThug: true,
-      striker: true,
-      barBrawler: true
-    };
-    var alive = enemies.filter(function(e) { 
-      return e && e.active && e.state !== 'dead' && !e.isBoss && !e.isElite && swarmable[e.typeKey]; 
-    });
-    
-    // Need minimum enemies alive and not already in swarm or split cooldown
-    if (alive.length < config.MIN_ENEMIES || scene._swarmActive || scene._swarmSplitCooldown > 0) {
-      return;
-    }
-    
-    // Initialize cooldown if needed
-    if (!scene._swarmCheckTimer) scene._swarmCheckTimer = 0;
-    scene._swarmCheckTimer += delta;
-    
-    // Only check every 500ms to avoid constant rolling
-    if (scene._swarmCheckTimer < 500) return;
-    scene._swarmCheckTimer = 0;
-    
-    // Random chance to trigger
-    if (Math.random() < config.MERGE_CHANCE * (delta / 16)) {
-      this.executeSwarmMerge(scene, alive);
+  applyEliteAbility: function(enemy, ability) {
+    if (!enemy || !ability) return;
+    enemy.eliteAbility = ability;
+    if (ability === 'counterStance') {
+      enemy.counterWindow = 400;
+      enemy.counterCooldown = 0;
+    } else if (ability === 'focusStrike') {
+      enemy.focusCharge = 0;
+      enemy.focusReady = false;
+    } else if (ability === 'chaosRush') {
+      enemy.chaosRushTimer = 0;
+      enemy.chaosRushActive = false;
     }
   },
 
-  // Execute the swarm merge
-  executeSwarmMerge: function(scene, aliveEnemies) {
-    var config = this.SWARM_CONFIG;
-    var player = scene.player;
-    if (!player || player.stats.hp <= 0) return;
-    
-    // Mark swarm as active
-    scene._swarmActive = true;
-    scene._swarmEnemies = aliveEnemies.slice(0, config.MIN_ENEMIES);
-    scene._swarmTimer = config.SWARM_DURATION;
-    
-    // Calculate center position for the swarm
-    var centerX = 0, centerY = 0;
-    scene._swarmEnemies.forEach(function(e) {
-      centerX += e.x;
-      centerY += e.y;
-    });
-    centerX /= scene._swarmEnemies.length;
-    centerY /= scene._swarmEnemies.length;
-    
-    // Store original stats for each enemy
-    scene._swarmEnemies.forEach(function(e) {
-      e._originalX = e.x;
-      e._originalY = e.y;
-      e._originalSpeed = e.type.speed;
-      e._originalAttackDmg = e.type.attackDamage;
-      e._originalAttackCooldown = e.type.attackCooldownMax;
-      e._originalMaxHp = e.stats.maxHp;
-      e._originalHp = e.stats.hp;
-      e._isSwarmMember = true;
-      // Track HP changes so we can infer single-hit burst damage and split the swarm
-      // without needing hooks in combat.js.
-      e._swarmPrevHp = (e.stats && typeof e.stats.hp === 'number') ? e.stats.hp : 0;
-      e.setTint(config.MERGE_COLOR);
-      
-      // Fade effect during merge
-      if (scene.tweens) {
-        scene.tweens.add({
-          targets: e,
-          alpha: 0.5,
-          duration: config.MERGE_TIME / 2,
-          yoyo: true,
-          repeat: 1
-        });
-      }
-    });
-    
-    // Create swarm visual indicator
-    var warningCircle = scene.add.circle(centerX, centerY, 60, config.MERGE_COLOR, 0.4);
-    scene.tweens.add({
-      targets: warningCircle,
-      alpha: 0,
-      scale: 2,
-      duration: config.MERGE_TIME,
-      onComplete: function() { warningCircle.destroy(); }
-    });
-    
-    // Show warning
-    if (MMA.UI && MMA.UI.showDamageText) {
-      MMA.UI.showDamageText(scene, centerX, centerY - 50, config.MERGE_WARNING, '#ff00ff');
-    }
-    
-    // After merge time, apply swarm bonuses
-    scene.time.delayedCall(config.MERGE_TIME, function() {
-      if (!scene._swarmActive) return;
-      
-      scene._swarmEnemies.forEach(function(e) {
-        if (!e || !e.active || e.state === 'dead') return;
-        
-        // Move to center
-        e.x = centerX + (Math.random() - 0.5) * 30;
-        e.y = centerY + (Math.random() - 0.5) * 30;
-        
-        // Apply swarm bonuses
-        e.type.speed = Math.round(e._originalSpeed * config.SPEED_MULT);
-        e.type.attackDamage = Math.round(e._originalAttackDmg * config.ATTACK_DAMAGE_MULT);
-        e.type.attackCooldownMax = Math.round(e._originalAttackCooldown / config.ATTACK_SPEED_MULT);
-        
-        // Combine HP
-        var totalHp = 0;
-        scene._swarmEnemies.forEach(function(te) {
-          if (te && te.active && te.state !== 'dead') {
-            totalHp += te.stats.hp;
-          }
-        });
-        var combinedMaxHp = Math.round(totalHp * config.HP_MULT);
-        e.stats.maxHp = combinedMaxHp;
-        e.stats.hp = combinedMaxHp;
-        
-        // Update HP bar to show combined health
-        if (e._hpBarFill) {
-          e._hpBarFill.width = 50; // Widen HP bar for swarm
-          e._hpBarBg.width = 50;
-        }
-        
-        e.setDisplaySize(e.displayWidth * 1.3, e.displayHeight * 1.3);
-      });
-      
-      // Show swarm formation complete
-      if (MMA.UI && MMA.UI.showDamageText) {
-        MMA.UI.showDamageText(scene, centerX, centerY - 60, 'SWARM FORMED!', '#ff00ff');
-      }
-    });
-  },
-
-  // Update swarm behavior (called from updateEnemies)
-  updateSwarm: function(scene, delta) {
-    if (!scene._swarmActive) return;
-    
-    var config = this.SWARM_CONFIG;
-    
-    // Update timer
-    scene._swarmTimer -= delta;
-    
-    // Check for high-damage hits that can break swarm
-    var swarmEnemies = scene._swarmEnemies || [];
-    var broken = false;
-    
-    swarmEnemies.forEach(function(e) {
-      if (!e || !e.active || e.state === 'dead') return;
-
-      // Infer per-frame damage by looking at HP deltas.
-      // This approximates "single big hit" burst damage well enough for split logic.
-      if (e.stats && typeof e.stats.hp === 'number') {
-        if (typeof e._swarmPrevHp !== 'number') e._swarmPrevHp = e.stats.hp;
-        var dmgTaken = Math.max(0, e._swarmPrevHp - e.stats.hp);
-        e._swarmPrevHp = e.stats.hp;
-        e._lastHitDamage = dmgTaken;
-      }
-
-      // Check if this enemy took massive damage
-      if (e._lastHitDamage && e._lastHitDamage > config.SPLIT_DAMAGE_THRESH) {
-        broken = true;
-      }
-
-      // Clear the damage tracker after checking
-      e._lastHitDamage = 0;
-    });
-    
-    // Break swarm if timer expires or broken by damage
-    if (scene._swarmTimer <= 0 || broken) {
-      this.breakSwarm(scene, broken);
-    }
-  },
-
-  // Break the swarm apart
-  breakSwarm: function(scene, wasBroken) {
-    var config = this.SWARM_CONFIG;
-    var swarmEnemies = scene._swarmEnemies || [];
-    
-    // Set cooldown to prevent immediate re-merge
-    scene._swarmActive = false;
-    scene._swarmSplitCooldown = config.SPLIT_COOLDOWN;
-    
-    // Show split text
-    if (MMA.UI && MMA.UI.showDamageText && wasBroken) {
-      var cx = 0, cy = 0, count = 0;
-      swarmEnemies.forEach(function(e) {
-        if (e && e.active && e.state !== 'dead') {
-          cx += e.x;
-          cy += e.y;
-          count++;
-        }
-      });
-      if (count > 0) {
-        MMA.UI.showDamageText(scene, cx/count, cy/count - 50, config.SPLIT_TEXT, '#ff8800');
-      }
-    }
-    
-    // Restore each enemy to original stats
-    swarmEnemies.forEach(function(e) {
-      if (!e || !e.active || e.state === 'dead') return;
-      
-      // Restore stats
-      e.type.speed = e._originalSpeed;
-      e.type.attackDamage = e._originalAttackDmg;
-      e.type.attackCooldownMax = e._originalAttackCooldown;
-      
-      // Distribute combined HP back (even split with small random)
-      var splitHp = Math.round(e.stats.hp / 2);
-      e.stats.maxHp = e._originalMaxHp;
-      e.stats.hp = Math.max(1, splitHp);
-      
-      // Reset visuals
-      e.clearTint();
-      e.setDisplaySize(CONFIG.DISPLAY_TILE, CONFIG.DISPLAY_TILE * 1.5);
-      
-      // Reset HP bar
-      if (e._hpBarFill) {
-        e._hpBarFill.width = 36;
-        e._hpBarBg.width = 36;
-      }
-      
-      // Move back toward original positions (scattered)
-      var scatterAngle = Math.random() * Math.PI * 2;
-      var scatterDist = 40 + Math.random() * 30;
-      var targetX = e._originalX + Math.cos(scatterAngle) * scatterDist;
-      var targetY = e._originalY + Math.sin(scatterAngle) * scatterDist;
-      
-      if (scene.tweens) {
-        scene.tweens.add({
-          targets: e,
-          x: targetX,
-          y: targetY,
-          duration: 300,
-          ease: 'Power2'
-        });
-      }
-      
-      // Clear swarm flags
-      e._isSwarmMember = false;
-      delete e._originalX;
-      delete e._originalY;
-      delete e._originalSpeed;
-      delete e._originalAttackDmg;
-      delete e._originalAttackCooldown;
-      delete e._originalMaxHp;
-      delete e._originalHp;
-      delete e._swarmPrevHp;
-    });
-    
-    scene._swarmEnemies = [];
-  },
-
-  // Track damage to swarm enemies for split detection
-  recordSwarmDamage: function(enemy, damage) {
-    if (enemy._isSwarmMember) {
-      enemy._lastHitDamage = (enemy._lastHitDamage || 0) + damage;
-    }
-  },
-  // one enemy stuns player (distracts) while others flank and attack from sides.
-  // Visual warning indicator appears 1s before trigger. Rewards single-target focus or area attacks.
-  GANG_UP_CONFIG: {
-    MIN_ENEMIES: 3,              // Minimum alive enemies to trigger gang up
-    TRIGGER_CHANCE: 0.004,       // Per-frame chance when conditions met (~4% per second at 60fps)
-    WARNING_MS: 1000,            // Visual warning duration before attack
-    STUN_DURATION: 600,          // How long player is stunned by distract attack
-    FLANK_DAMAGE_BONUS: 0.35,    // +35% damage for flanking attacks
-    COOLDOWN_MS: 8000,           // Time between gang up attempts
-    FLANK_ANGLE_MIN: 0.8,        // Minimum angle offset for flanking (radians)
-    FLANK_ANGLE_MAX: 2.2         // Maximum angle offset for flanking (radians)
-  },
-
-  // Check if gang up can trigger and execute it
-  checkGangUpCoordination: function(scene, delta) {
-    var config = this.GANG_UP_CONFIG;
-    var enemies = scene.enemies || [];
-    var alive = enemies.filter(function(e) { return e && e.active && e.state !== 'dead'; });
-    
-    // Need minimum enemies alive
-    if (alive.length < config.MIN_ENEMIES) {
-      // Reset cooldown when not enough enemies
-      scene._gangUpCooldown = scene._gangUpCooldown || 0;
-      return;
-    }
-    
-    // Initialize cooldown if needed
-    if (!scene._gangUpCooldown) scene._gangUpCooldown = 0;
-    if (scene._gangUpCooldown > 0) {
-      scene._gangUpCooldown -= delta;
-      return;
-    }
-    
-    // Random chance to trigger
-    if (Math.random() < config.TRIGGER_CHANCE * (delta / 16)) {
-      this.executeGangUp(scene, alive);
-    }
-  },
-
-  // Execute the coordinated gang up attack
-  executeGangUp: function(scene, aliveEnemies) {
-    var config = this.GANG_UP_CONFIG;
-    var player = scene.player;
-    if (!player || player.stats.hp <= 0) return;
-    
-    // Set cooldown
-    scene._gangUpCooldown = config.COOLDOWN_MS;
-    
-    // Find the "distracter" - closest enemy to player (will stun)
-    var distracter = aliveEnemies[0];
-    var minDist = Infinity;
-    aliveEnemies.forEach(function(e) {
-      var d = Math.hypot(e.x - player.x, e.y - player.y);
-      if (d < minDist) {
-        minDist = d;
-        distracter = e;
-      }
-    });
-    
-    // Find flankers - other enemies that will attack from sides
-    var flankers = aliveEnemies.filter(function(e) { return e !== distracter; });
-    
-    // Calculate player angle for flanking positions
-    var playerAngle = Math.atan2(player.y - distracter.y, player.x - distracter.x);
-    
-    // Position flankers at angles from player
-    flankers.forEach(function(flanker, idx) {
-      // Alternate sides for multiple flankers
-      var side = (idx % 2 === 0) ? 1 : -1;
-      var angleOffset = config.FLANK_ANGLE_MIN + Math.random() * (config.FLANK_ANGLE_MAX - config.FLANK_ANGLE_MIN);
-      angleOffset = angleOffset * side;
-      
-      var flankerAngle = playerAngle + angleOffset;
-      var flankDist = 70; // distance from player for flanking position
-      
-      // Store original position to return to
-      flanker._gangUpOriginX = flanker.x;
-      flanker._gangUpOriginY = flanker.y;
-      
-      // Move to flanking position
-      flanker.x = player.x + Math.cos(flankerAngle) * flankDist;
-      flanker.y = player.y + Math.sin(flankerAngle) * flankDist;
-      
-      // Mark as flanking
-      flanker.isGangUpFlanking = true;
-      flanker._gangUpTargetAngle = flankerAngle;
-    });
-    
-    // Mark distracter
-    distracter.isGangUpDistracter = true;
-    distracter._gangUpOriginX = distracter.x;
-    distracter._gangUpOriginY = distracter.y;
-    
-    // Move distracter toward player but stop at range
-    var dx = player.x - distracter.x;
-    var dy = player.y - distracter.y;
-    var dist = Math.hypot(dx, dy) || 1;
-    if (dist > 80) {
-      distracter.x = player.x - (dx/dist) * 80;
-      distracter.y = player.y - (dy/dist) * 80;
-    }
-    
-    // Show warning indicator
-    if (MMA.UI && MMA.UI.showDamageText) {
-      MMA.UI.showDamageText(scene, player.x, player.y - 60, 'GANG UP!', '#ff0000');
-    }
-    
-    // Visual warning circle around player
-    var warningCircle = scene.add.circle(player.x, player.y, 50, 0xff0000, 0.3);
-    scene.tweens.add({
-      targets: warningCircle,
-      alpha: 0,
-      scale: 1.5,
-      duration: config.WARNING_MS,
-      onComplete: function() { warningCircle.destroy(); }
-    });
-    
-    // After warning, execute the coordinated attack
-    scene.time.delayedCall(config.WARNING_MS, function() {
-      // Distracter attacks (stuns player briefly)
-      if (distracter && distracter.active && distracter.state !== 'dead') {
-        var distractDmg = Math.round(distracter.type.attackDamage * 0.5 * (window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(distracter, scene) : 1));
-        window.MMA.Enemies.damagePlayer(distracter, scene, distractDmg);
-        
-        // Stun player
-        scene.registry.set('playerStunned', true);
-        scene.time.delayedCall(config.STUN_DURATION, function() {
-          scene.registry.set('playerStunned', false);
-        });
-        
-        if (MMA.UI && MMA.UI.showDamageText) {
-          MMA.UI.showDamageText(scene, player.x, player.y - 30, 'STUNNED!', '#ff00ff');
-        }
-      }
-      
-      // Flankers attack with bonus damage
-      flankers.forEach(function(flanker) {
-        if (flanker && flanker.active && flanker.state !== 'dead') {
-          var flankDmg = Math.round(flanker.type.attackDamage * (1 + config.FLANK_DAMAGE_BONUS) * (window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(flanker, scene) : 1));
-          window.MMA.Enemies.damagePlayer(flanker, scene, flankDmg);
-          
-          if (MMA.UI && MMA.UI.showDamageText) {
-            MMA.UI.showDamageText(scene, flanker.x, flanker.y - 30, 'FLANK!', '#ff8800');
-          }
-          
-          // Return to original position after attack
-          scene.tweens.add({
-            targets: flanker,
-            x: flanker._gangUpOriginX,
-            y: flanker._gangUpOriginY,
-            duration: 400,
-            onComplete: function() {
-              flanker.isGangUpFlanking = false;
-              delete flanker._gangUpOriginX;
-              delete flanker._gangUpOriginY;
-            }
-          });
-        }
-      });
-      
-      // Reset distracter
-      if (distracter && distracter.active && distracter.state !== 'dead') {
-        scene.tweens.add({
-          targets: distracter,
-          x: distracter._gangUpOriginX,
-          y: distracter._gangUpOriginY,
-          duration: 400,
-          onComplete: function() {
-            distracter.isGangUpDistracter = false;
-            delete distracter._gangUpOriginX;
-            delete distracter._gangUpOriginY;
-          }
-        });
-      }
-    });
-  },
+  // Tag Team AI: paired enemies alternate who "pressures" the player.
   // The resting partner backs off, repositions, and recovers faster.
   TAG_TEAM: {
     ENABLED: true,
@@ -2177,6 +1879,99 @@ window.MMA.Enemies = {
         }
       }
     }
+  },
+
+  coordination: {
+    COOLDOWN_MS: 2600,
+    DURATION_MS: 1400,
+    RETREAT_THRESHOLD: 0.22,
+    checkCoordination: function(scene, delta) {
+      if (!scene || !scene.player || !scene.enemies) return;
+      if (scene._mmaCoordinationCooldown === undefined) scene._mmaCoordinationCooldown = 0;
+      if (scene._mmaCoordinationCooldown > 0) {
+        scene._mmaCoordinationCooldown -= delta;
+        if (scene._mmaCoordinationCooldown < 0) scene._mmaCoordinationCooldown = 0;
+      }
+      if (scene._mmaCoordinationCooldown > 0) return;
+
+      var fighters = scene.enemies.filter(function(e) {
+        return e && e.active && e.state !== 'dead' && !e.isBoss && !e.isFleeing;
+      });
+      if (fighters.length < 2) return;
+      if (Math.random() > 0.005 * (delta / 16)) return;
+
+      var leader = fighters[Math.floor(Math.random() * fighters.length)];
+      var flankers = fighters.filter(function(e) { return e !== leader; }).slice(0, 2);
+      if (!leader || !flankers.length) return;
+
+      var callout = ['FLANK HIM!', 'PRESS NOW!', 'CUT HIM OFF!'][Math.floor(Math.random() * 3)];
+      if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        MMA.UI.showDamageText(scene, leader.x, leader.y - 46, callout, '#ff8800');
+      }
+
+      leader.coordinationRole = 'press';
+      leader.coordinationTimer = this.DURATION_MS;
+      for (var i = 0; i < flankers.length; i++) {
+        flankers[i].coordinationRole = 'flank';
+        flankers[i].coordinationSide = i === 0 ? 1 : -1;
+        flankers[i].coordinationTimer = this.DURATION_MS + i * 160;
+      }
+
+      scene._mmaCoordinationCooldown = this.COOLDOWN_MS;
+    },
+
+    updateEnemy: function(enemy, player, scene, delta) {
+      if (!enemy || !player || !enemy.coordinationTimer) return false;
+
+      enemy.coordinationTimer -= delta;
+      if (enemy.coordinationTimer <= 0) {
+        enemy.coordinationTimer = 0;
+        enemy.coordinationRole = null;
+        enemy.coordinationSide = 0;
+        return false;
+      }
+
+      var dx = player.x - enemy.x;
+      var dy = player.y - enemy.y;
+      var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      var hpRatio = enemy.stats && enemy.stats.maxHp ? (enemy.stats.hp / enemy.stats.maxHp) : 1;
+      var retreat = hpRatio <= this.RETREAT_THRESHOLD;
+      var speed = enemy.type && enemy.type.speed ? enemy.type.speed : (enemy.baseSpeed || 80);
+
+      if (retreat) {
+        enemy.setVelocity(-(dx / dist) * speed * 1.2, -(dy / dist) * speed * 1.2);
+        return true;
+      }
+
+      if (enemy.coordinationRole === 'press') {
+        enemy.setVelocity((dx / dist) * speed * 1.08, (dy / dist) * speed * 1.08);
+        return true;
+      }
+
+      if (enemy.coordinationRole === 'flank') {
+        var angle = Math.atan2(dy, dx) + ((enemy.coordinationSide || 1) * 0.9);
+        var targetX = player.x - Math.cos(angle) * 74;
+        var targetY = player.y - Math.sin(angle) * 74;
+        var tx = targetX - enemy.x;
+        var ty = targetY - enemy.y;
+        var flankDist = Math.sqrt(tx * tx + ty * ty) || 1;
+        enemy.setVelocity((tx / flankDist) * speed * 1.04, (ty / flankDist) * speed * 1.04);
+        return true;
+      }
+
+      return false;
+    }
+  },
+
+  _playEnemyAnimation: function(scene, enemy, animationKey) {
+    if (!scene || !enemy || !window.MMA || !MMA.Sprites || typeof MMA.Sprites.playEnemyAnimation !== 'function') return null;
+    return MMA.Sprites.playEnemyAnimation(enemy, animationKey, scene);
+  },
+
+  _didPlayerRecentlyAttack: function(scene, windowMs) {
+    if (!scene || !scene.player) return false;
+    var now = scene.time && typeof scene.time.now === 'number' ? scene.time.now : Date.now();
+    return !!(scene.player._mmaLastAttackAt && now - scene.player._mmaLastAttackAt <= (windowMs || 240));
   },
 
   AI: {},
@@ -2391,15 +2186,18 @@ window.MMA.Enemies = {
       if (typeKey === 'muayThaiFighter') eliteKey = 'eliteMuayThai';
       if (typeKey === 'groundNPounder') eliteKey = 'eliteGroundNPounder';
       if (typeKey === 'bjjBlackBelt') eliteKey = 'eliteBJJ';
+      if (typeKey === 'streetFighter') eliteKey = 'eliteStreetFighter';
       
       if (this.ELITE_TYPES[eliteKey]) {
         eliteType = this.ELITE_TYPES[eliteKey];
         baseTypeKey = eliteType.baseType;
       }
     }
-    
+
     var baseType = this.TYPES[baseTypeKey];
     var type = Object.assign({}, baseType);
+    type.id = typeKey;
+    type.typeKey = typeKey;
     
     // Ensemble Cast: check if we should spawn a named character instead of generic enemy
     // Only apply if not elite and not boss/rival special types
@@ -2488,17 +2286,16 @@ window.MMA.Enemies = {
     type.attackDamage = Math.max(1, Math.round(type.attackDamage * 0.36)); type.attackCooldownMax = Math.round(type.attackCooldownMax * 1.8); type.speed = Math.round(type.speed * 0.85);
     if (typeof type.groundDefense !== 'number') type.groundDefense = 0.25;
     if (typeof type.groundEscape !== 'number') type.groundEscape = 0.2;
-    var tex = (baseTypeKey === 'streetThug') ? 'enemy_thug' : 'enemy_brawler';
+    var tex = (window.MMA && MMA.Sprites && typeof MMA.Sprites.resolveEnemyTextureKey === 'function')
+      ? MMA.Sprites.resolveEnemyTextureKey(typeKey, baseTypeKey)
+      : ((baseTypeKey === 'streetThug') ? 'enemy_thug' : 'enemy_brawler');
     var e = scene.physics.add.sprite(x, y, tex);
     e.setDisplaySize(CONFIG.DISPLAY_TILE, CONFIG.DISPLAY_TILE * 1.5); if (baseTypeKey === 'barBrawler') e.setDisplaySize(CONFIG.DISPLAY_TILE * 1.08, CONFIG.DISPLAY_TILE * 1.62);
-    e.body.setSize(24, 36); e.body.setOffset(12, 18); e.stats = { hp: type.hp, maxHp: type.maxHp }; e.type = type; e.typeKey = typeKey; e.baseSpeed = type.speed; // store base speed
-    // Territory Control anchor
-    e.homeRoomId = scene.currentRoomId || scene.roomId || null;
-    e.homeX = x;
-    e.homeY = y;
-    e._territoryShown = false;
+    e.body.setSize(24, 36); e.body.setOffset(12, 18); e.stats = { hp: type.hp, maxHp: type.maxHp }; e.type = type; e.typeKey = typeKey; e.baseTypeKey = baseTypeKey; e.baseSpeed = type.speed; // store base speed
     e.state = 'idle'; e.attackCooldown = 0; e.staggerTimer = 0;
-    e.isBoss = (typeKey === 'mmaChamp'); e.phaseTwo = false;
+    // Enemy Combo Memory: initialize tracking for long-term pattern learning
+    self.initComboMemory(e);
+    e.isBoss = (typeKey === 'mmaChamp'); e.phaseTwo = false; e.isElite = !!eliteType;
 
     // Tutor Enemy: snapshot player's recent move keys so it can "mirror" your habits.
     if (typeKey === 'tutor') {
@@ -2525,6 +2322,9 @@ window.MMA.Enemies = {
         repeat: -1,
         ease: 'Sine.easeInOut'
       });
+    }
+    if (eliteType && eliteType.specialAbility) {
+      this.applyEliteAbility(e, eliteType.specialAbility);
     }
 
     // Predator Patience: elite+ enemies briefly "size up" before engaging.
@@ -2785,6 +2585,7 @@ window.MMA.Enemies = {
     // Tag Team AI: establish pairs per-room and update who is "active".
     self._ensureTagTeams(scene);
     self._updateTagTeams(scene, delta);
+    self.coordination.checkCoordination(scene, delta);
 
     // Gang Up Coordination: check for coordinated 3+ enemy attacks
     self.checkGangUpCoordination(scene, delta);
@@ -2987,63 +2788,39 @@ window.MMA.Enemies = {
         e.enrageAttackBonus = 0;
       }
 
-      // Enemy Fear Tremble: below 25% HP, enemies tremble with intensity based on recent damage
-      var trembleCfg = self.FEAR_TREMBLE_CONFIG;
-      var eHpPct = e.stats.hp / e.stats.maxHp;
-      
-      // Track recent damage for tremble intensity
-      if (!e._recentDamage) e._recentDamage = 0;
-      e._recentDamage *= Math.pow(0.1, delta / 1000); // Decay over time (half-life ~300ms)
-      
-      // Check if in fear threshold
-      if (eHpPct <= trembleCfg.HP_THRESHOLD && !e.isBoss) {
-        // Calculate tremble intensity based on recent damage
-        var damageIntensity = Math.min(e._recentDamage * trembleCfg.INTENSITY_SCALE, 1);
-        var amplitude = trembleCfg.BASE_AMPLITUDE + (trembleCfg.MAX_AMPLITUDE - trembleCfg.BASE_AMPLITUDE) * damageIntensity;
-        
-        // Apply trembling offset to enemy position (visual only, doesn't affect physics)
-        var trembleX = (Math.random() - 0.5) * amplitude * 2;
-        var trembleY = (Math.random() - 0.5) * amplitude * 2;
-        
-        // Store original position if not already tracking
-        if (!e._trembleOriginalX) {
-          e._trembleOriginalX = e.x;
-          e._trembleOriginalY = e.y;
-        }
-        
-        // Apply visual offset (restore previous frame's offset first)
-        e.x = e._trembleOriginalX + trembleX;
-        e.y = e._trembleOriginalY + trembleY;
-        
-        // Store for next frame
-        e._trembleOffsetX = trembleX;
-        e._trembleOffsetY = trembleY;
-        
-        // Show FEAR indicator once when first entering tremble state
-        if (!e._fearTrembleShown) {
-          e._fearTrembleShown = true;
+      if (e.counterCooldown > 0) e.counterCooldown -= delta;
+      if (e.eliteAbility === 'focusStrike') {
+        e.focusCharge = (e.focusCharge || 0) + delta;
+        if (e.focusCharge >= 2200 && !e.focusReady) {
+          e.focusReady = true;
           if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
-            MMA.UI.showDamageText(scene, e.x, e.y - 45, 'WEAKENED!', '#ff8800');
+            MMA.UI.showDamageText(scene, e.x, e.y - 50, 'FOCUS!', '#66ffff');
           }
         }
-      } else {
-        // Reset tremble state when HP recovers above threshold
-        if (e._fearTrembleShown) {
-          e._fearTrembleShown = false;
+      } else if (e.eliteAbility === 'chaosRush') {
+        e.chaosRushTimer = (e.chaosRushTimer || 0) + delta;
+        if (e.chaosRushTimer >= 2600) {
+          e.chaosRushTimer = 0;
+          e.chaosRushActive = true;
         }
-        // Clear any existing offset
-        if (e._trembleOriginalX !== undefined && e._trembleOffsetX !== undefined) {
-          e.x = e._trembleOriginalX;
-          e.y = e._trembleOriginalY;
-          e._trembleOriginalX = undefined;
-          e._trembleOriginalY = undefined;
-          e._trembleOffsetX = undefined;
-          e._trembleOffsetY = undefined;
+      }
+
+      var aiStateNow = e.aiState || '';
+      if (e._mmaLastAiState !== aiStateNow) {
+        if (aiStateNow === 'windup' || aiStateNow === 'feintWindup' || aiStateNow === 'focusWindup' || aiStateNow === 'counterWindup' || aiStateNow === 'chaosRush') {
+          self._playEnemyAnimation(scene, e, 'attackWindup');
         }
+        e._mmaLastAiState = aiStateNow;
       }
       
       // Apply enrage speed bonus to effective speed calculation later
-      
+      if (e.staggerTimer > 0 && !e._mmaHitAnimQueued) {
+        self._playEnemyAnimation(scene, e, 'hitReaction');
+        e._mmaHitAnimQueued = true;
+      } else if (e.staggerTimer <= 0) {
+        e._mmaHitAnimQueued = false;
+      }
+
       if (e.staggerTimer > 0) { e.staggerTimer -= delta; e.setVelocity(0,0); return; }
       // Flee logic for non-boss enemies
       if (!e.isBoss) {
@@ -3155,6 +2932,11 @@ window.MMA.Enemies = {
       var maxSpeed = e.baseSpeed * 2 * (1 + enrageSpeedBonus);
       e.type.speed = Math.min(e.baseSpeed + bonus, maxSpeed);
 
+      if (self.coordination.updateEnemy(e, scene.player, scene, delta)) {
+        if (e.attackCooldown > 0) e.attackCooldown -= delta;
+        return;
+      }
+
       var ai = self.AI[e.type.aiPattern || 'chase'];
       (ai || self.AI.chase)(e, scene.player, scene, delta);
     });
@@ -3162,15 +2944,10 @@ window.MMA.Enemies = {
   killEnemy: function(scene, enemy) {
     scene.enemiesDefeated = (scene.enemiesDefeated || 0) + 1;
     enemy.state = 'dead';
-    try { if (window.sfx) window.sfx.thud(); } catch(e) {}
-
-    // Ring Rust: record fight time whenever an enemy is defeated
-    this.recordFightTime();
-
-    // Flash KO Blindness: record the KO so same-type enemies in next room may be blinded
-    if (!enemy.isBoss) {
-      this.recordFlashKO(enemy.typeKey);
-    }
+    enemy.aiState = 'dead';
+    enemy.setVelocity(0, 0);
+    if (enemy.body) enemy.body.enable = false;
+    this._playEnemyAnimation(scene, enemy, 'deathFrames');
 
     // Loyalty Bond: trigger Vengeance on nearby allies when a non-boss enemy dies
     if (!enemy.isBoss) {
@@ -3265,24 +3042,13 @@ window.MMA.Enemies = {
     }
     
     var contractTier = this.getContractTier(scene);
-    var xp = enemy.type.xpReward;
-    if (scene.rapidFireState) {
-      if (scene.rapidFireState.active) {
-        var rapidBonusXp = Math.max(1, Math.round(xp * ((scene.rapidFireState.scoreMultiplier || 1) - 1)));
-        xp += rapidBonusXp;
-        scene.rapidFireState.kills = (scene.rapidFireState.kills || 0) + 1;
-        scene.rapidFireState.bonusXp = (scene.rapidFireState.bonusXp || 0) + rapidBonusXp;
-        scene.registry.set('rapidFireKills', scene.rapidFireState.kills);
-        scene.registry.set('rapidFireBonusXp', scene.rapidFireState.bonusXp);
-        var score = scene.registry.get('score') || 0;
-        scene.registry.set('score', score + Math.round(enemy.type.xpReward * (scene.rapidFireState.scoreMultiplier || 1)));
-        MMA.UI.showDamageText(scene, enemy.x, enemy.y - 48, 'RAPID x' + (scene.rapidFireState.scoreMultiplier || 1), '#ff8844');
-      } else if (scene.rapidFireState.completed) {
-        var completionScore = scene.registry.get('score') || 0;
-        scene.registry.set('score', completionScore + enemy.type.xpReward);
-      }
+    var xp = enemy.type.xpReward; scene.player.stats.xp += xp;
+    scene._mmaRoomXpGained = (scene._mmaRoomXpGained || 0) + xp;
+    if (scene.registry) {
+      scene.registry.set('lastEnemyDefeated', enemy.type.name || enemy.typeKey || 'Enemy');
+      scene.registry.set('xpGained', scene._mmaRoomXpGained);
+      scene.registry.set('fightStats', Object.assign({}, MMA.UI.fightStats));
     }
-    scene.player.stats.xp += xp;
     MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, '+' + xp + ' XP', '#e8c830');
     
     // Elite enemy rare item drop
@@ -3345,7 +3111,7 @@ window.MMA.Enemies = {
         MMA.UI.recordBossDefeat(bossId, zone, duration);
       }
       scene.registry.set('gameMessage', 'VICTORY!'); scene.cameras.main.flash(500, 255, 215, 0); scene.gameOver = true;
-      scene.registry.set('playerStats', Object.assign({}, scene.player.stats)); scene.registry.set('enemiesDefeated', scene.enemiesDefeated); scene.registry.set('playTime', Math.floor((Date.now() - scene.runStartMs) / 1000));
+      scene.registry.set('playerStats', Object.assign({}, scene.player.stats)); scene.registry.set('enemiesDefeated', scene.enemiesDefeated); scene.registry.set('playTime', Math.floor((Date.now() - scene.runStartMs) / 1000)); scene.registry.set('fightStats', Object.assign({}, MMA.UI.fightStats)); scene.registry.set('xpGained', scene._mmaRoomXpGained || 0); scene.registry.set('bossDefeated', true);
       scene.time.delayedCall(3000, function(){ scene.scene.stop(); scene.scene.launch('VictoryScene'); });
       return;
     }
@@ -3406,7 +3172,10 @@ window.MMA.Enemies = {
     // Destroy role icon on death
     if (enemy._roleIcon) { enemy._roleIcon.destroy(); enemy._roleIcon = null; }
     MMA.Items.spawnDropsForEnemy(scene, enemy);
-    enemy.destroy(); scene.enemies = scene.enemies.filter(function(e){ return e !== enemy; });
+    scene.enemies = scene.enemies.filter(function(e){ return e !== enemy; });
+    scene.time.delayedCall(320, function() {
+      if (enemy && enemy.active) enemy.destroy();
+    });
     if (window.saveGame) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);
     var alive = scene.enemies.filter(function(e){ return e.state !== 'dead' && e.active; });
     if (alive.length === 0) {
@@ -3421,7 +3190,11 @@ window.MMA.Enemies = {
       // Show fight stats
       scene.time.delayedCall(1500, function(){ MMA.UI.showFightStats(scene); });
       scene.time.delayedCall(3500, function(){ scene.registry.set('gameMessage', ''); });
-      if (scene.currentZone >= 3 && !(scene.rapidFireState && scene.rapidFireState.completed)) { try { localStorage.clear(); } catch(e) {} scene.scene.pause('GameScene'); scene.scene.launch('VictoryScene'); }
+      if (scene.registry) {
+        scene.registry.set('fightStats', Object.assign({}, MMA.UI.fightStats));
+        scene.registry.set('xpGained', scene._mmaRoomXpGained || 0);
+      }
+      if (scene.currentZone >= 3) { try { localStorage.clear(); } catch(e) {} scene.scene.pause('GameScene'); scene.scene.launch('VictoryScene'); }
     }
   }
 };
@@ -3429,6 +3202,148 @@ window.MMA.Enemies.AI = {
   // Regen AI: behaves like chase AI; its gimmick is handled in updateEnemies via periodic healing.
   regen: function(enemy, player, scene, dt){
     return window.MMA.Enemies.AI.chase(enemy, player, scene, dt);
+  },
+
+  defender: function(enemy, player, scene, dt) {
+    var dx = player.x - enemy.x;
+    var dy = player.y - enemy.y;
+    var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+    var recentAttack = window.MMA.Enemies._didPlayerRecentlyAttack(scene, enemy.eliteAbility === 'counterStance' ? 320 : 220);
+    var strafeAngle = Math.atan2(dy, dx) + (enemy.circleDir || 1) * 1.15;
+
+    if (enemy.counterCooldown > 0) enemy.counterCooldown -= dt;
+    if (!enemy.circleDir) enemy.circleDir = Math.random() < 0.5 ? 1 : -1;
+
+    if (enemy.aiState === 'counterWindup') {
+      enemy.setVelocity(0, 0);
+      enemy.counterTimer -= dt;
+      if (enemy.counterTimer <= 0) {
+        enemy.aiState = 'recover';
+        enemy.counterTimer = 260;
+        enemy.attackCooldown = enemy.type.attackCooldownMax * 1.15 * attackMod;
+        MMA.Player.damage(scene, Math.round(enemy.type.attackDamage * (enemy.eliteAbility === 'counterStance' ? 1.45 : 1.25)));
+        MMA.UI.showDamageText(scene, player.x, player.y - 34, 'COUNTER!', '#ff5555');
+      }
+      return;
+    }
+
+    if (enemy.aiState === 'recover') {
+      enemy.setVelocity(-(dx / dist) * enemy.type.speed * 0.42, -(dy / dist) * enemy.type.speed * 0.42);
+      enemy.counterTimer -= dt;
+      if (enemy.counterTimer <= 0) enemy.aiState = null;
+      return;
+    }
+
+    if (enemy.blockTimer > 0) {
+      enemy.blockTimer -= dt;
+      enemy.isBlocking = true;
+      enemy.setVelocity(0, 0);
+      if (enemy.blockTimer <= 0) {
+        enemy.isBlocking = false;
+        enemy.aiState = 'counterWindup';
+        enemy.counterTimer = enemy.eliteAbility === 'counterStance' ? 110 : 150;
+      }
+      return;
+    }
+
+    if (recentAttack && dist <= enemy.type.attackRange * 1.45 && enemy.counterCooldown <= 0) {
+      enemy.blockTimer = enemy.eliteAbility === 'counterStance' ? 320 : 240;
+      enemy.counterCooldown = 900;
+      enemy.isBlocking = true;
+      if (window.sfx && typeof window.sfx.block === 'function') window.sfx.block();
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 36, 'BLOCK!', '#88ddff');
+      return;
+    }
+
+    if (dist < enemy.type.chaseRange) {
+      if (dist > enemy.type.attackRange * 1.1) {
+        enemy.setVelocity((dx / dist) * enemy.type.speed * 0.86 * speedMod, (dy / dist) * enemy.type.speed * 0.86 * speedMod);
+      } else if (dist < enemy.type.attackRange * 0.75) {
+        enemy.setVelocity(Math.cos(strafeAngle) * enemy.type.speed * 0.84 * speedMod, Math.sin(strafeAngle) * enemy.type.speed * 0.84 * speedMod);
+      } else {
+        enemy.setVelocity(0, 0);
+        if ((enemy.hasAttackToken || enemy.isBoss) && enemy.attackCooldown <= 0) {
+          enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod;
+          MMA.Player.damage(scene, Math.round(enemy.type.attackDamage * 0.95));
+          MMA.UI.showDamageText(scene, player.x, player.y - 28, 'JAB!', '#cc4444');
+        }
+      }
+    } else {
+      enemy.setVelocity(0, 0);
+    }
+
+    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
+  },
+
+  boxer: function(enemy, player, scene, dt) {
+    return window.MMA.Enemies.AI.defender(enemy, player, scene, dt);
+  },
+
+  karateka: function(enemy, player, scene, dt) {
+    var dx = player.x - enemy.x;
+    var dy = player.y - enemy.y;
+    var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+
+    if (enemy.aiState === 'focusWindup') {
+      enemy.setVelocity(0, 0);
+      enemy.focusWindupTimer -= dt;
+      if (enemy.focusWindupTimer <= 0) {
+        enemy.aiState = 'retreat';
+        enemy.retreatTimer = 520;
+        enemy.focusReady = false;
+        enemy.focusCharge = 0;
+        enemy.attackCooldown = enemy.type.attackCooldownMax * 1.1 * attackMod;
+        MMA.Player.damage(scene, Math.round(enemy.type.attackDamage * 1.8));
+        MMA.UI.showDamageText(scene, player.x, player.y - 32, 'FOCUS STRIKE!', '#66ffff');
+      }
+      return;
+    }
+
+    if (enemy.focusReady && dist <= enemy.type.attackRange * 1.3 && enemy.attackCooldown <= 0) {
+      enemy.aiState = 'focusWindup';
+      enemy.focusWindupTimer = 260;
+      enemy.setVelocity(0, 0);
+      return;
+    }
+
+    return window.MMA.Enemies.AI.kickboxer(enemy, player, scene, dt);
+  },
+
+  streetFighter: function(enemy, player, scene, dt) {
+    var dx = player.x - enemy.x;
+    var dy = player.y - enemy.y;
+    var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+
+    if (enemy.aiState === 'chaosRush') {
+      enemy.chaosRushTimerActive -= dt;
+      enemy.setVelocity((dx / dist) * enemy.type.speed * 1.7 * speedMod, (dy / dist) * enemy.type.speed * 1.7 * speedMod);
+      if (!enemy._chaosRushDamageDone && dist <= enemy.type.attackRange * 1.2) {
+        enemy._chaosRushDamageDone = true;
+        MMA.Player.damage(scene, Math.round(enemy.type.attackDamage * 1.6));
+        MMA.UI.showDamageText(scene, player.x, player.y - 34, 'CHAOS RUSH!', '#ff9933');
+      }
+      if (enemy.chaosRushTimerActive <= 0) {
+        enemy.aiState = 'recover';
+        enemy.counterTimer = 320;
+        enemy.chaosRushActive = false;
+        enemy._chaosRushDamageDone = false;
+      }
+      return;
+    }
+
+    if (enemy.chaosRushActive && dist <= enemy.type.chaseRange) {
+      enemy.aiState = 'chaosRush';
+      enemy.chaosRushTimerActive = 260;
+      enemy.attackCooldown = enemy.type.attackCooldownMax * 1.2 * attackMod;
+      return;
+    }
+
+    return window.MMA.Enemies.AI.combo(enemy, player, scene, dt);
   },
 
   stunner: function(enemy, player, scene, dt){

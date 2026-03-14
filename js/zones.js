@@ -2,7 +2,7 @@ window.MMA = window.MMA || {};
 window.MMA.Zones = {
   ZONE1_ROOMS: {
     room1:{id:'room1',zone:1,weatherOptions:['clear','clear','rain','night'],weightClass:'light',doors:{left:{col:0,row:5},right:{col:15,row:5},up:{col:7,row:0}},connections:{left:'room2',right:'room3',up:'room4'},spawnPositions:[{col:3,row:3},{col:12,row:3},{col:12,row:9}],enemyPool:['streetThug','streetThug','barBrawler'],name:'Alley Entrance'},
-    room2:{id:'room2',zone:1,weatherOptions:['clear','rain','wind'],weightClass:'light',doors:{right:{col:15,row:5}},connections:{right:'room1'},spawnPositions:[{col:3,row:3},{col:3,row:9}],enemyPool:['streetThug','barBrawler'],name:'Side Alley'},
+    room2:{id:'room2',zone:1,weatherOptions:['clear','rain','wind','fog'],weightClass:'light',doors:{right:{col:15,row:5}},connections:{right:'room1'},spawnPositions:[{col:3,row:3},{col:3,row:9}],enemyPool:['streetThug','barBrawler'],name:'Side Alley'},
     // Secret alley with bonus loot hooks – discovered as a side path off the main street
     secret1:{
       id:'secret1',
@@ -19,8 +19,8 @@ window.MMA.Zones = {
       bonusLootTags:['cash','rare'],
       bonusCurrencyMultiplier:2.0
     },
-    room3:{id:'room3',zone:1,weatherOptions:['clear','clear','night','wind'],weightClass:'light',doors:{left:{col:0,row:5}},connections:{left:'room1'},spawnPositions:[{col:3,row:5},{col:12,row:3},{col:12,row:9}],enemyPool:['barBrawler','barBrawler','muayThaiFighter'],name:'Back Lot'},
-    room4:{id:'room4',zone:1,weatherOptions:['clear','rain'],weightClass:'light',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'room1',up:'clinic1'},spawnPositions:[{col:3,row:8},{col:12,row:8}],enemyPool:['barBrawler','muayThaiFighter','muayThaiFighter'],name:'Storage Area'},
+    room3:{id:'room3',zone:1,weatherOptions:['clear','clear','night','wind','fog'],weightClass:'light',doors:{left:{col:0,row:5}},connections:{left:'room1'},spawnPositions:[{col:3,row:5},{col:12,row:3},{col:12,row:9}],enemyPool:['barBrawler','barBrawler','muayThaiFighter'],name:'Back Lot'},
+    room4:{id:'room4',zone:1,weatherOptions:['clear','rain','fog'],weightClass:'light',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'room1',up:'clinic1'},spawnPositions:[{col:3,row:8},{col:12,row:8}],enemyPool:['barBrawler','muayThaiFighter','muayThaiFighter'],name:'Storage Area'},
     // Clinic/Medical Bay: inter-zone recovery space between street and gym
     clinic1:{
       id:'clinic1',
@@ -40,14 +40,14 @@ window.MMA.Zones = {
     }
   },
   ZONE2_ROOMS: {
-    gym1:{id:'gym1',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{left:{col:0,row:5},right:{col:15,row:5},down:{col:7,row:11}},connections:{left:'gym2',right:'gym3',down:'clinic1'},spawnPositions:[{col:4,row:4},{col:11,row:4},{col:7,row:8}],enemyPool:['wrestler','judoka','groundNPounder'],name:'Gym Entrance'},
-    gym2:{id:'gym2',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{right:{col:15,row:5}},connections:{right:'gym1'},spawnPositions:[{col:4,row:4},{col:4,row:8}],enemyPool:['wrestler','judoka'],name:'Weight Area'},
-    gym3:{id:'gym3',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{left:{col:0,row:5},up:{col:7,row:0}},connections:{left:'gym1',up:'gym4'},spawnPositions:[{col:11,row:4},{col:11,row:8}],enemyPool:['judoka','groundNPounder'],enemyPoolTrainers:['wrestler','judoka'],name:'Mats Hall'},
+    gym1:{id:'gym1',zone:2,weatherOptions:['clear'],weightClass:'middle',musicCue:'zone2',doors:{left:{col:0,row:5},right:{col:15,row:5},down:{col:7,row:11}},connections:{left:'gym2',right:'gym3',down:'clinic1'},spawnPositions:[{col:4,row:4},{col:11,row:4},{col:7,row:8}],enemyPool:['wrestler','judoka','groundNPounder'],name:'Gym Entrance'},
+    gym2:{id:'gym2',zone:2,weatherOptions:['clear'],weightClass:'middle',musicCue:'zone2',doors:{right:{col:15,row:5}},connections:{right:'gym1'},spawnPositions:[{col:4,row:4},{col:4,row:8}],enemyPool:['wrestler','judoka'],name:'Weight Area'},
+    gym3:{id:'gym3',zone:2,weatherOptions:['clear'],weightClass:'middle',musicCue:'zone2',doors:{left:{col:0,row:5},up:{col:7,row:0}},connections:{left:'gym1',up:'gym4'},spawnPositions:[{col:11,row:4},{col:11,row:8}],enemyPool:['judoka','groundNPounder'],enemyPoolTrainers:['wrestler','judoka'],name:'Mats Hall'},
     // Dedicated Training Room: used for speed/accuracy/endurance minigame hooks
     // Also serves as the Zone 2 Rival Crossroads – metadata-only branching hooks
     // that let other systems offer two thematic encounter paths and boss archetypes
     // without hardcoding layout here.
-    gym4:{id:'gym4',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym3',up:'gymTraining'},spawnPositions:[{col:7,row:4},{col:7,row:8}],enemyPool:['wrestler','groundNPounder','groundNPounder'],name:'Training Ring',
+    gym4:{id:'gym4',zone:2,weatherOptions:['clear'],weightClass:'middle',musicCue:'zone2',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym3',up:'gymTraining'},spawnPositions:[{col:7,row:4},{col:7,row:8}],enemyPool:['wrestler','groundNPounder','groundNPounder'],name:'Training Ring',
       rivalCrossroads:true,
       rivalCrossroadsZone:2,
       rivalCrossroadsLabel:'Rival Crossroads – Gym Paths',
@@ -56,7 +56,7 @@ window.MMA.Zones = {
         { id:'zone2_technical', label:'Technical Clinic Path', bossArchetype:'grapplerBoss', description:'Grappling-heavy rooms that culminate in a methodical grappler rival.' }
       ]
     },
-    gymTraining:{id:'gymTraining',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym4',up:'trainingSim'},spawnPositions:[{col:5,row:4},{col:9,row:4},{col:7,row:8}],enemyPool:['wrestler','judoka','groundNPounder'],trainingTypes:['speed','accuracy','endurance'],trainingLabel:'Gym Training Room'},
+    gymTraining:{id:'gymTraining',zone:2,weatherOptions:['clear'],weightClass:'middle',musicCue:'zone2',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym4',up:'trainingSim'},spawnPositions:[{col:5,row:4},{col:9,row:4},{col:7,row:8}],enemyPool:['wrestler','judoka','groundNPounder'],trainingTypes:['speed','accuracy','endurance'],trainingLabel:'Gym Training Room'},
     // Training Simulation: slow-mo friendly practice space with infinite stamina & dummy targets
     trainingSim:{
       id:'trainingSim',
@@ -80,7 +80,7 @@ window.MMA.Zones = {
     // maxHype: maximum hype achievable (0-1)
     // crowdLabel: short description displayed to player
     // weightClass: "light", "middle", "heavy" or "standard" (default)
-    oct1:{id:'oct1',zone:3,weatherOptions:['clear','night'],weightClass:'middle',cornerPressure:true,crowdSize:200,baseHype:0.3,maxHype:0.8,crowdLabel:'Rowdy Entrance Crowd',
+    oct1:{id:'oct1',zone:3,weatherOptions:['clear','night','fog'],weightClass:'middle',musicCue:'zone3',cornerPressure:true,crowdSize:200,baseHype:0.3,maxHype:0.8,crowdLabel:'Rowdy Entrance Crowd',
       ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,crowdHypemen:true,
       crowdHypemanBuffs:[
         { id:'damage', label:'+10% damage (3 rooms)' },
@@ -89,7 +89,7 @@ window.MMA.Zones = {
       ],
       doors:{right:{col:15,row:5},up:{col:7,row:0}},connections:{right:'oct2',up:'oct3'},
       spawnPositions:[{col:3,row:4},{col:12,row:4}],enemyPool:['bjjBlackBelt'],name:'Arena Entrance',narratorStyle:'arenaPrelims'},
-    oct2:{id:'oct2',zone:3,weatherOptions:['clear','night','wind'],weightClass:'middle',cornerPressure:true,crowdSize:300,baseHype:0.5,maxHype:0.9,crowdLabel:'Boisterous Prelim Crowd',
+    oct2:{id:'oct2',zone:3,weatherOptions:['clear','night','wind','fog'],weightClass:'middle',musicCue:'zone3',cornerPressure:true,crowdSize:300,baseHype:0.5,maxHype:0.9,crowdLabel:'Boisterous Prelim Crowd',
       ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,crowdHypemen:true,
       crowdHypemanBuffs:[
         { id:'damage', label:'+10% damage (3 rooms)' },
@@ -102,7 +102,7 @@ window.MMA.Zones = {
       bettingPayoutMultipliers:{ lowRisk:1.2, mediumRisk:1.6, highRisk:2.2 },
       doors:{left:{col:0,row:5}},connections:{left:'oct1'},
       spawnPositions:[{col:3,row:3},{col:3,row:8}],enemyPool:['bjjBlackBelt','bjjBlackBelt'],name:'Prelim Cage',narratorStyle:'arenaPrelims'},
-    oct3:{id:'oct3',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:500,baseHype:0.7,maxHype:1.0,crowdLabel:'Electric Main Cage Crowd',
+    oct3:{id:'oct3',zone:3,weatherOptions:['clear','night','fog'],weightClass:'heavy',musicCue:'zone3',cornerPressure:true,crowdSize:500,baseHype:0.7,maxHype:1.0,crowdLabel:'Electric Main Cage Crowd',
       ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,crowdHypemen:true,
       crowdHypemanBuffs:[
         { id:'damage', label:'+10% damage (3 rooms)' },
@@ -115,7 +115,7 @@ window.MMA.Zones = {
       bettingPayoutMultipliers:{ lowRisk:1.3, mediumRisk:1.8, highRisk:2.5 },
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct1',up:'oct4'},
       spawnPositions:[{col:5,row:5},{col:9,row:5}],enemyPool:['bjjBlackBelt'],name:'Main Cage',narratorStyle:'arenaMain'},
-    oct4:{id:'oct4',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:800,baseHype:0.9,maxHype:1.0,crowdLabel:'Championship Crowd',
+    oct4:{id:'oct4',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',musicCue:'boss',cornerPressure:true,crowdSize:800,baseHype:0.9,maxHype:1.0,crowdLabel:'Championship Crowd',
       ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,crowdHypemen:true,
       crowdHypemanBuffs:[
         { id:'damage', label:'+10% damage (3 rooms)' },
@@ -128,9 +128,9 @@ window.MMA.Zones = {
     survival1:{
       id:'survival1',
       zone:3,
-      weatherOptions:['clear','night'],
+      weatherOptions:['clear','night','fog'],
       weightClass:'heavy',
-      cornerPressure:true,
+      musicCue:'zone3',cornerPressure:true,
       crowdSize:900,
       baseHype:0.6,
       maxHype:1.0,

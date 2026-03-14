@@ -146,6 +146,7 @@ var BootScene = new Phaser.Class({
       originalPreUpdate.call(this, time, delta);
 
       if (!this.active || !this.scene || !this._mmaBaseTextureKey) return;
+      if (this._mmaAnimOverrideUntil && time < this._mmaAnimOverrideUntil) return;
       var nextBase = resolveEquippedOutfitBase(this) || resolveVisualBase(this);
       var nextEquipmentTier = resolveEquipmentTier(this);
       if (!nextBase) return;
@@ -257,6 +258,7 @@ var BootScene = new Phaser.Class({
       originalPreUpdate.call(this, time, delta);
 
       if (!this.active || !this.scene || !this.stats || !this.stats.maxHp || !this._mmaBaseTextureKey) return;
+      if (this._mmaAnimOverrideUntil && time < this._mmaAnimOverrideUntil) return;
       var damageSets = window.MMA && window.MMA.Sprites && window.MMA.Sprites.DAMAGE_TEXTURES;
       var visualBaseKey = this._mmaVisualBaseKey || this._mmaBaseTextureKey;
       if (!damageSets || !damageSets[visualBaseKey]) return;
@@ -332,6 +334,7 @@ var BootScene = new Phaser.Class({
       originalPreUpdate.call(this, time, delta);
 
       if (!this.active || !this.scene || !this._mmaBaseTextureKey) return;
+      if (this._mmaAnimOverrideUntil && time < this._mmaAnimOverrideUntil) return;
       var visualBaseKey = this._mmaVisualBaseKey || this._mmaBaseTextureKey;
       var spriteDefs = window.MMA && window.MMA.Sprites;
       var limbSets = spriteDefs && spriteDefs.LIMB_DAMAGE_TEXTURES;
