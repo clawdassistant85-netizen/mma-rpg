@@ -51,6 +51,122 @@ window.MMA.Enemies = {
     return this.MERCENARY_CONTRACTS[tier];
   },
 
+  // Nemesis Encounter System: tracks which enemy archetype has defeated player most across sessions
+  // That archetype becomes a "Nemesis" with unique dialogue, purple/black glow, scales to player level
+  // Defeating Nemesis grants "Nemesis Slayer" title and exclusive equipment drop
+  NEMESIS_CONFIG: {
+    STORAGE_KEY: 'mma_rpg_nemesis_deaths',
+    SLAYER_KEY: 'mma_rpg_nemesis_slain',
+    DEFEAT_THRESHOLD: 2,          // Min deaths to become a nemesis
+    HP_BONUS: 0.25,               // +25% HP for nemesis enemies
+    DAMAGE_BONUS: 0.20,           // +20% damage for nemesis enemies
+    SPEED_BONUS: 0.10,            // +10% speed for nemesis enemies
+    LEVEL_GAP: 1,                 // Always within 1 level of player
+    GLOW_COLOR: 0x8800ff,         // Purple glow for nemesis
+    TEXT_COLOR: '#aa44ff',        // Purple text color
+    SLAYER_TITLE: 'Nemesis Slayer',
+    SLAYER_ITEM: 'nemesisRing'    // Exclusive ring drop
+  },
+
+  // Get death count for a specific enemy type
+  _getNemesisDeathCount: function(typeKey) {
+    try {
+      var data = localStorage.getItem(this.NEMESIS_CONFIG.STORAGE_KEY);
+      var deaths = data ? JSON.parse(data) : {};
+      return deaths[typeKey] || 0;
+    } catch(e) { return 0; }
+  },
+
+  // Record that an enemy type defeated the player
+  recordNemesisDefeat: function(typeKey) {
+    try {
+      var data = localStorage.getItem(this.NEMESIS_CONFIG.STORAGE_KEY);
+      var deaths = data ? JSON.parse(data) : {};
+      deaths[typeKey] = (deaths[typeKey] || 0) + 1;
+      localStorage.setItem(this.NEMESIS_CONFIG.STORAGE_KEY, JSON.stringify(deaths));
+    } catch(e) {}
+  },
+
+  // Get the current nemesis enemy type (most defeats)
+  getCurrentNemesis: function() {
+    try {
+      var data = localStorage.getItem(this.NEMESIS_CONFIG.STORAGE_KEY);
+      var deaths = data ? JSON.parse(data) : {};
+      var threshold = this.NEMESIS_CONFIG.DEFEAT_THRESHOLD;
+      var maxType = null, maxCount = 0;
+      Object.keys(deaths).forEach(function(type) {
+        if (deaths[type] > maxCount && deaths[type] >= threshold) {
+          maxCount = deaths[type];
+          maxType = type;
+        }
+      });
+      return maxType;
+    } catch(e) { return null; }
+  },
+
+  // Check if player has slain the nemesis
+  hasSlainNemesis: function() {
+    try {
+      return localStorage.getItem(this.NEMESIS_CONFIG.SLAYER_KEY) === 'true';
+    } catch(e) { return false; }
+  },
+
+  // Mark nemesis as slain
+  markNemesisSlain: function() {
+    try {
+      localStorage.setItem(this.NEMESIS_CONFIG.SLAYER_KEY, 'true');
+    } catch(e) {}
+  },
+
+  // Apply nemesis modifiers to enemy type (called during spawn)
+  applyNemesisModifiers: function(type, scene) {
+    var nemesis = this.getCurrentNemesis();
+    if (!nemesis) return type;
+
+    // Check if this is the nemesis type (exact match or base type)
+    var isNemesis = (type.typeKey === nemesis) || 
+                    (type.baseType && type.baseType === nemesis) ||
+                    (type.aiPattern && this._getAiPatternFromType(nemesis) === type.aiPattern);
+
+    if (!isNemesis) return type;
+
+    // Apply nemesis bonuses
+    var cfg = this.NEMESIS_CONFIG;
+    type.hp = Math.round(type.hp * (1 + cfg.HP_BONUS));
+    type.maxHp = type.hp;
+    type.attackDamage = Math.round(type.attackDamage * (1 + cfg.DAMAGE_BONUS));
+    type.speed = Math.round(type.speed * (1 + cfg.SPEED_BONUS));
+    type.xpReward = Math.round(type.xpReward * 1.5); // 50% more XP for beating nemesis
+
+    // Mark as nemesis
+    type.isNemesis = true;
+    type.nemesisType = nemesis;
+
+    return type;
+  },
+
+  // Helper: get AI pattern from type key (for matching)
+  _getAiPatternFromType: function(typeKey) {
+    var mapping = {
+      'streetThug': 'chase', 'barBrawler': 'chase', 'muayThaiFighter': 'kicker',
+      'wrestler': 'grasper', 'judoka': 'thrower', 'groundNPounder': 'chase',
+      'bjjBlackBelt': 'subHunter', 'mmaChamp': 'chase', 'kickboxer': 'kickboxer',
+      'striker': 'combo', 'stunner': 'stunner', 'coach': 'coach',
+      'drunkMonk': 'drunkMonk', 'shadowRival': 'chase', 'feintMaster': 'feintMaster',
+      'bully': 'bully', 'regenerator': 'regen', 'glitcher': 'glitcher',
+      'tutor': 'tutor', 'echo': 'echo', 'enforcer': 'enforcer', 'tank': 'tank'
+    };
+    return mapping[typeKey] || 'chase';
+  },
+
+  // Check if enemy is nemesis and return special damage text
+  getNemesisText: function(enemy) {
+    if (enemy && enemy.type && enemy.type.isNemesis) {
+      return { text: 'NEMESIS!', color: this.NEMESIS_CONFIG.TEXT_COLOR };
+    }
+    return null;
+  },
+
   // Adaptive Tactics: enemy analyzes player's last 5 attacks and gains +15% defense against repeated move types
   ADAPTIVE_TACTICS: {
     TRACK_COUNT: 5,           // Number of recent attacks to track
@@ -530,6 +646,9 @@ window.MMA.Enemies = {
         MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 55, 'COMEBACK LOADED', '#66ccff');
       }
     } catch (e) {}
+
+    // Nemesis Encounter System: record this defeat for nemesis tracking
+    this.recordNemesisDefeat(typeKey);
   },
 
   applyComebackIfAny: function(scene, typeKey, typeObj) {
@@ -706,7 +825,12 @@ window.MMA.Enemies = {
   // Coach Enemy: support-type enemy that boosts nearby allies (+15% attack speed per Coach in room)
   COACH_CONFIG: {
     BOOST_RADIUS: 200,
-    ATTACK_SPEED_BONUS: 0.15
+    ATTACK_SPEED_BONUS: 0.15,
+
+    // When a Coach is KO'd, nearby allies become temporarily disorganized:
+    // - cannot receive new coach boosts
+    // - their attack cadence slows (handled via updateEnemies shakenAttackMult)
+    NO_COACH_DURATION_MS: 5000
   },
 
   // Mirror Match Protocol: when player HP drops below 30%, enemy temporarily mirrors player's last 3 attacks
@@ -856,9 +980,17 @@ window.MMA.Enemies = {
     // Find all coach enemies
     var coaches = scene.enemies.filter(function(e){ return e.type && e.type.id === 'coach'; });
     if (coaches.length===0) return;
+
     // For each non-coach enemy, check distance to any coach
     scene.enemies.forEach(function(enemy){
       if (enemy.type && enemy.type.id === 'coach') return;
+
+      // Coach Down Disarray: temporarily prevent re-coaching
+      if (enemy.noCoachTimer && enemy.noCoachTimer > 0) {
+        if (enemy.baseAttackSpeed) enemy.attackSpeed = enemy.baseAttackSpeed;
+        return;
+      }
+
       var boosted = false;
       coaches.forEach(function(coach){
         var dx = enemy.x - coach.x;
@@ -1112,6 +1244,124 @@ window.MMA.Enemies = {
     tank:{name:'Tank',hp:150,maxHp:150,speed:45,attackDamage:18,attackCooldownMax:1800,attackRange:55,chaseRange:200,color:0x555555,xpReward:50,teachesMove:null,zone:2,aiPattern:'tank',groundDefense:0.75,groundEscape:0.3}
   },
 
+  // Flash KO Blindness: dramatic KO causes camera flash that leaves enemy temporarily blinded
+  // in next room (if same enemy type) — 30% miss chance for 10 seconds, visual white afterimage effect
+  FLASH_KO_BLINDNESS: {
+    ENABLED: true,
+    MISS_CHANCE: 0.30,         // 30% miss chance while blinded
+    DURATION: 10000,           // 10 seconds blindness duration
+    STORAGE_KEY: 'mma_rpg_ko_blindness',
+    BLIND_TEXT: 'BLINDED!',
+    BLIND_COLOR: '#ffffff'
+  },
+
+  // Check if current enemy type has blindness from previous KO
+  getBlindnessState: function(typeKey) {
+    if (!this.FLASH_KO_BLINDNESS || !this.FLASH_KO_BLINDNESS.ENABLED) return null;
+    try {
+      var data = localStorage.getItem(this.FLASH_KO_BLINDNESS.STORAGE_KEY);
+      if (!data) return null;
+      var blindData = JSON.parse(data);
+      if (!blindData) return null;
+      
+      // Check if this type matches and hasn't expired
+      if (blindData.typeKey === typeKey && blindData.expiresAt > Date.now()) {
+        return blindData;
+      }
+    } catch(e) {}
+    return null;
+  },
+
+  // Apply blindness to an enemy (called during spawn)
+  applyBlindnessToEnemy: function(enemy) {
+    var cfg = this.FLASH_KO_BLINDNESS;
+    var blindState = this.getBlindnessState(enemy.typeKey);
+    
+    if (blindState) {
+      // Mark enemy as blinded
+      enemy.isBlinded = true;
+      enemy.blindnessExpiresAt = blindState.expiresAt;
+      
+      // Apply visual effect - white afterimage/sickness tint
+      enemy.setTint(0xffffff);
+      
+      // Add subtle wobble animation to show disorientation
+      if (enemy.scene && enemy.scene.tweens) {
+        enemy.scene.tweens.add({
+          targets: enemy,
+          alpha: 0.7,
+          x: enemy.x + 3,
+          duration: 150,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
+      
+      // Show "BLINDED!" text once when spawning
+      if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        MMA.UI.showDamageText(enemy.scene, enemy.x, enemy.y - 55, cfg.BLIND_TEXT, cfg.BLIND_COLOR);
+      }
+      
+      return true;
+    }
+    return false;
+  },
+
+  // Record a KO that will cause blindness to same-type enemies
+  recordFlashKO: function(typeKey) {
+    if (!this.FLASH_KO_BLINDNESS || !this.FLASH_KO_BLINDNESS.ENABLED) return;
+    
+    try {
+      var cfg = this.FLASH_KO_BLINDNESS;
+      var data = {
+        typeKey: typeKey,
+        expiresAt: Date.now() + cfg.DURATION
+      };
+      localStorage.setItem(cfg.STORAGE_KEY, JSON.stringify(data));
+    } catch(e) {}
+  },
+
+  // Clear blindness state (called when blindness expires)
+  clearBlindness: function() {
+    try {
+      localStorage.removeItem(this.FLASH_KO_BLINDNESS.STORAGE_KEY);
+    } catch(e) {}
+  },
+
+  // Update blindness state (called each frame for blinded enemies)
+  updateBlindness: function(enemy, delta) {
+    if (!enemy || !enemy.isBlinded) return;
+    
+    // Check if blindness has expired
+    if (enemy.blindnessExpiresAt && Date.now() > enemy.blindnessExpiresAt) {
+      // Remove blindness
+      enemy.isBlinded = false;
+      
+      // Restore visuals
+      enemy.clearTint();
+      if (enemy.scene && enemy.scene.tweens) {
+        enemy.scene.tweens.killTweensOf(enemy);
+        enemy.setAlpha(1);
+      }
+      
+      // Clear storage
+      this.clearBlindness();
+      return;
+    }
+    
+    // While blinded, enemy has chance to miss attacks (handled in AI damage calculation)
+    // This is applied in the damagePlayer call - we add a miss chance
+  },
+
+  // Calculate if blinded enemy misses attack
+  rollBlindMiss: function(enemy) {
+    if (!enemy || !enemy.isBlinded) return false;
+    if (!this.FLASH_KO_BLINDNESS || !this.FLASH_KO_BLINDNESS.ENABLED) return false;
+    
+    return Math.random() < this.FLASH_KO_BLINDNESS.MISS_CHANCE;
+  },
+
   // Temperamental Enforcer Config: triggers when allies die nearby
   ENFORCER_CONFIG: {
     ENRAGE_RADIUS: 180,           // pixels - range to detect ally deaths
@@ -1349,7 +1599,8 @@ window.MMA.Enemies = {
     giBelt:{name:'Gi Belt',stat:'defense',value:5,duration:30000,color:0xff8800,description:'+5 Defense for 30s'},
     kneePads:{name:'Knee Pads',stat:'hp',value:20,duration:0,color:0xaa8800,description:'+20 Max HP (permanent)'},
     submissionGloves:{name:'Submission Gloves',stat:'attackDamage',value:8,duration:45000,color:0x8800ff,description:'+8 Attack for 45s'},
-    armorPlating:{name:'Armor Plating',stat:'defense',value:8,duration:60000,color:0x888888,description:'+8 Defense for 60s'}
+    armorPlating:{name:'Armor Plating',stat:'defense',value:8,duration:60000,color:0x888888,description:'+8 Defense for 60s'},
+    nemesisRing:{name:'Nemesis Ring',stat:'all',value:15,duration:120000,color:0x8800ff,description:'+15 All Stats for 2min (Nemesis Slayer exclusive)'}
   },
   
   // Spawn a rare item pickup
@@ -2213,7 +2464,13 @@ window.MMA.Enemies = {
       }
     }
 
-    // Apply Mercenary Contract multipliers AFTER elite/rival/zone scaling
+    // Nemesis Encounter System: apply nemesis modifiers if this is the current nemesis type
+    // Only apply to non-boss, non-elite, non-rival enemies to avoid stacking too many bonuses
+    if (!eliteType && typeKey !== 'shadowRival' && typeKey !== 'mmaChamp') {
+      type = self.applyNemesisModifiers(type, scene);
+    }
+
+    // Apply Mercenary Contract multipliers AFTER elite/rival/zone/nemesis scaling
     var contractTier = this.getContractTier(scene);
     if (contractTier) {
       var contractMult = this.getContractMultipliers(contractTier);
@@ -2281,7 +2538,7 @@ window.MMA.Enemies = {
       }
     }
 
-    // Regenerator visual cue (only if not overridden by elite/boss)
+    // Regenerator visual cue (only if not overridden by elite/boss/nemesis)
     if (!eliteType && !e.isBoss && type && type.aiPattern === 'regen') {
       e.setTint(0x22ff66);
       if (scene.tweens) {
@@ -2294,6 +2551,25 @@ window.MMA.Enemies = {
           ease: 'Sine.easeInOut'
         });
       }
+    }
+    
+    // Nemesis visual cue: purple glow with pulsing effect
+    if (type.isNemesis) {
+      e.setTint(self.NEMESIS_CONFIG.GLOW_COLOR);
+      if (scene.tweens) {
+        scene.tweens.add({
+          targets: e,
+          alpha: 0.7,
+          duration: 400,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
+      // Show nemesis spawn message
+      var nemesisName = type.name || typeKey;
+      scene.registry.set('gameMessage', 'NEMESIS: ' + nemesisName.toUpperCase() + '!');
+      scene.time.delayedCall(2000, function(){ scene.registry.set('gameMessage', ''); });
     }
     
     if (e.isBoss) { e.setTint(0xffd700); scene.registry.set('gameMessage', 'BOSS FIGHT!'); scene.time.delayedCall(2000, function(){ scene.registry.set('gameMessage', ''); }); }
@@ -2329,6 +2605,9 @@ window.MMA.Enemies = {
       self._showEnsembleIntro(scene, e);
     }
     
+    // Flash KO Blindness: check if this enemy type should be blinded from previous KO
+    self.applyBlindnessToEnemy(e);
+
     // Enemy Role Call: create icon above enemy based on role
     e._roleIconBase = self.getRoleIcon(e);
     var roleIcon = scene.add.text(0, 0, e._roleIconBase, {
@@ -2605,6 +2884,9 @@ window.MMA.Enemies = {
       // Update vengeance timers (5 second duration, then expires)
       self.updateVengeance(e, delta);
 
+      // Flash KO Blindness: update blindness timer
+      self.updateBlindness(e, delta);
+
       // Regenerator gimmick: periodic self-heal (non-boss only)
       if (e.type && e.type.aiPattern === 'regen' && !e.isBoss) {
         var rCfg = self.REGENERATOR_CONFIG;
@@ -2630,8 +2912,16 @@ window.MMA.Enemies = {
         }
       }
 
-      // Coach Demoralize: after a Coach is KO'd, nearby allies become SHAKEN for a short time
-      // (slower movement + slower attacks). This is driven by killEnemy() setting shakenTimer.
+      // Coach Down Disarray: after a Coach is KO'd, nearby allies are briefly disorganized.
+      // - they get SHAKEN (slower movement + slower attacks)
+      // - they cannot receive new coach boosts (noCoachTimer)
+      // This is driven by killEnemy() setting shakenTimer/noCoachTimer.
+      if (e.noCoachTimer === undefined) e.noCoachTimer = 0;
+      if (e.noCoachTimer > 0) {
+        e.noCoachTimer -= delta;
+        if (e.noCoachTimer < 0) e.noCoachTimer = 0;
+      }
+
       if (e.shakenTimer === undefined) e.shakenTimer = 0;
       if (e.shakenMoveMult === undefined) e.shakenMoveMult = 1;
       if (e.shakenAttackMult === undefined) e.shakenAttackMult = 1;
@@ -2877,6 +3167,11 @@ window.MMA.Enemies = {
     // Ring Rust: record fight time whenever an enemy is defeated
     this.recordFightTime();
 
+    // Flash KO Blindness: record the KO so same-type enemies in next room may be blinded
+    if (!enemy.isBoss) {
+      this.recordFlashKO(enemy.typeKey);
+    }
+
     // Loyalty Bond: trigger Vengeance on nearby allies when a non-boss enemy dies
     if (!enemy.isBoss) {
       this.applyVengeanceToNearby(enemy, scene);
@@ -2918,6 +3213,7 @@ window.MMA.Enemies = {
         var dx = other.x - enemy.x, dy = other.y - enemy.y;
         if (Math.sqrt(dx*dx + dy*dy) <= R) {
           other.shakenTimer = Math.max(other.shakenTimer || 0, 2600);
+          other.noCoachTimer = Math.max(other.noCoachTimer || 0, (MMA.Enemies.COACH_CONFIG.NO_COACH_DURATION_MS || 5000));
           other._shakenShown = false; // allow popup once
         }
       });
@@ -2928,6 +3224,37 @@ window.MMA.Enemies = {
 
     // Track enemy defeated in fight stats
     MMA.UI.recordEnemyDefeated();
+    
+    // Nemesis Encounter System: if defeated a nemesis enemy, grant Nemesis Slayer title and exclusive item
+    if (enemy.type && enemy.type.isNemesis && !this.hasSlainNemesis()) {
+      this.markNemesisSlain();
+      // Grant Nemesis Slayer title (best-effort via registry)
+      if (scene.registry) {
+        var titles = scene.registry.get('playerTitles') || [];
+        if (titles.indexOf(this.NEMESIS_CONFIG.SLAYER_TITLE) === -1) {
+          titles.push(this.NEMESIS_CONFIG.SLAYER_TITLE);
+          scene.registry.set('playerTitles', titles);
+        }
+      }
+      // Spawn exclusive Nemesis Ring item
+      if (typeof this.spawnItem === 'function') {
+        this.spawnItem(scene, enemy.x, enemy.y, this.NEMESIS_CONFIG.SLAYER_ITEM);
+      }
+      // Show celebration message
+      if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        MMA.UI.showDamageText(scene, enemy.x, enemy.y - 60, 'NEMESIS SLAYER!', '#ffd700');
+        scene.time.delayedCall(1500, function() {
+          MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 50, 'TITLE EARNED!', '#ffd700');
+        });
+      }
+      // Clear nemesis deaths for this type (new nemesis will emerge)
+      try {
+        var data = localStorage.getItem(this.NEMESIS_CONFIG.STORAGE_KEY);
+        var deaths = data ? JSON.parse(data) : {};
+        delete deaths[enemy.typeKey || enemy.type.nemesisType];
+        localStorage.setItem(this.NEMESIS_CONFIG.STORAGE_KEY, JSON.stringify(deaths));
+      } catch(e) {}
+    }
     
     // Check for outfit unlocks based on enemy type
     if (MMA.Outfits) {
@@ -3195,7 +3522,10 @@ window.MMA.Enemies.AI = {
             }
             
             // Body Language Read: short telegraph before the hit.
-            if (!window.MMA.Enemies.startTelegraphAttack(enemy, player, scene, dmg, 120, 'SHOULDER DIP', '#66ccff', 'SHOULDER DIP')) {
+            // Check for Flash KO Blindness miss chance
+            if (window.MMA.Enemies.rollBlindMiss(enemy)) {
+              MMA.UI.showDamageText(scene, player.x, player.y - 35, 'MISS!', '#ffffff');
+            } else if (!window.MMA.Enemies.startTelegraphAttack(enemy, player, scene, dmg, 120, 'SHOULDER DIP', '#66ccff', 'SHOULDER DIP')) {
               window.MMA.Enemies.damagePlayer(enemy, scene, dmg); 
             }
           } 
@@ -3422,7 +3752,12 @@ window.MMA.Enemies.AI = {
             window.MMA.Enemies.consumeMirrorMove(enemy);
             MMA.UI.showDamageText(scene, player.x, player.y - 35, window.MMA.Enemies.MIRROR_MATCH_CONFIG.MIRROR_TEXT + ' ' + mirrorMove, '#ff66ff');
           }
-          window.MMA.Enemies.damagePlayer(enemy, scene, dmg); 
+          // Check for Flash KO Blindness miss chance
+          if (window.MMA.Enemies.rollBlindMiss(enemy)) {
+            MMA.UI.showDamageText(scene, player.x, player.y - 35, 'MISS!', '#ffffff');
+          } else {
+            window.MMA.Enemies.damagePlayer(enemy, scene, dmg); 
+          }
           MMA.UI.showDamageText(scene, player.x, player.y - 30, names[comboNum] || 'HIT!', '#ff3366'); 
           enemy.aiState = 'combo' + (comboNum + 1); 
           enemy.comboTimer = 180 * attackMod; 

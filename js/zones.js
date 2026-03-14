@@ -44,7 +44,18 @@ window.MMA.Zones = {
     gym2:{id:'gym2',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{right:{col:15,row:5}},connections:{right:'gym1'},spawnPositions:[{col:4,row:4},{col:4,row:8}],enemyPool:['wrestler','judoka'],name:'Weight Area'},
     gym3:{id:'gym3',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{left:{col:0,row:5},up:{col:7,row:0}},connections:{left:'gym1',up:'gym4'},spawnPositions:[{col:11,row:4},{col:11,row:8}],enemyPool:['judoka','groundNPounder'],enemyPoolTrainers:['wrestler','judoka'],name:'Mats Hall'},
     // Dedicated Training Room: used for speed/accuracy/endurance minigame hooks
-    gym4:{id:'gym4',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym3',up:'gymTraining'},spawnPositions:[{col:7,row:4},{col:7,row:8}],enemyPool:['wrestler','groundNPounder','groundNPounder'],name:'Training Ring'},
+    // Also serves as the Zone 2 Rival Crossroads – metadata-only branching hooks
+    // that let other systems offer two thematic encounter paths and boss archetypes
+    // without hardcoding layout here.
+    gym4:{id:'gym4',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym3',up:'gymTraining'},spawnPositions:[{col:7,row:4},{col:7,row:8}],enemyPool:['wrestler','groundNPounder','groundNPounder'],name:'Training Ring',
+      rivalCrossroads:true,
+      rivalCrossroadsZone:2,
+      rivalCrossroadsLabel:'Rival Crossroads – Gym Paths',
+      rivalCrossroadsBranches:[
+        { id:'zone2_aggro', label:'Sparring Gauntlet Path', bossArchetype:'strikerBoss', description:'High-pressure striking rooms leading to an aggressive striker-style rival.' },
+        { id:'zone2_technical', label:'Technical Clinic Path', bossArchetype:'grapplerBoss', description:'Grappling-heavy rooms that culminate in a methodical grappler rival.' }
+      ]
+    },
     gymTraining:{id:'gymTraining',zone:2,weatherOptions:['clear'],weightClass:'middle',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym4',up:'trainingSim'},spawnPositions:[{col:5,row:4},{col:9,row:4},{col:7,row:8}],enemyPool:['wrestler','judoka','groundNPounder'],trainingTypes:['speed','accuracy','endurance'],trainingLabel:'Gym Training Room'},
     // Training Simulation: slow-mo friendly practice space with infinite stamina & dummy targets
     trainingSim:{
@@ -514,6 +525,33 @@ window.MMA.Zones = {
       crowdSizeScale: Math.min(3, 0.001 * (crowd.crowdSize || 0) + 0.25)
     };
   },
+  // Rival Crossroads helpers
+  // Metadata-only implementation of the backlog's "Rival Crossroads" feature.
+  // Specific rooms (usually mid-zone hubs) can advertise multiple branch
+  // options that lead to different encounter/boss archetypes. Zones just
+  // define the data; player/combat/UI systems decide how to surface choices
+  // and what branching actually does.
+  getRivalCrossroadsConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.rivalCrossroads) return null;
+    return {
+      active: true,
+      zone: room.rivalCrossroadsZone || room.zone || 1,
+      label: room.rivalCrossroadsLabel || 'Rival Crossroads',
+      branches: (room.rivalCrossroadsBranches || []).slice()
+    };
+  },
+  // Store/read the currently chosen branch for this run so other systems can
+  // tune enemy spawns, loot, or boss archetypes downstream without having to
+  // know which room originally presented the decision.
+  applyRivalCrossroadsChoice: function(scene, branchId) {
+    if (!scene || !scene.registry || !branchId) return;
+    scene.registry.set('rivalCrossroadsChosenBranch', branchId);
+  },
+  getRivalCrossroadsChoice: function(scene) {
+    if (!scene || !scene.registry) return null;
+    return scene.registry.get('rivalCrossroadsChosenBranch') || null;
+  },
   // Register performance after a fight to grow the crowd funding pool.
   // payload can include: damageDealt, killCount, maxCombo.
   registerCrowdFundingPerformance: function(scene, payload) {
@@ -557,6 +595,61 @@ window.MMA.Zones = {
     scene.registry.set('timeOfDayPhase', next);
     var label = next === 'day' ? 'Day' : (next === 'sunset' ? 'Sunset' : 'Night');
     scene.registry.set('timeOfDayLabel', label);
+  },
+  // Weather Adaptation System helpers
+  // Lightweight, run-local implementation of the backlog's weather affinity
+  // concept. We track how many rooms the player has fought in for each
+  // weather type this session and expose small, data-driven multipliers that
+  // combat systems can opt into. Affinity is intentionally subtle so it
+  // layers cleanly with existing buffs like crowd hype and weight class.
+  _getWeatherAffinityState: function(scene) {
+    if (!scene || !scene.registry) return { map:{}, lastType:null };
+    var map = scene.registry.get('weatherAffinityMap');
+    if (!map) map = {};
+    var last = scene.registry.get('weatherLastType') || null;
+    return { map: map, lastType: last };
+  },
+  _storeWeatherAffinityState: function(scene, state) {
+    if (!scene || !scene.registry || !state) return;
+    scene.registry.set('weatherAffinityMap', state.map || {});
+    scene.registry.set('weatherLastType', state.lastType || null);
+  },
+  _updateWeatherAffinityOnEnter: function(scene, weatherType) {
+    if (!scene || !scene.registry || !weatherType) return;
+    var state = this._getWeatherAffinityState(scene);
+    var map = state.map;
+    if (!map[weatherType]) map[weatherType] = { rooms:0, level:0 };
+    // Increment exposure for this weather and recompute a coarse level.
+    map[weatherType].rooms += 1;
+    var rooms = map[weatherType].rooms;
+    // Level 0: 0-2 rooms, Level 1: 3-5, Level 2: 6-8, Level 3+: 9+
+    var level = 0;
+    if (rooms >= 3 && rooms <= 5) level = 1;
+    else if (rooms >= 6 && rooms <= 8) level = 2;
+    else if (rooms >= 9) level = 3;
+    map[weatherType].level = level;
+    state.lastType = weatherType;
+    this._storeWeatherAffinityState(scene, state);
+    // Expose small damage / stamina efficiency multipliers keyed off level.
+    var dmgMult = 1.0 + (0.04 * level);
+    var staminaMult = 1.0 + (0.03 * level);
+    scene.registry.set('weatherAffinityType', weatherType);
+    scene.registry.set('weatherAffinityLevel', level);
+    scene.registry.set('weatherAffinityDamageMultiplier', dmgMult);
+    scene.registry.set('weatherAffinityStaminaMultiplier', staminaMult);
+    // Surface a short, non-spammy message when the level increases.
+    var lastNotifiedLevel = scene.registry.get('weatherAffinityLastNotifiedLevel_' + weatherType) || 0;
+    if (level > 0 && level !== lastNotifiedLevel) {
+      scene.registry.set('weatherAffinityLastNotifiedLevel_' + weatherType, level);
+      var label = weatherType.charAt(0).toUpperCase() + weatherType.slice(1);
+      var dmgPct = Math.round((dmgMult - 1.0) * 100);
+      var stamPct = Math.round((staminaMult - 1.0) * 100);
+      var msg = 'Weather Affinity: comfortable in ' + label + ' – +' + dmgPct + '% damage, +' + stamPct + '% stamina efficiency.';
+      scene.time.delayedCall(2550, function(){
+        scene.registry.set('gameMessage', msg);
+        scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+      });
+    }
   },
   // Weather helper: choose a weather type for the given room
   // weatherOptions on the room (array of strings) is preferred; otherwise we
@@ -613,6 +706,11 @@ window.MMA.Zones = {
   },
   applyWeatherToScene: function(scene, room) {
     var weather = this.chooseWeatherForRoom(scene, room);
+    // Update lightweight, session-local weather affinity state so combat
+    // systems can reward players who repeatedly fight in the same
+    // conditions. This keeps the "Weather Adaptation System" fully
+    // zone-driven and requires no save-file changes.
+    this._updateWeatherAffinityOnEnter(scene, weather.type);
     var active = weather.type !== 'clear';
     scene.registry.set('weatherActive', active);
     scene.registry.set('weatherType', weather.type);
@@ -723,6 +821,34 @@ window.MMA.Zones = {
         scene.registry.set('crowdFundingActive', false);
         // Preserve balance so donations feel persistent within the broader arena run.
         scene.registry.set('crowdFundingOptions', []);
+      }
+      // Rival Crossroads metadata: mid-zone decision rooms that let players
+      // pick between different encounter/boss archetype paths. Implementation
+      // is intentionally metadata-only here so that combat/player systems can
+      // hook into it without the zones file owning progression logic.
+      var crossroadsCfg = this.getRivalCrossroadsConfig(room.id);
+      if (crossroadsCfg && crossroadsCfg.active && crossroadsCfg.branches.length) {
+        scene.registry.set('rivalCrossroadsActive', true);
+        scene.registry.set('rivalCrossroadsZone', crossroadsCfg.zone);
+        scene.registry.set('rivalCrossroadsLabel', crossroadsCfg.label);
+        scene.registry.set('rivalCrossroadsBranches', crossroadsCfg.branches);
+        // Do not overwrite an existing choice – that is up to the systems
+        // that actually present and resolve the decision.
+        if (!scene.registry.get('rivalCrossroadsChosenBranch')) {
+          scene.registry.set('rivalCrossroadsChosenBranch', null);
+        }
+        scene.time.delayedCall(2300, function(){
+          var label = crossroadsCfg.label;
+          scene.registry.set('gameMessage', label + ': choose your path to shape which rival awaits.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('rivalCrossroadsActive', false);
+        scene.registry.set('rivalCrossroadsZone', 0);
+        scene.registry.set('rivalCrossroadsLabel', '');
+        scene.registry.set('rivalCrossroadsBranches', []);
+        // We deliberately keep rivalCrossroadsChosenBranch sticky across rooms
+        // so downstream systems can continue to read it.
       }
       // Training Room metadata: used by player/combat/UI systems for minigames
       if (room.trainingTypes && room.trainingTypes.length) {

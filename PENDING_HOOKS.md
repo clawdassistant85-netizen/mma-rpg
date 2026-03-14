@@ -16,6 +16,46 @@ document it here. The Reviewer agent will integrate these.
 - **Status**: 🔲 Not implemented
 - **Added**: 2026-03-14
 
+### Fighter's Roadmap Feature
+- **Module**: Player (js/player.js)
+- **Target file**: js/combat.js, js/ui.js, js/main.js, js/scenes/GameScene.js
+- **Description**: Visual skill progression tree that maps available techniques based on player's playstyle analytics. Dynamically reveals branches based on combo preferences, favorite zones, and boss defeat patterns. Requires player.js to store analytics and roadmap state, combat.js to track move usage patterns, ui.js for roadmap visualization and challenge display, main.js for persistence, GameScene.js to trigger analytics updates.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Combo Style Discovery Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/player.js, js/ui.js, js/main.js
+- **Description**: Hidden synergy bonuses discovered when specific move combinations are used repeatedly. Landing same combo 10+ times reveals synergy (e.g., boxer's rhythm +15% combo damage). Requires combat.js to track move sequences and detect synergy triggers, player.js to store unlocked synergies and apply bonuses, ui.js for "STYLE SYNERGY!" notification, main.js for persistence.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Rival Echo System Feature
+- **Module**: Enemies (js/enemies.js)
+- **Target file**: js/combat.js, js/player.js, js/ui.js, js/sprites.js
+- **Description**: After 3+ defeats to same enemy type, that enemy's style echoes in future fights with +15% attack speed. Clear by defeating without repeating moves. Requires enemies.js to apply echo aura and stat boosts, combat.js to track player move repetition, player.js to track defeat counts and echo states, ui.js for "RIVAL ECHO" warnings, sprites.js for translucent ghost aura rendering.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Arena Atmosphere Gauge Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/combat.js, js/player.js, js/ui.js, js/vfx.js
+- **Description**: Real-time arena conditions change based on combat — crowd energy affects lighting warmth, floor condition affects movement, ambient noise shifts. Warm lighting = +5% accuracy, scuffed floor = +3% dodge, crowd roar = +10% intimidation. Requires zones.js to define atmosphere parameters per room, combat.js to update atmosphere based on combat events, player.js to apply atmosphere bonuses, ui.js for atmosphere state HUD, vfx.js for lighting/particle effects.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Signature Entrance System Feature
+- **Module**: Sprites (js/sprites.js)
+- **Target file**: js/player.js, js/ui.js, js/scenes/GameScene.js, js/audio.js
+- **Description**: Customizable pre-fight entrance animations/music that build player identity. 5 entrance styles, 4 music genres, unlockable variations via championship wins. Plays before boss fights. Requires sprites.js for entrance animation variants, player.js to store entrance preferences, ui.js for customization UI, GameScene.js to trigger entrance sequence, audio.js for entrance music tracks.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
 ### Spirit Animal Companion Feature
 - **Module**: Sprites (js/sprites.js)
 - **Target file**: js/player.js, js/combat.js, js/ui.js, js/scenes/GameScene.js
@@ -124,6 +164,54 @@ document it here. The Reviewer agent will integrate these.
 - **Module**: Combat (js/combat.js)
 - **Target file**: js/vfx.js, js/sprites.js, js/ui.js
 - **Description**: During attack clashes, both fighters enter "Clash Standoff" — rapid button mash determines winner. Winner deals 2x damage + 1s stun. Loser gets knocked back. Requires combat.js for clash detection and mash logic, vfx.js for standoff visual, sprites.js for lockup poses, ui.js for mash prompt.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Combo Breaker System Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/enemies.js, js/ui.js, js/vfx.js
+- **Description**: Enemy AI gains ability to interrupt player combos at 10+ hits. Interrupt chance scales with enemy Fight IQ (15% base, +5% per enemy tier). When broken, player suffers 300ms stun and combo resets. Creates high-combo risk/reward. Requires enemies.js for AI interrupt logic, combat.js for combo tracking, vfx.js for interrupt flash effect (yellow glow), ui.js for "COMBO BROKEN!" warning.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Signature Tournament Bracket Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/combat.js, js/enemies.js, js/player.js, js/ui.js, js/scenes/GameScene.js
+- **Description**: Optional tournament mode with 4-8 fighter bracket. Self-contained roguelike run within main game. Requires zones.js for tournament arena rooms, enemies.js for evolved bracket variants, combat.js for bracket progression and match results, player.js for champion titles and bracket rewards, ui.js for bracket display and matchup announcements, GameScene.js for tournament flow.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Enemy Combo Memory Feature
+- **Module**: Enemies (js/enemies.js)
+- **Target file**: js/combat.js, js/player.js
+- **Description**: Enemies track player attack patterns over 45+ second fights. After adaptation threshold, enemy gains +20% defense against player's most-used combos. Player must vary strategy or exploit predictable enemy. Requires enemies.js for pattern tracking and adaptation, combat.js to report player move sequences, player.js for optional "feint" ability to reset enemy memory.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Nemesis Encounter System Feature
+- **Module**: Enemies (js/enemies.js)
+- **Target file**: js/main.js, js/player.js, js/ui.js
+- **Description**: Game tracks which enemy archetype defeats player most across sessions. That archetype becomes "Nemesis" with unique dialogue, purple/black glow, always scales to within 1 player level. Defeating Nemesis grants title + exclusive equipment. Requires main.js for persistent death tracking across saves, enemies.js for Nemesis variant spawning, player.js for Nemesis Slayer title, ui.js for Nemesis warning announcements.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Legacy Mode (New Game+) Feature
+- **Module**: Player (js/player.js)
+- **Target file**: js/main.js, js/scenes/GameScene.js, js/combat.js, js/enemies.js, js/ui.js
+- **Description**: NG+ after final boss — carryover learned techniques, 50% gold, champion titles. Enemies scale 1.1x per cycle. New exclusive NG+ techniques and equipment. Requires player.js for carryover state, main.js for NG+ cycle tracking, GameScene.js for difficulty scaling, combat.js for NG+ technique unlocks, enemies.js for scaled variants, ui.js for cycle counter and exclusive content display.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Training Day Minigames Feature
+- **Module**: Player (js/player.js)
+- **Target file**: js/scenes/GameScene.js, js/combat.js, js/ui.js
+- **Description**: Optional pre-zone training sessions — speed bag (rhythm), heavy bag (combo), sparring dummy (counter). Performance grades D-S grant +2-10% stat bonuses. Requires player.js for bonus application, GameScene.js for minigame scene, combat.js for scoring logic, ui.js for grade display and zone selection.
 - **Priority**: P2
 - **Status**: 🔲 Not implemented
 - **Added**: 2026-03-14

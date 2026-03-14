@@ -25,6 +25,7 @@ var BootScene = new Phaser.Class({
     this.installExertionCueHook();
     this.installLastChancePulseHook();
     this.installFightIqAuraReadHook();
+    this.installEnemyFearTrembleHook();
     this.scene.start('GameScene');
     this.scene.stop('BootScene');
   },
@@ -2039,5 +2040,131 @@ var BootScene = new Phaser.Class({
     };
 
     Phaser.Physics.Arcade.Sprite.prototype._mmaFightIqAuraReadHookInstalled = true;
+  },
+  installEnemyFearTrembleHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaEnemyFearTrembleHookInstalled) return;
+
+    function getFearConfig() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.FEAR_TREMBLE_CONFIG) || {};
+    }
+
+    function isEnemy(sprite) {
+      return !!(sprite && sprite.scene && sprite.scene.player !== sprite && sprite.stats && sprite.stats.maxHp);
+    }
+
+    function markRecentDamage(scene, beforeState) {
+      if (!scene) return;
+      var now = scene.time && typeof scene.time.now === 'number' ? scene.time.now : 0;
+      for (var i = 0; i < beforeState.length; i++) {
+        var entry = beforeState[i];
+        var enemy = entry.enemy;
+        if (!enemy || !enemy.active || !enemy.stats || typeof entry.hp !== 'number' || typeof enemy.stats.hp !== 'number') continue;
+        var dealt = Math.max(0, entry.hp - enemy.stats.hp);
+        if (dealt <= 0) continue;
+        enemy._mmaFearRecentDamage = Math.max(enemy._mmaFearRecentDamage || 0, dealt);
+        enemy._mmaFearRecentDamageAt = now;
+      }
+    }
+
+    function snapshotEnemyHealth(scene) {
+      var enemies = (scene && scene.enemyGroup && typeof scene.enemyGroup.getChildren === 'function') ? scene.enemyGroup.getChildren() : [];
+      return enemies.map(function(enemy) {
+        return {
+          enemy: enemy,
+          hp: enemy && enemy.stats && typeof enemy.stats.hp === 'number' ? enemy.stats.hp : null
+        };
+      });
+    }
+
+    function wrapCombatMethod(methodName) {
+      if (!window.MMA || !window.MMA.Combat) return;
+      var original = window.MMA.Combat[methodName];
+      if (typeof original !== 'function' || original._mmaFearTrembleWrapped) return;
+      var wrapped = function(scene) {
+        var before = snapshotEnemyHealth(scene);
+        var result = original.apply(this, arguments);
+        markRecentDamage(scene, before);
+        return result;
+      };
+      wrapped._mmaFearTrembleWrapped = true;
+      window.MMA.Combat[methodName] = wrapped;
+    }
+
+    wrapCombatMethod('executeMove');
+    wrapCombatMethod('executeSpecialMove');
+    wrapCombatMethod('executeGroundMove');
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+
+      if (!this.active || !this.scene || !isEnemy(this)) {
+        if (this._mmaFearBaseScaleX) this.setScale(this._mmaFearBaseScaleX, this._mmaFearBaseScaleY || this._mmaFearBaseScaleX);
+        this.setAngle(0);
+        this.setAlpha(1);
+        this.clearTint();
+        this._mmaFearActive = false;
+        return;
+      }
+
+      var cfg = getFearConfig();
+      var hpRatio = Phaser.Math.Clamp(this.stats.hp / this.stats.maxHp, 0, 1);
+      var threshold = typeof cfg.healthThreshold === 'number' ? cfg.healthThreshold : 0.25;
+      var recentWindow = typeof cfg.recentDamageWindowMs === 'number' ? cfg.recentDamageWindowMs : 1400;
+      var now = this.scene.time && typeof this.scene.time.now === 'number' ? this.scene.time.now : time;
+      var recentDamage = 0;
+      if (this._mmaFearRecentDamageAt && now - this._mmaFearRecentDamageAt <= recentWindow) {
+        recentDamage = this._mmaFearRecentDamage || 0;
+      } else if (this._mmaFearRecentDamageAt && now - this._mmaFearRecentDamageAt > recentWindow) {
+        this._mmaFearRecentDamage = 0;
+      }
+
+      if (hpRatio > threshold) {
+        if (this._mmaFearActive) {
+          this.setAngle(0);
+          this.setAlpha(1);
+          this.clearTint();
+          this.setScale(this._mmaFearBaseScaleX || this.scaleX || 1, this._mmaFearBaseScaleY || this.scaleY || 1);
+        }
+        this._mmaFearActive = false;
+        return;
+      }
+
+      if (!this._mmaFearBaseScaleX) {
+        this._mmaFearBaseScaleX = this.scaleX || 1;
+        this._mmaFearBaseScaleY = this.scaleY || 1;
+      }
+
+      var fearIntensity = Phaser.Math.Clamp((threshold - hpRatio) / Math.max(0.001, threshold), 0, 1);
+      var damageBoost = Phaser.Math.Clamp(recentDamage / 24, 0, typeof cfg.damageBoostCap === 'number' ? cfg.damageBoostCap : 0.9);
+      var totalIntensity = Phaser.Math.Clamp(fearIntensity + damageBoost, 0, 1.8);
+      var pulse = Math.sin(time * (cfg.pulseSpeed || 0.02));
+      var jiggle = Math.cos(time * ((cfg.pulseSpeed || 0.02) * 1.8));
+      var amplitude = (cfg.amplitude || 1.6) * (0.4 + totalIntensity);
+      var angle = (cfg.angle || 3.5) * totalIntensity;
+
+      this.setAngle((pulse + jiggle * 0.35) * angle);
+      this.setScale(
+        (this._mmaFearBaseScaleX || 1) + Math.abs(jiggle) * 0.03 * totalIntensity,
+        (this._mmaFearBaseScaleY || 1) - Math.abs(pulse) * 0.02 * Math.min(1, totalIntensity)
+      );
+      this.setTintFill((cfg.tint || 0xffb3c1));
+      this.setAlpha(0.92 + Math.abs(pulse) * 0.08);
+      this._mmaFearActive = true;
+
+      var labelCooldown = typeof cfg.labelCooldown === 'number' ? cfg.labelCooldown : 1800;
+      if (window.MMA && window.MMA.UI && typeof MMA.UI.showDamageText === 'function' && (!this._mmaFearLabelAt || now - this._mmaFearLabelAt >= labelCooldown)) {
+        MMA.UI.showDamageText(this.scene, this.x, this.y - 72, 'THEY\'RE SHOOK', '#ffb3c1');
+        this._mmaFearLabelAt = now;
+      }
+    };
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      this._mmaFearActive = false;
+      return originalDestroy.call(this, fromScene);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaEnemyFearTrembleHookInstalled = true;
   }
 });

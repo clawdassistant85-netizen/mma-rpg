@@ -60,6 +60,10 @@ window.MMA.Combat = {
   CHAIN_COUNTER_MAX_STACKS: 5,
   CHAIN_COUNTER_DAMAGE_PER_STACK: 0.25,
   COUNTER_ATTACK_WINDOW_MS: 700,
+  COUNTER_FLOW_MAX_STACKS: 3,
+  COUNTER_FLOW_WINDOW_PENALTY_MS: 20,
+  COUNTER_FLOW_COUNTER_BONUS_PER_STACK: 0.15,
+  COUNTER_FLOW_AUTO_DURATION_MS: 3000,
   GUARD_CRUSH_BLOCKS_REQUIRED: 5,
   GUARD_CRUSH_WINDOW_MS: 2000,
   GUARD_CRUSH_RELEASE_MS: 1000,
@@ -78,6 +82,10 @@ window.MMA.Combat = {
   RECOVERY_TECH_WINDOW_MS: 300,
   RECOVERY_TECH_STAMINA_COST: 15,
   RECOVERY_TECH_DAMAGE_MULTIPLIER: 2,
+  COMBO_BREAKER_MIN_HITS: 10,
+  COMBO_BREAKER_BASE_CHANCE: 0.15,
+  COMBO_BREAKER_TIER_BONUS: 0.05,
+  COMBO_BREAKER_PLAYER_STUN_MS: 300,
   STYLE_MASTERY_COUNTER_GAIN: 50,
   STYLE_MASTERY_THRESHOLD: 100,
   STYLE_MASTERY_DAMAGE_MULTIPLIER: 1.4,
@@ -296,6 +304,7 @@ window.MMA.Combat = {
     var hp = (scene.player && scene.player.stats && typeof scene.player.stats.hp === 'number') ? scene.player.stats.hp : state.lastKnownHp;
     if (typeof hp === 'number' && hp < state.lastKnownHp) {
       state.consecutiveHitsTaken += 1;
+      this.resetComboBreakerState(scene);
     }
     state.lastKnownHp = hp;
     return state;
@@ -304,6 +313,53 @@ window.MMA.Combat = {
     var state = this.ensureMomentumShiftState(scene);
     state.consecutiveHitsTaken = 0;
     return state;
+  },
+  ensureComboBreakerState: function(scene) {
+    scene.player.comboBreakerState = scene.player.comboBreakerState || { comboHits: 0 };
+    return scene.player.comboBreakerState;
+  },
+  onComboBreakerHit: function(scene) {
+    var state = this.ensureComboBreakerState(scene);
+    state.comboHits += 1;
+    return state;
+  },
+  resetComboBreakerState: function(scene) {
+    var state = this.ensureComboBreakerState(scene);
+    state.comboHits = 0;
+    return state;
+  },
+  getEnemyComboBreakerTier: function(enemy) {
+    if (!enemy || !enemy.type) return 0;
+    var tier = enemy.type.tier;
+    if (typeof tier !== 'number') tier = enemy.type.rank;
+    if (typeof tier !== 'number') tier = enemy.type.difficulty;
+    if (typeof tier !== 'number') tier = 0;
+    return Math.max(0, Math.floor(tier));
+  },
+  maybeTriggerComboBreaker: function(scene, enemy) {
+    var state = this.ensureComboBreakerState(scene);
+    if (!enemy || !enemy.active || enemy.state === 'dead') return false;
+    if (state.comboHits < this.COMBO_BREAKER_MIN_HITS) return false;
+
+    var tier = this.getEnemyComboBreakerTier(enemy);
+    var chance = Phaser.Math.Clamp(this.COMBO_BREAKER_BASE_CHANCE + (tier * this.COMBO_BREAKER_TIER_BONUS), 0, 0.75);
+    if (Math.random() >= chance) return false;
+
+    scene.player.stunnedUntil = Math.max(scene.player.stunnedUntil || 0, scene.time.now + this.COMBO_BREAKER_PLAYER_STUN_MS);
+    this.resetComboBreakerState(scene);
+    this.onMomentumMiss(scene);
+    this.onPressureMiss(scene);
+    this.onStunChainMiss(scene);
+    this.onWhiffShiftMiss(scene);
+    this.resetBreakingPointChain(scene);
+    MMA.UI.resetCombo();
+    if (enemy.setTint) enemy.setTint(0xffee58);
+    scene.time.delayedCall(120, function() {
+      if (enemy && enemy.active && enemy.clearTint) enemy.clearTint();
+    });
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 114, 'COMBO BREAKER!', '#ffee58');
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 92, 'COMBO BROKEN', '#ff9e9e');
+    return true;
   },
   maybeTriggerMomentumShift: function(scene, didCounterHit) {
     var state = this.ensureMomentumShiftState(scene);
@@ -389,6 +445,69 @@ window.MMA.Combat = {
       if (typeof value === 'number' && isFinite(value)) best = Math.max(best, value);
     }
     return best;
+  },
+  ensureCounterFlowState: function(scene) {
+    scene.player.counterFlowState = scene.player.counterFlowState || {
+      stacks: 0,
+      lastSeenBlockAt: 0,
+      autoCounterUntil: 0
+    };
+    return scene.player.counterFlowState;
+  },
+  refreshCounterFlowState: function(scene) {
+    var state = this.ensureCounterFlowState(scene);
+    var now = scene.time.now;
+    var lastBlockAt = this.getLastBlockTimestamp(scene);
+
+    if (lastBlockAt && lastBlockAt !== state.lastSeenBlockAt) {
+      state.lastSeenBlockAt = lastBlockAt;
+      if (now >= (state.autoCounterUntil || 0)) {
+        state.stacks = Math.min(this.COUNTER_FLOW_MAX_STACKS, state.stacks + 1);
+        MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 116, 'COUNTER FLOW x' + state.stacks, '#a5f3fc');
+        if (state.stacks >= this.COUNTER_FLOW_MAX_STACKS) {
+          MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 134, 'FLOW STATE PRIMED', '#67e8f9');
+        }
+      }
+    }
+
+    if (state.autoCounterUntil && now >= state.autoCounterUntil) {
+      state.autoCounterUntil = 0;
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 134, 'FLOW STATE ENDED', '#9ca3af');
+    }
+
+    return state;
+  },
+  isCounterFlowAutoCounterActive: function(scene) {
+    var state = this.ensureCounterFlowState(scene);
+    return scene.time.now < (state.autoCounterUntil || 0);
+  },
+  getCounterAttackWindow: function(scene) {
+    var state = this.ensureCounterFlowState(scene);
+    if (scene.time.now < (state.autoCounterUntil || 0)) return this.COUNTER_ATTACK_WINDOW_MS;
+    var reduction = (state.stacks || 0) * this.COUNTER_FLOW_WINDOW_PENALTY_MS;
+    return Math.max(220, this.COUNTER_ATTACK_WINDOW_MS - reduction);
+  },
+  applyCounterFlowOnCounterHit: function(scene, damage, didCounterHit) {
+    var state = this.ensureCounterFlowState(scene);
+    if (!didCounterHit) return { damage: damage, active: false, stacks: state.stacks, flowState: false };
+
+    var flowStateActive = scene.time.now < (state.autoCounterUntil || 0);
+    var stacksForBonus = flowStateActive ? this.COUNTER_FLOW_MAX_STACKS : (state.stacks || 0);
+    var mult = 1 + (stacksForBonus * this.COUNTER_FLOW_COUNTER_BONUS_PER_STACK);
+    var boosted = Math.round(damage * mult);
+
+    if (!flowStateActive && state.stacks >= this.COUNTER_FLOW_MAX_STACKS) {
+      state.autoCounterUntil = scene.time.now + this.COUNTER_FLOW_AUTO_DURATION_MS;
+      state.stacks = 0;
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 152, 'FLOW STATE ACTIVE!', '#22d3ee');
+    }
+
+    return {
+      damage: boosted,
+      active: stacksForBonus > 0,
+      stacks: stacksForBonus,
+      flowState: flowStateActive
+    };
   },
   isBlocking: function(scene) {
     if (!scene || !scene.player) return false;
@@ -521,9 +640,10 @@ window.MMA.Combat = {
   },
   isCounterAttackWindow: function(scene, enemy) {
     if (!enemy || !enemy.active || enemy.state === 'dead') return false;
+    if (this.isCounterFlowAutoCounterActive(scene)) return true;
     var lastBlockAt = this.getLastBlockTimestamp(scene);
     if (!lastBlockAt) return false;
-    return (scene.time.now - lastBlockAt) <= this.COUNTER_ATTACK_WINDOW_MS;
+    return (scene.time.now - lastBlockAt) <= this.getCounterAttackWindow(scene);
   },
   getExploitRecoveryState: function(scene) {
     scene.player.exploitRecoveryState = scene.player.exploitRecoveryState || { consumedAtDodge: 0 };
@@ -1408,6 +1528,7 @@ window.MMA.Combat = {
           continue;
         }
         this.onIntuitionEngage(scene, enemy);
+        if (this.maybeTriggerComboBreaker(scene, enemy)) continue;
         var counterAttack = this.isCounterAttackWindow(scene, enemy);
         var attackBonus = scene.player.attackBonus || 0;
         var baseDamage = Math.round((move.damage + attackBonus) * 1.2);
@@ -1429,7 +1550,8 @@ window.MMA.Combat = {
         var panicAdjusted = this.applyMentalPanicIfActive(scene, enemy, rageAdjustedDamage);
         var deadlyWindowAdjusted = this.applyDeadlyWindowIfActive(scene, enemy, panicAdjusted.damage);
         var chainCounterAdjusted = this.applyChainCounterIfActive(scene, deadlyWindowAdjusted.damage, counterAttack);
-        var breakingPointAdjusted = this.applyBreakingPointIfActive(scene, enemy, chainCounterAdjusted.damage);
+        var counterFlowAdjusted = this.applyCounterFlowOnCounterHit(scene, chainCounterAdjusted.damage, counterAttack);
+        var breakingPointAdjusted = this.applyBreakingPointIfActive(scene, enemy, counterFlowAdjusted.damage);
         var finishHimAdjusted = this.applyFinishHimIfArmed(scene, enemy, breakingPointAdjusted.damage);
         this.applyLimbInjuryOnHit(scene, enemy, moveKey);
         var injuryAdjusted = this.applyInjuryDamageBonus(enemy, finishHimAdjusted.damage);
@@ -1441,6 +1563,7 @@ window.MMA.Combat = {
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
         this.resetMomentumShiftHits(scene);
+        this.onComboBreakerHit(scene);
         // Track swarm damage for split detection
         if (MMA.Enemies.recordSwarmDamage) {
           MMA.Enemies.recordSwarmDamage(enemy, dmg);
@@ -1481,6 +1604,9 @@ window.MMA.Combat = {
         }
         if (chainCounterAdjusted.active) {
           MMA.UI.showDamageText(scene, enemy.x, enemy.y - 116, 'CHAIN COUNTER x' + chainCounterAdjusted.stacks, '#a0f0ff');
+        }
+        if (counterFlowAdjusted.active) {
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 122, 'COUNTER FLOW x' + counterFlowAdjusted.stacks, '#67e8f9');
         }
         if (breakingPointAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 120, 'BREAKING POINT OPEN!', '#ff8fab');
         if (exploitRecovery.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 112, 'EXPLOIT WINDOW x1.3', '#44d6ff');
@@ -1524,6 +1650,7 @@ window.MMA.Combat = {
       this.onMomentumMiss(scene);
       this.onStunChainMiss(scene);
       this.onWhiffShiftMiss(scene);
+      this.resetComboBreakerState(scene);
       this.resetBreakingPointChain(scene);
       MMA.UI.resetCombo();
     }
@@ -1560,6 +1687,7 @@ window.MMA.Combat = {
       if (dist <= DT * 2.5) {
         hit = true;
         this.onIntuitionEngage(scene, enemy);
+        if (this.maybeTriggerComboBreaker(scene, enemy)) continue;
         var counterAttack = this.isCounterAttackWindow(scene, enemy);
         var attackBonus = scene.player.attackBonus || 0;
         var baseDamage = Math.round((move.damage + attackBonus) * 1.2);
@@ -1579,7 +1707,8 @@ window.MMA.Combat = {
         var panicAdjusted = this.applyMentalPanicIfActive(scene, enemy, rageAdjustedDamage);
         var deadlyWindowAdjusted = this.applyDeadlyWindowIfActive(scene, enemy, panicAdjusted.damage);
         var chainCounterAdjusted = this.applyChainCounterIfActive(scene, deadlyWindowAdjusted.damage, counterAttack);
-        var breakingPointAdjusted = this.applyBreakingPointIfActive(scene, enemy, chainCounterAdjusted.damage);
+        var counterFlowAdjusted = this.applyCounterFlowOnCounterHit(scene, chainCounterAdjusted.damage, counterAttack);
+        var breakingPointAdjusted = this.applyBreakingPointIfActive(scene, enemy, counterFlowAdjusted.damage);
         var finishHimAdjusted = this.applyFinishHimIfArmed(scene, enemy, breakingPointAdjusted.damage);
         this.applyLimbInjuryOnHit(scene, enemy, bestMoveKey);
         var injuryAdjusted = this.applyInjuryDamageBonus(enemy, finishHimAdjusted.damage);
@@ -1591,6 +1720,7 @@ window.MMA.Combat = {
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
         this.resetMomentumShiftHits(scene);
+        this.onComboBreakerHit(scene);
         // Track swarm damage for split detection
         if (MMA.Enemies.recordSwarmDamage) {
           MMA.Enemies.recordSwarmDamage(enemy, dmg);
@@ -1628,6 +1758,9 @@ window.MMA.Combat = {
         }
         if (chainCounterAdjusted.active) {
           MMA.UI.showDamageText(scene, enemy.x, enemy.y - 118, 'CHAIN COUNTER x' + chainCounterAdjusted.stacks, '#a0f0ff');
+        }
+        if (counterFlowAdjusted.active) {
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 124, 'COUNTER FLOW x' + counterFlowAdjusted.stacks, '#67e8f9');
         }
         if (breakingPointAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 122, 'BREAKING POINT OPEN!', '#ff8fab');
         if (exploitRecovery.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 114, 'EXPLOIT WINDOW x1.3', '#44d6ff');
@@ -1670,6 +1803,7 @@ window.MMA.Combat = {
       this.onMomentumMiss(scene);
       this.onStunChainMiss(scene);
       this.onWhiffShiftMiss(scene);
+      this.resetComboBreakerState(scene);
       this.resetBreakingPointChain(scene);
     }
     MMA.VFX.playAttackEffect(scene, 'cross', scene.player.x, scene.player.y - 4, px, py);
@@ -1725,6 +1859,7 @@ window.MMA.Combat = {
   handleInput: function(scene, delta) {
     this.refreshChainCounterState(scene);
     this.refreshMomentumShiftState(scene);
+    this.refreshCounterFlowState(scene);
     this.refreshBreakthroughState(scene);
     this.applyGuardCrushChip(scene, delta);
     if (scene.player.stunnedUntil && scene.time.now < scene.player.stunnedUntil) {

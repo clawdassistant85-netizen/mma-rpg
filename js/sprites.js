@@ -156,6 +156,16 @@ window.MMA.Sprites = {
     }
   },
   ATTACK_READ_TEXTURES: {},
+  FEAR_TREMBLE_CONFIG: {
+    healthThreshold: 0.25,
+    pulseSpeed: 0.02,
+    amplitude: 1.6,
+    angle: 3.5,
+    recentDamageWindowMs: 1400,
+    damageBoostCap: 0.9,
+    labelCooldown: 1800,
+    tint: 0xffb3c1
+  },
   VISUAL_VARIANTS: {},
   EQUIPMENT_TEXTURES: {},
   STYLE_AURA_COLORS: {

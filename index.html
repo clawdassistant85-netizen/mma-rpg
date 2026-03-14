@@ -229,6 +229,23 @@
       50% { opacity: 1; }
     }
     
+    /* Stamina Break Warning Overlay - flashes when enemy is about to stagger */
+    #stamina-break-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 28;
+      transition: opacity 150ms ease;
+    }
+    #stamina-break-overlay.active {
+      animation: staminaBreakFlash 400ms ease-in-out infinite;
+    }
+    @keyframes staminaBreakFlash {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 0.9; }
+    }
+    
     @keyframes healthPulse {
       0%, 100% { opacity: 0; }
       50% { opacity: 1; }
@@ -314,6 +331,7 @@
       <div id="screen-flash-overlay"></div>
       <div id="health-pulse-overlay"></div>
       <div id="danger-warning-overlay"></div>
+      <div id="stamina-break-overlay"></div>
       <div id="weight-class-indicator" title="Weight class affects speed/power">
         <span class="wc-icon">⚖️</span>
         <span class="wc-name">Featherweight</span>

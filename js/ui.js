@@ -403,6 +403,8 @@ window.MMA.UI = {
     // Reset perfect block counter for new fight
     this.perfectBlockCounter.count = 0;
     this.perfectBlockCounter.lastBlockTime = 0;
+    // Reset combo milestones for new fight
+    this.resetComboMilestones();
   },
   // Per-fight style tracking (resets each fight)
   fightStylePoints: { strike: 0, grapple: 0 },
@@ -525,6 +527,106 @@ window.MMA.UI = {
       container.setAlpha(1);
       this.comboCounter.visible = true;
     }
+    
+    // Check for combo milestones
+    this.checkComboMilestone(scene, count);
+  },
+  // Combo Milestone System - special effects at combo thresholds
+  comboMilestones: {
+    lastMilestone: 0,
+    milestones: [
+      { count: 5, text: 'NICE!', color: '#44ff44', scale: 1.0 },
+      { count: 10, text: 'COMBO MAGIC!', color: '#ff6600', scale: 1.2 },
+      { count: 15, text: 'UNSTOPPABLE!', color: '#ff00ff', scale: 1.4 },
+      { count: 20, text: 'BEAST MODE!', color: '#ff0044', scale: 1.6 },
+      { count: 25, text: 'LEGENDARY!', color: '#ffd700', scale: 2.0 }
+    ]
+  },
+  // Check and trigger combo milestones
+  checkComboMilestone: function(scene, count) {
+    var self = this;
+    var ms = this.comboMilestones;
+    
+    // Find the highest milestone reached (that we haven't shown yet)
+    var reachedMilestone = null;
+    for (var i = ms.milestones.length - 1; i >= 0; i--) {
+      if (count >= ms.milestones[i].count && ms.lastMilestone < ms.milestones[i].count) {
+        reachedMilestone = ms.milestones[i];
+        ms.lastMilestone = reachedMilestone.count;
+        break;
+      }
+    }
+    
+    if (!reachedMilestone) return;
+    
+    var centerX = scene.cameras.main.width / 2;
+    var centerY = scene.cameras.main.height / 2 - 30;
+    
+    // Create milestone text
+    var milestoneText = scene.add.text(centerX, centerY, reachedMilestone.text, {
+      fontFamily: 'Arial Black, sans-serif',
+      fontSize: (28 * reachedMilestone.scale) + 'px',
+      color: reachedMilestone.color,
+      stroke: '#000000',
+      strokeThickness: 4 * reachedMilestone.scale,
+      fontStyle: 'bold'
+    }).setOrigin(0.5).setDepth(80);
+    
+    // Glow effect for high milestones
+    if (reachedMilestone.scale >= 1.4) {
+      var glow = scene.add.graphics();
+      glow.fillStyle(parseInt(reachedMilestone.color.replace('#', '0x'), 16), 0.3);
+      glow.fillCircle(centerX, centerY, 80 * reachedMilestone.scale);
+      glow.setDepth(79);
+      
+      scene.tweens.add({
+        targets: glow,
+        alpha: 0,
+        scaleX: 1.5,
+        scaleY: 1.5,
+        duration: 800,
+        onComplete: function() { if (glow && glow.destroy) glow.destroy(); }
+      });
+    }
+    
+    // Animate text
+    scene.tweens.add({
+      targets: milestoneText,
+      scaleX: reachedMilestone.scale * 1.2,
+      scaleY: reachedMilestone.scale * 1.2,
+      duration: 150,
+      yoyo: true,
+      ease: 'Quad.easeOut'
+    });
+    
+    scene.tweens.add({
+      targets: milestoneText,
+      alpha: 0,
+      y: centerY - 50,
+      delay: 800,
+      duration: 400,
+      ease: 'Quad.easeIn',
+      onComplete: function() { if (milestoneText && milestoneText.destroy) milestoneText.destroy(); }
+    });
+    
+    // Screen flash for very high milestones (15+)
+    if (reachedMilestone.scale >= 1.4) {
+      var flash = scene.add.graphics();
+      flash.fillStyle(parseInt(reachedMilestone.color.replace('#', '0x'), 16), 0.25);
+      flash.fillRect(0, 0, scene.cameras.main.width, scene.cameras.main.height);
+      flash.setDepth(78);
+      
+      scene.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: 400,
+        onComplete: function() { if (flash && flash.destroy) flash.destroy(); }
+      });
+    }
+  },
+  // Reset combo milestones (call at start of new fight)
+  resetComboMilestones: function() {
+    this.comboMilestones.lastMilestone = 0;
   },
   hideComboCounter: function(scene) {
     var container = this.comboCounter.container;
@@ -1642,6 +1744,203 @@ window.MMA.UI = {
     container: null,
     indicators: []
   },
+  // Stamina Break Warning - shows when enemy stamina is critically low, indicating they're about to stagger
+  staminaBreakWarning: {
+    active: false,
+    container: null,
+    enemy: null,
+    warningThreshold: 0.2, // 20% stamina triggers warning
+    breakThreshold: 0, // 0% stamina = break
+    isBroken: false
+  },
+  // Show stamina break warning for an enemy
+  showStaminaBreakWarning: function(scene, enemy) {
+    if (!enemy || !enemy.stats || !enemy.stats.stamina) return;
+    
+    var self = this;
+    var maxStamina = enemy.stats.maxStamina || 100;
+    var currentStamina = enemy.stats.stamina;
+    var pct = currentStamina / maxStamina;
+    
+    // Only show if stamina is low but not already broken
+    if (pct > this.staminaBreakWarning.warningThreshold || this.staminaBreakWarning.isBroken) {
+      return;
+    }
+    
+    this.staminaBreakWarning.active = true;
+    this.staminaBreakWarning.enemy = enemy;
+    
+    // Create or get container
+    if (!this.staminaBreakWarning.container) {
+      var rightX = scene.cameras.main.width - 100;
+      var topY = 140;
+      
+      var container = scene.add.container(rightX, topY);
+      container.setDepth(55);
+      container.setAlpha(0);
+      
+      // Background - warning color
+      var bg = scene.add.graphics();
+      bg.fillStyle(0xff4444, 0.8);
+      bg.fillRoundedRect(0, -15, 80, 30, 8);
+      container.add(bg);
+      
+      // Warning icon and text
+      var icon = scene.add.text(10, 0, '⚡', { fontSize: '16px' }).setOrigin(0, 0.5);
+      container.add(icon);
+      
+      var text = scene.add.text(35, 0, 'STAMINA\nBREAK!', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '10px',
+        color: '#ffffff',
+        fontStyle: 'bold'
+      }).setOrigin(0, 0.5);
+      container.add(text);
+      
+      this.staminaBreakWarning.container = container;
+      this.staminaBreakWarning.icon = icon;
+      this.staminaBreakWarning.text = text;
+    }
+    
+    var container = this.staminaBreakWarning.container;
+    
+    // Show container with pulse animation
+    container.setAlpha(1);
+    scene.tweens.add({
+      targets: container,
+      scaleX: 1.15,
+      scaleY: 1.15,
+      duration: 200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    
+    // Screen edge flash
+    var flash = scene.add.graphics();
+    flash.fillStyle(0xff4444, 0.15);
+    flash.fillRect(0, 0, scene.cameras.main.width, scene.cameras.main.height);
+    flash.setDepth(54);
+    scene.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 400,
+      onComplete: function() { if (flash && flash.destroy) flash.destroy(); }
+    });
+  },
+  // Update stamina break warning - call this each frame when enemy has low stamina
+  updateStaminaBreakWarning: function(scene, enemy) {
+    if (!enemy || !enemy.stats || !enemy.stats.stamina) {
+      this.hideStaminaBreakWarning(scene);
+      return;
+    }
+    
+    var maxStamina = enemy.stats.maxStamina || 100;
+    var currentStamina = enemy.stats.stamina;
+    var pct = currentStamina / maxStamina;
+    
+    // Enemy is broken - stagger them
+    if (pct <= this.staminaBreakWarning.breakThreshold && !this.staminaBreakWarning.isBroken) {
+      this.triggerStaminaBreak(scene, enemy);
+      return;
+    }
+    
+    // Show warning when stamina is critically low
+    if (pct <= this.staminaBreakWarning.warningThreshold && pct > this.staminaBreakWarning.breakThreshold && !this.staminaBreakWarning.active) {
+      this.showStaminaBreakWarning(scene, enemy);
+    }
+    
+    // Hide if stamina recovered
+    if (pct > this.staminaBreakWarning.warningThreshold && this.staminaBreakWarning.active) {
+      this.hideStaminaBreakWarning(scene);
+    }
+  },
+  // Trigger stamina break - enemy becomes staggered
+  triggerStaminaBreak: function(scene, enemy) {
+    this.staminaBreakWarning.isBroken = true;
+    this.staminaBreakWarning.active = false;
+    
+    // Stop pulse animation
+    if (this.staminaBreakWarning.container) {
+      scene.tweens.killTweensOf(this.staminaBreakWarning.container);
+    }
+    
+    // Show "BREAK!" text
+    var centerX = scene.cameras.main.width / 2;
+    var centerY = scene.cameras.main.height / 2;
+    
+    var breakText = scene.add.text(centerX, centerY - 60, 'STAMINA BREAK!', {
+      fontFamily: 'Arial Black, sans-serif',
+      fontSize: '32px',
+      color: '#ff4444',
+      stroke: '#000000',
+      strokeThickness: 4
+    }).setOrigin(0.5).setDepth(100);
+    
+    // Big flash effect
+    var flash = scene.add.graphics();
+    flash.fillStyle(0xff0000, 0.4);
+    flash.fillRect(0, 0, scene.cameras.main.width, scene.cameras.main.height);
+    flash.setDepth(99);
+    scene.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 500,
+      onComplete: function() { if (flash && flash.destroy) flash.destroy(); }
+    });
+    
+    scene.tweens.add({
+      targets: breakText,
+      scaleX: 1.3,
+      scaleY: 1.3,
+      duration: 200,
+      yoyo: true,
+      repeat: 1
+    });
+    
+    scene.tweens.add({
+      targets: breakText,
+      alpha: 0,
+      y: centerY - 100,
+      delay: 1000,
+      duration: 400,
+      onComplete: function() { if (breakText && breakText.destroy) breakText.destroy(); }
+    });
+    
+    // Apply stagger visual to enemy
+    if (enemy && enemy.sprite) {
+      enemy.sprite.setTint(0xff6666);
+      scene.time.delayedCall(2000, function() {
+        if (enemy.sprite) enemy.sprite.clearTint();
+      });
+    }
+  },
+  // Hide stamina break warning
+  hideStaminaBreakWarning: function(scene) {
+    this.staminaBreakWarning.active = false;
+    this.staminaBreakWarning.enemy = null;
+    
+    if (this.staminaBreakWarning.container) {
+      scene.tweens.killTweensOf(this.staminaBreakWarning.container);
+      this.staminaBreakWarning.container.setAlpha(0);
+      this.staminaBreakWarning.container.setScale(1);
+    }
+  },
+  // Reset stamina break state for new fight
+  resetStaminaBreakWarning: function() {
+    this.staminaBreakWarning.active = false;
+    this.staminaBreakWarning.enemy = null;
+    this.staminaBreakWarning.isBroken = false;
+  },
+  // Check if enemy is stamina broken (for damage multiplier)
+  isEnemyStaminaBroken: function() {
+    return this.staminaBreakWarning.isBroken;
+  },
+  // Get stamina break damage multiplier (1.5x when enemy is broken)
+  getStaminaBreakDamageMultiplier: function() {
+    return this.staminaBreakWarning.isBroken ? 1.5 : 1.0;
+  },
+  
   // Weight Class System - determines speed/power tradeoffs based on player stats
   weightClass: {
     current: 'featherweight', // featherweight, lightweight, welterweight, middleweight, heavyweight
