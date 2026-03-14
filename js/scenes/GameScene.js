@@ -14,6 +14,8 @@ var GameScene = new Phaser.Class({
     this.roomTransitioning = false;
     this.runStartMs = 0;
     this.enemiesDefeated = 0;
+    this.player2 = null;
+    this._netTick = 0;
     this.groundState = { active: false, enemy: null, timer: 0, escapeTick: 0 };
     this.gameOverAt = 0;
     this.rapidFireState = null;
@@ -24,13 +26,16 @@ var GameScene = new Phaser.Class({
     var self = this;
     this.runStartMs = Date.now();
     this.enemiesDefeated = 0;
+    this.player2 = null;
+    this._netTick = 0;
     this.gameOverAt = 0;
     this.defeatSceneQueued = false;
     this.groundState = { active: false, enemy: null, timer: 0, escapeTick: 0 };
     this.rapidFireState = null;
 
     this._savedGameData = null;
-    if (typeof loadGame === 'function') {
+    var allowLocalSave = !(window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient());
+    if (allowLocalSave && typeof loadGame === 'function') {
       var loaded = loadGame();
       if (loaded && loaded.currentRoomId) {
         this.currentRoomId = loaded.currentRoomId;
@@ -44,9 +49,15 @@ var GameScene = new Phaser.Class({
     MMA.Zones.buildRoom(this, this.currentRoomId);
 
     MMA.Player.create(this);
+    if (window.MMA && MMA.Network && typeof MMA.Network.isMultiplayer === 'function' && MMA.Network.isMultiplayer()) {
+      MMA.Player.createP2(this);
+      this._setupNetworkHandlers();
+    }
 
     this.enemyGroup = this.physics.add.group();
-    MMA.Enemies.spawnForRoom(this, this.currentRoomId);
+    if (!(window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient())) {
+      MMA.Enemies.spawnForRoom(this, this.currentRoomId);
+    }
     this.physics.add.collider(this.enemyGroup, this.walls);
 
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -90,6 +101,16 @@ var GameScene = new Phaser.Class({
         MMA.Player.regenStaminaTick(self);
       }
     });
+
+    if (window.MMA && MMA.Network && typeof MMA.Network.isHost === 'function' && MMA.Network.isHost()) {
+      this.time.delayedCall(300, function() {
+        MMA.Network.send('room_change', {
+          roomId: self.currentRoomId,
+          zone: self.currentZone,
+          initialSync: true
+        });
+      });
+    }
   },
 
   playTakedownLunge: function(enemy) {
@@ -175,8 +196,111 @@ var GameScene = new Phaser.Class({
     if (this.runStartMs) elapsed = Math.max(0, Math.floor((Date.now() - this.runStartMs) / 1000));
     else elapsed = Math.max(0, Math.floor((((this.time && this.time.now) || 0)) / 1000));
     this.registry.set('playTime', elapsed);
+    if (window.MMA && MMA.Network && typeof MMA.Network.isHost === 'function' && MMA.Network.isHost() && MMA.Network.isMultiplayer()) {
+      MMA.Network.send('game_over');
+    }
 
     this.scene.start('DefeatScene');
+  },
+  _setupNetworkHandlers: function() {
+    var self = this;
+
+    MMA.Network._handlers.player_state = [];
+    MMA.Network._handlers.enemy_states = [];
+    MMA.Network._handlers.room_change = [];
+    MMA.Network._handlers.peer_disconnected = [];
+    MMA.Network._handlers.game_over = [];
+
+    MMA.Network.on('player_state', function(msg) {
+      var p2 = self.player2;
+      if (!p2 || !p2.active) return;
+      p2.setPosition(msg.x, msg.y);
+      p2.setFlipX(!!msg.flipX);
+      p2.isAttacking = !!msg.isAttacking;
+      p2.facing = msg.facing || p2.facing;
+      if (p2.stats) {
+        p2.stats.hp = msg.hp;
+        p2.stats.maxHp = msg.maxHp;
+      }
+    });
+
+    MMA.Network.on('enemy_states', function(msg) {
+      if (MMA.Network.isHost()) return;
+
+      var stateMap = {};
+      (msg.enemies || []).forEach(function(s) {
+        if (!s || !s.id) return;
+        stateMap[s.id] = s;
+
+        var enemy = self.enemies.find(function(e) {
+          return e && e._netId === s.id;
+        });
+
+        if (!enemy) {
+          enemy = MMA.Enemies.spawnEnemy(self, s.typeKey || 'streetThug', s.x, s.y, !!s.isElite, {
+            netId: s.id,
+            silent: true,
+            skipEliteRoll: true
+          });
+        }
+
+        if (!enemy || !enemy.active) return;
+        if (enemy.body) enemy.body.enable = false;
+        enemy.setPosition(s.x, s.y);
+        enemy.setFlipX(!!s.flipX);
+        enemy.state = s.state || enemy.state;
+        if (enemy.stats) enemy.stats.hp = s.hp;
+
+        if (enemy._hpBarBg && enemy._hpBarFill && enemy.stats && enemy.stats.maxHp) {
+          enemy._hpBarBg.x = enemy.x;
+          enemy._hpBarBg.y = enemy.y - enemy.displayHeight / 2 - 8;
+          enemy._hpBarFill.x = enemy.x;
+          enemy._hpBarFill.y = enemy.y - enemy.displayHeight / 2 - 8;
+          enemy._hpBarFill.width = 36 * Math.max(0, enemy.stats.hp / enemy.stats.maxHp);
+        }
+      });
+
+      self.enemies.slice().forEach(function(enemy) {
+        if (!enemy || stateMap[enemy._netId]) return;
+        if (enemy._hpBarBg) enemy._hpBarBg.destroy();
+        if (enemy._hpBarFill) enemy._hpBarFill.destroy();
+        if (enemy.active) enemy.destroy();
+      });
+      self.enemies = self.enemies.filter(function(enemy) {
+        return enemy && enemy.active && stateMap[enemy._netId];
+      });
+    });
+
+    MMA.Network.on('room_change', function(msg) {
+      if (MMA.Network.isHost()) return;
+      if (msg.initialSync) {
+        self.currentRoomId = msg.roomId || self.currentRoomId;
+        self.currentZone = msg.zone || self.currentZone;
+        self.enemies.forEach(function(enemy) {
+          if (!enemy) return;
+          if (enemy._hpBarBg) enemy._hpBarBg.destroy();
+          if (enemy._hpBarFill) enemy._hpBarFill.destroy();
+          if (enemy.active) enemy.destroy();
+        });
+        self.enemies = [];
+        MMA.Zones.buildRoom(self, self.currentRoomId);
+        return;
+      }
+      MMA.Zones.transitionToRoom(self, msg.roomId, msg.fromDirection);
+    });
+
+    MMA.Network.on('game_over', function() {
+      if (MMA.Network.isHost()) return;
+      self.startDefeatScene();
+    });
+
+    MMA.Network.on('peer_disconnected', function() {
+      self.registry.set('gameMessage', 'CO-OP: Player 2 disconnected');
+      if (self.player2) {
+        self.player2.destroy();
+        self.player2 = null;
+      }
+    });
   },
   resumeFromPause: function() {
     this.physics.resume();
@@ -313,6 +437,15 @@ var GameScene = new Phaser.Class({
       }
       return;
     }
+
+    if (window.MMA && MMA.Network && typeof MMA.Network.isMultiplayer === 'function' && MMA.Network.isMultiplayer()) {
+      this._netTick += delta;
+      if (this._netTick >= 50) {
+        this._netTick = 0;
+        MMA.Network.sendPlayerState(this.player);
+        if (MMA.Network.isHost()) MMA.Network.sendEnemyStates(this.enemies);
+      }
+    }
     MMA.UI.setPauseButtonVisible(!this.paused && !this.roomTransitioning && !this.gameOver);
     if (this.paused || this.roomTransitioning) return;
 
@@ -350,8 +483,13 @@ var GameScene = new Phaser.Class({
       }
     }
 
-    if (!this.groundState.active) MMA.Enemies.updateEnemies(this, delta);
-    else {
+    if (!this.groundState.active) {
+      if (!(window.MMA && MMA.Network && typeof MMA.Network.isMultiplayer === 'function' && MMA.Network.isMultiplayer() && MMA.Network.isClient())) {
+        MMA.Enemies.updateEnemies(this, delta);
+      } else {
+        this.enemies.forEach(function(e){ if (e && e.active) e.setVelocity(0, 0); });
+      }
+    } else {
       this.enemies.forEach(function(e){ if (e && e.active) e.setVelocity(0, 0); });
     }
 

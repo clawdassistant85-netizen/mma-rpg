@@ -87,6 +87,18 @@ window.MMA.Player = {
     scene.physics.add.overlap(scene.player, scene.doors, function(player, door){ MMA.Zones.handleDoorEnter(scene, player, door); }, null, scene);
     scene.playerHpGfx = scene.add.graphics().setDepth(5);
   },
+  createP2: function(scene) {
+    var DT = CONFIG.DISPLAY_TILE;
+    scene.player2 = scene.physics.add.sprite(10 * DT, 6 * DT, 'player');
+    scene.player2.setDisplaySize(DT, DT * 1.5);
+    scene.player2.body.setSize(26, 38);
+    scene.player2.body.setOffset(11, 18);
+    scene.player2.body.setCollideWorldBounds(true);
+    scene.player2.setTint(0x88aaff);
+    scene.player2.stats = { hp: 200, maxHp: 200 };
+    scene.player2.isNetworkPlayer = true;
+    scene.physics.add.collider(scene.player2, scene.walls);
+  },
   handleMovement: function(scene, time, delta) {
     if (scene.player.stunnedUntil && scene.time.now < scene.player.stunnedUntil) {
       scene.player.body.setVelocity(0, 0);

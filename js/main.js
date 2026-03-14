@@ -21,7 +21,7 @@ window.onload = function() {
       default: 'arcade',
       arcade: { gravity: { y: 0 }, debug: false }
     },
-    scene: [TitleScene, BootScene, GameScene, HUDScene, PauseScene, UnlockScene, VictoryScene, OutfitScene, DefeatScene],
+    scene: [LobbyScene, TitleScene, BootScene, GameScene, HUDScene, PauseScene, UnlockScene, VictoryScene, OutfitScene, DefeatScene],
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH

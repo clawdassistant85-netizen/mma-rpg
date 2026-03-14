@@ -2835,6 +2835,72 @@ window.MMA.Enemies = {
     return data.attack[Math.floor(Math.random() * data.attack.length)];
   },
 
+  // Enemy Health Bar Color Coding: different enemy types have different colored health bars
+  // Helps players quickly identify threats in crowded rooms
+  getHealthBarColor: function(enemy) {
+    if (!enemy || !enemy.type) return 0xe83030; // default red
+    
+    var ai = enemy.type.aiPattern;
+    var tk = enemy.typeKey;
+    
+    // Boss: gold
+    if (enemy.isBoss) return 0xffd700;
+    
+    // Elite: purple glow
+    if (enemy.isElite) return 0xff00ff;
+    
+    // Nemesis: dark purple
+    if (enemy.type && enemy.type.isNemesis) return 0x8800ff;
+    
+    // Rival Echo: light purple
+    if (enemy.type && enemy.type.isRivalEcho) return 0xaa66ff;
+    
+    // Coach: cyan (support type)
+    if (tk === 'coach' || ai === 'coach') return 0x00ffff;
+    
+    // Grappler patterns (grasper, thrower, subHunter): blue
+    if (ai === 'grasper' || ai === 'thrower' || ai === 'subHunter') return 0x4444ff;
+    
+    // Kicker patterns: green
+    if (ai === 'kickboxer' || ai === 'kicker') return 0x44ff44;
+    
+    // Tank: gray (heavy/armored)
+    if (ai === 'tank') return 0x888888;
+    
+    // Stunner: magenta
+    if (ai === 'stunner') return 0xff44ff;
+    
+    // Regenerator: bright green
+    if (ai === 'regen') return 0x22ff66;
+    
+    // Glitcher: cyan
+    if (ai === 'glitcher') return 0x00e5ff;
+    
+    // Trickster: pink
+    if (ai === 'trickster') return 0xff66aa;
+    
+    // Echo: purple
+    if (ai === 'echo') return 0x9933ff;
+    
+    // Enforcer: orange-red
+    if (ai === 'enforcer') return 0xff4400;
+    
+    // Bully: orange
+    if (ai === 'bully') return 0xff8800;
+    
+    // Drunk Monk: purple-brown
+    if (ai === 'drunkMonk') return 0x9966aa;
+    
+    // Feint Master: magenta
+    if (ai === 'feintMaster') return 0xff00ff;
+    
+    // Tutor: lime green
+    if (ai === 'tutor') return 0x66ff33;
+    
+    // Default striker/combo/chase: red
+    return 0xe83030;
+  },
+
   // Role Icon mapping for Enemy Role Call feature
   getRoleIcon: function(enemy) {
     if (!enemy || !enemy.type) return '⚔';
@@ -2917,11 +2983,26 @@ window.MMA.Enemies = {
     });
   },
 
-  // getDynamicRoleIcon implementation is defined earlier; duplicate removed.
-
-  spawnEnemy: function(scene, typeKey, x, y, forceElite) {
+  getActivePlayers: function(scene) {
+    var players = [];
+    if (scene && scene.player && scene.player.active) players.push(scene.player);
+    if (scene && scene.player2 && scene.player2.active) players.push(scene.player2);
+    return players;
+  },
+  getTargetPlayer: function(scene, enemy) {
+    var players = this.getActivePlayers(scene);
+    if (!players.length) return scene && scene.player ? scene.player : null;
+    if (!enemy) return players[0];
+    return players.reduce(function(best, candidate) {
+      var bestDist = Math.hypot(enemy.x - best.x, enemy.y - best.y);
+      var nextDist = Math.hypot(enemy.x - candidate.x, enemy.y - candidate.y);
+      return nextDist < bestDist ? candidate : best;
+    }, players[0]);
+  },
+  spawnEnemy: function(scene, typeKey, x, y, forceElite, options) {
     var self = this;
-    var isElite = forceElite || (Math.random() < this.ELITE_SPAWN_CHANCE && !typeKey.includes('champ') && typeKey !== 'shadowRival');
+    var opts = options || {};
+    var isElite = forceElite || (!opts.skipEliteRoll && Math.random() < this.ELITE_SPAWN_CHANCE && !typeKey.includes('champ') && typeKey !== 'shadowRival');
     var eliteType = null;
     var baseTypeKey = typeKey;
 
@@ -3130,16 +3211,22 @@ window.MMA.Enemies = {
       scene.time.delayedCall(2000, function(){ scene.registry.set('gameMessage', ''); });
     }
 
-    if (e.isBoss) { e.setTint(0xffd700); scene.registry.set('gameMessage', 'BOSS FIGHT!'); scene.time.delayedCall(2000, function(){ scene.registry.set('gameMessage', ''); }); }
+    if (e.isBoss) {
+      e.setTint(0xffd700);
+      if (!opts.silent) {
+        scene.registry.set('gameMessage', 'BOSS FIGHT!');
+        scene.time.delayedCall(2000, function(){ scene.registry.set('gameMessage', ''); });
+      }
+    }
 
     // Show elite spawn message
-    if (eliteType) {
+    if (eliteType && !opts.silent) {
       scene.registry.set('gameMessage', 'ELITE ENEMY!');
       scene.time.delayedCall(1500, function(){ scene.registry.set('gameMessage', ''); });
     }
 
     // Rival spawn message (style-dependent)
-    if (typeKey === 'shadowRival') {
+    if (typeKey === 'shadowRival' && !opts.silent) {
       var msg = 'A SHADOW RIVAL APPEARS!';
       if (type.rivalStyle === 'striker') msg = 'SHADOW: "Your hands won\'t save you."';
       if (type.rivalStyle === 'grappler') msg = 'SHADOW: "Let\'s see you wrestle with fate."';
@@ -3172,14 +3259,16 @@ window.MMA.Enemies = {
     }
 
     scene.enemyGroup.add(e); scene.enemies.push(e);
-
-    // HP bar above enemy sprite
+    e._netId = opts.netId || e._netId || ('e_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5));
+    
+    // HP bar above enemy sprite - color coded by enemy type
+    var hpBarColor = self.getHealthBarColor(e);
     var hpBg = scene.add.rectangle(0, -e.displayHeight/2 - 8, 36, 5, 0x333333).setOrigin(0.5);
-    var hpFill = scene.add.rectangle(0, -e.displayHeight/2 - 8, 36, 5, 0xe83030).setOrigin(0.5);
+    var hpFill = scene.add.rectangle(0, -e.displayHeight/2 - 8, 36, 5, hpBarColor).setOrigin(0.5);
     e._hpBarBg = hpBg;
     e._hpBarFill = hpFill;
 
-    if (window.narrate) window.narrate('combatStart', { enemy: { name: type.name || typeKey } }).then(function(msg){ if (msg) scene.registry.set('gameMessage', msg); scene.time.delayedCall(3000, function(){ scene.registry.set('gameMessage', ''); }); });
+    if (!opts.silent && window.narrate) window.narrate('combatStart', { enemy: { name: type.name || typeKey } }).then(function(msg){ if (msg) scene.registry.set('gameMessage', msg); scene.time.delayedCall(3000, function(){ scene.registry.set('gameMessage', ''); }); });
 
     // Ensemble Cast: show intro dialogue for named characters
     if (ensembleChar) {
@@ -3209,6 +3298,7 @@ window.MMA.Enemies = {
     return e;
   },
   spawnForRoom: function(scene, roomId) {
+    if (window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient()) return;
     var DT = CONFIG.DISPLAY_TILE;
     var positions = MMA.Zones.getRoomSpawnPositions(roomId || scene.currentRoomId);
     var pool = (MMA.Zones.getRoomEnemyPool(roomId || scene.currentRoomId) || []).slice();
@@ -3421,13 +3511,16 @@ window.MMA.Enemies = {
     if (!scene._enemyAttackToken || !scene._enemyAttackToken.enemy || !scene._enemyAttackToken.enemy.active || now > scene._enemyAttackToken.expiresAt) {
       // Find eligible enemies within radius, choose closest to player
       var candidates = scene.enemies.filter(function(e) {
-        return e.active && e.state !== 'dead' && !e.isBoss && !(e.isFleeing) && !e.isResting && !e.isSizingUp && Math.hypot(e.x - scene.player.x, e.y - scene.player.y) <= ATTACK_TOKEN_RADIUS;
+        var target = self.getTargetPlayer(scene, e);
+        return target && e.active && e.state !== 'dead' && !e.isBoss && !(e.isFleeing) && !e.isResting && Math.hypot(e.x - target.x, e.y - target.y) <= ATTACK_TOKEN_RADIUS;
       });
       if (candidates.length) {
         // pick closest
         var primary = candidates.reduce(function(best, cur) {
-          var dBest = Math.hypot(best.x - scene.player.x, best.y - scene.player.y);
-          var dCur = Math.hypot(cur.x - scene.player.x, cur.y - scene.player.y);
+          var bestTarget = self.getTargetPlayer(scene, best);
+          var curTarget = self.getTargetPlayer(scene, cur);
+          var dBest = bestTarget ? Math.hypot(best.x - bestTarget.x, best.y - bestTarget.y) : Number.MAX_SAFE_INTEGER;
+          var dCur = curTarget ? Math.hypot(cur.x - curTarget.x, cur.y - curTarget.y) : Number.MAX_SAFE_INTEGER;
           return dCur < dBest ? cur : best;
         }, candidates[0]);
         scene._enemyAttackToken = { enemy: primary, expiresAt: now + ATTACK_TOKEN_TTL };
@@ -3457,6 +3550,9 @@ window.MMA.Enemies = {
         // Still update UI elements (hp bar / role icon) below.
       }
 
+      var targetPlayer = self.getTargetPlayer(scene, e);
+      if (!targetPlayer) return;
+      
       // Update HP bar position and width
       if (e._hpBarBg) {
         e._hpBarBg.x = e.x;
@@ -3741,8 +3837,8 @@ window.MMA.Enemies = {
           // Increase speed by 40%
           e.type.speed = Math.round(e.baseSpeed * 1.4);
           // Move away from player
-          var dx = e.x - scene.player.x;
-          var dy = e.y - scene.player.y;
+          var dx = e.x - targetPlayer.x;
+          var dy = e.y - targetPlayer.y;
           var dist = Math.sqrt(dx*dx + dy*dy) || 1;
           e.setVelocity((dx/dist)*e.type.speed, (dy/dist)*e.type.speed);
           e.fleeTimer -= delta;
@@ -3832,16 +3928,17 @@ window.MMA.Enemies = {
 
       e.type.speed = Math.min(e.baseSpeed + bonus, maxSpeed);
 
-      if (self.coordination.updateEnemy(e, scene.player, scene, delta)) {
+      if (self.coordination.updateEnemy(e, targetPlayer, scene, delta)) {
         if (e.attackCooldown > 0) e.attackCooldown -= delta;
         return;
       }
 
       var ai = self.AI[e.type.aiPattern || 'chase'];
-      (ai || self.AI.chase)(e, scene.player, scene, delta);
+      (ai || self.AI.chase)(e, targetPlayer, scene, delta);
     });
   },
   killEnemy: function(scene, enemy) {
+    if (window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient()) return;
     scene.enemiesDefeated = (scene.enemiesDefeated || 0) + 1;
     enemy.state = 'dead';
     enemy.aiState = 'dead';
@@ -4106,7 +4203,7 @@ window.MMA.Enemies = {
       if (window.narrate) window.narrate('levelUp', { level: scene.player.stats.level }).then(function(msg){ var current = scene.registry.get('gameMessage') || ''; if (msg && (current === '' || current.indexOf('LEVEL') === 0)) { scene.registry.set('gameMessage', msg); scene.time.delayedCall(3000, function(){ scene.registry.set('gameMessage', ''); }); } });
       scene.registry.set('gameMessage', newMoves.length ? 'LEVEL UP! NEW MOVES: ' + newMoves.join(', ') : 'LEVEL ' + scene.player.stats.level + '!');
       scene.time.delayedCall(2500, function(){ scene.registry.set('gameMessage', ''); });
-      if (window.saveGame) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);
+      if (!(window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient()) && window.saveGame) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);
     }
     if (enemy._hpBarBg) { enemy._hpBarBg.destroy(); enemy._hpBarFill.destroy(); }
     // Destroy role icon on death
@@ -4116,7 +4213,7 @@ window.MMA.Enemies = {
     scene.time.delayedCall(320, function() {
       if (enemy && enemy.active) enemy.destroy();
     });
-    if (window.saveGame) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);
+    if (!(window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient()) && window.saveGame) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);
     var alive = scene.enemies.filter(function(e){ return e.state !== 'dead' && e.active; });
     if (alive.length === 0) {
       if (scene.rapidFireState && scene.rapidFireState.active) {

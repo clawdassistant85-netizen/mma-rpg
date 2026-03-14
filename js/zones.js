@@ -1314,7 +1314,14 @@ window.MMA.Zones = {
     if (scene.roomTransitioning || scene.gameOver) return;
     var direction = door.getData('direction'); if (!direction) return;
     var newRoomId = this.getConnectedRoom(scene.currentRoomId, direction);
-    if (newRoomId) this.transitionToRoom(scene, newRoomId, direction);
+    if (!newRoomId) return;
+
+    if (window.MMA && MMA.Network && typeof MMA.Network.isMultiplayer === 'function' && MMA.Network.isMultiplayer()) {
+      if (MMA.Network.isClient()) return;
+      MMA.Network.send('room_change', { roomId: newRoomId, fromDirection: direction });
+    }
+
+    this.transitionToRoom(scene, newRoomId, direction);
   },
   transitionToRoom: function(scene, newRoomId, fromDirection) {
     scene.roomTransitioning = true;
@@ -1333,11 +1340,17 @@ window.MMA.Zones = {
       scene.player.setPosition(spawnX, spawnY).setActive(true).setVisible(true);
       if (scene.player.body) scene.player.body.enable = true;
       self.buildRoom(scene, newRoomId);
-      scene.enemies.forEach(function(e){ if (e && e.active) e.destroy(); }); scene.enemies = [];
+      scene.enemies.forEach(function(e){
+        if (!e) return;
+        if (e._hpBarBg) e._hpBarBg.destroy();
+        if (e._hpBarFill) e._hpBarFill.destroy();
+        if (e.active) e.destroy();
+      }); scene.enemies = [];
       // Reset fight stats for new room
       MMA.UI.resetFightStats();
-      if (window.MMA && MMA.Enemies) MMA.Enemies.spawnForRoom(scene, newRoomId);
-      if (window.saveGame) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);
+      var isClientMp = window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient();
+      if (window.MMA && MMA.Enemies && !isClientMp) MMA.Enemies.spawnForRoom(scene, newRoomId);
+      if (window.saveGame && !isClientMp) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);
       scene.roomTransitioning = false;
       scene.registry.set('gameMessage', 'ZONE ' + zone + ' - ' + room.name);
       scene.time.delayedCall(1500, function(){ scene.registry.set('gameMessage', ''); });
