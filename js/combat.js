@@ -82,6 +82,8 @@ window.MMA.Combat = {
   RECOVERY_TECH_WINDOW_MS: 300,
   RECOVERY_TECH_STAMINA_COST: 15,
   RECOVERY_TECH_DAMAGE_MULTIPLIER: 2,
+  WEIGHT_ADVANTAGE_BONUS: 0.2,
+  WEIGHT_ADVANTAGE_PENALTY: 0.15,
   COMBO_BREAKER_MIN_HITS: 10,
   COMBO_BREAKER_BASE_CHANCE: 0.15,
   COMBO_BREAKER_TIER_BONUS: 0.05,
@@ -878,6 +880,64 @@ window.MMA.Combat = {
     if (move.type === 'grapple' || move.type === 'sub') return 'grapple';
     return 'strike';
   },
+  getAttackWeightClass: function(moveKey) {
+    var lightMoves = {
+      jab: true,
+      lowKick: true,
+      bodyShot: true,
+      singleLeg: true
+    };
+    var heavyMoves = {
+      cross: true,
+      hook: true,
+      uppercut: true,
+      headKick: true,
+      spinningBackFist: true,
+      takedown: true,
+      hipThrow: true,
+      armbar: true,
+      triangleChoke: true,
+      guillotine: true,
+      rnc: true,
+      heelHook: true,
+      kneebar: true,
+      kimura: true,
+      americana: true
+    };
+    if (lightMoves[moveKey]) return 'light';
+    if (heavyMoves[moveKey]) return 'heavy';
+    return 'neutral';
+  },
+  getEnemyWeightClass: function(enemy) {
+    if (!enemy || !enemy.type) return 'neutral';
+    var raw = enemy.type.weightClass || enemy.type.weight || enemy.type.build || '';
+    var normalized = String(raw).toLowerCase();
+    if (normalized.indexOf('heavy') !== -1) return 'heavy';
+    if (normalized.indexOf('light') !== -1 || normalized.indexOf('feather') !== -1) return 'light';
+    return 'neutral';
+  },
+  applyWeightClassAdvantage: function(enemy, moveKey, damage) {
+    var attackClass = this.getAttackWeightClass(moveKey);
+    var enemyClass = this.getEnemyWeightClass(enemy);
+    if (attackClass === 'neutral' || enemyClass === 'neutral') {
+      return { damage: damage, active: false, bonus: 0 };
+    }
+
+    var bonus = 0;
+    if (attackClass === 'light' && enemyClass === 'heavy') bonus = this.WEIGHT_ADVANTAGE_BONUS;
+    if (attackClass === 'light' && enemyClass === 'light') bonus = -this.WEIGHT_ADVANTAGE_PENALTY;
+    if (attackClass === 'heavy' && enemyClass === 'light') bonus = this.WEIGHT_ADVANTAGE_BONUS;
+    if (attackClass === 'heavy' && enemyClass === 'heavy') bonus = -this.WEIGHT_ADVANTAGE_PENALTY;
+
+    if (!bonus) return { damage: damage, active: false, bonus: 0 };
+    return {
+      damage: Math.round(damage * (1 + bonus)),
+      active: true,
+      bonus: bonus,
+      attackClass: attackClass,
+      enemyClass: enemyClass
+    };
+  },
   getDominantStyleGroup: function(scene) {
     var style = this.getPlayerGrappleStyle(scene);
     if (style === 'grappler') return 'grapple';
@@ -1559,6 +1619,8 @@ window.MMA.Combat = {
         var effectiveDefenseMult = this.getDefenseMultiplierWithAdrenaline(adaptiveDefenseMult, adrenalinePrimed);
         var styleMasteryApplied = this.applyStyleMasteryIfPrimed(scene, moveKey, injuryAdjusted.damage, effectiveDefenseMult);
         var dmg = Math.round(styleMasteryApplied.damage / styleMasteryApplied.defenseMult);
+        var weightAdjusted = this.applyWeightClassAdvantage(enemy, moveKey, dmg);
+        dmg = weightAdjusted.damage;
         var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
@@ -1614,6 +1676,11 @@ window.MMA.Combat = {
         if (breakthroughAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 148, 'BREAKTHROUGH x1.25', '#ffd6a5');
         if (momentumShiftAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 160, 'MOMENTUM SHIFT x1.2', '#66f2ff');
         if (styleMasteryApplied.consumed) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 168, 'STYLE MASTERY x1.4', '#c8b6ff');
+        if (weightAdjusted.active) {
+          var weightPct = Math.round(Math.abs(weightAdjusted.bonus) * 100);
+          var weightLabel = weightAdjusted.bonus > 0 ? 'WEIGHT ADV +' + weightPct + '%' : 'WEIGHT MISMATCH -' + weightPct + '%';
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 176, weightLabel, weightAdjusted.bonus > 0 ? '#8cffc1' : '#ff9e9e');
+        }
         if (staminaBreakDamage.staminaBreakActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 92, 'STAMINA BREAK x1.5', '#ffd166');
         var staminaState = this.onEnemyStaminaHit(scene, enemy, move);
         if (staminaState.brokeNow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 110, 'STAMINA BROKEN!', '#ff9f1c');
@@ -1716,6 +1783,8 @@ window.MMA.Combat = {
         var effectiveDefenseMult = this.getDefenseMultiplierWithAdrenaline(adaptiveDefenseMult, adrenalinePrimed);
         var styleMasteryApplied = this.applyStyleMasteryIfPrimed(scene, bestMoveKey, injuryAdjusted.damage, effectiveDefenseMult);
         var dmg = Math.round(styleMasteryApplied.damage / styleMasteryApplied.defenseMult);
+        var weightAdjusted = this.applyWeightClassAdvantage(enemy, bestMoveKey, dmg);
+        dmg = weightAdjusted.damage;
         var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
@@ -1768,6 +1837,11 @@ window.MMA.Combat = {
         if (breakthroughAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 144, 'BREAKTHROUGH x1.25', '#ffd6a5');
         if (momentumShiftAdjusted.active) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 156, 'MOMENTUM SHIFT x1.2', '#66f2ff');
         if (styleMasteryApplied.consumed) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 164, 'STYLE MASTERY x1.4', '#c8b6ff');
+        if (weightAdjusted.active) {
+          var weightPct = Math.round(Math.abs(weightAdjusted.bonus) * 100);
+          var weightLabel = weightAdjusted.bonus > 0 ? 'WEIGHT ADV +' + weightPct + '%' : 'WEIGHT MISMATCH -' + weightPct + '%';
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 172, weightLabel, weightAdjusted.bonus > 0 ? '#8cffc1' : '#ff9e9e');
+        }
         if (staminaBreakDamage.staminaBreakActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 84, 'STAMINA BREAK x1.5', '#ffd166');
         var staminaState = this.onEnemyStaminaHit(scene, enemy, move);
         if (staminaState.brokeNow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 102, 'STAMINA BROKEN!', '#ff9f1c');

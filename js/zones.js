@@ -123,7 +123,17 @@ window.MMA.Zones = {
         { id:'stamina', label:'+20% stamina regen (3 rooms)' }
       ],
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct3',up:'survival1'},
-      spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:'Championship Ring',narratorStyle:'arenaTitle'},
+      spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:'Championship Ring',narratorStyle:'arenaTitle',
+      // Signature Room Theme: gold spotlight with slow-falling confetti
+      roomTheme:{
+        id:'championship_gold',
+        label:'Championship Gold Theme',
+        lightingTint:0xffd24d,
+        vignetteColor:0x8b5a2b,
+        ambientParticles:['confettiGold','confettiWhite'],
+        intensity:1.0
+      }
+    },
     // Survival Time Attack: 90s endurance room with escalating waves and score focus
     survival1:{
       id:'survival1',
@@ -191,6 +201,15 @@ window.MMA.Zones = {
       enemyPool:['mmaChamp'],
       name:'Boss Rush Corridor',
       narratorStyle:'arenaTitle',
+      // Signature Room Theme: blood-red gauntlet lighting with dust motes
+      roomTheme:{
+        id:'boss_rush_blood_red',
+        label:'Boss Rush Blood-Red Theme',
+        lightingTint:0xc81d25,
+        vignetteColor:0x3b0910,
+        ambientParticles:['dustMotes','emberSparks'],
+        intensity:1.1
+      },
       bossRushMode:true,
       bossRushWaves:3,
       bossRushWaveEnemyPool:['mmaChamp','bjjBlackBelt'],
@@ -226,6 +245,15 @@ window.MMA.Zones = {
       enemyPool:['mmaChamp'],
       name:"Champion's Dojo",
       narratorStyle:'dojoLegend',
+      // Signature Room Theme: dim, smoky dojo with spotlighted center mat
+      roomTheme:{
+        id:'dojo_legend',
+        label:"Legend's Dojo Theme",
+        lightingTint:0xf0e6d2,
+        vignetteColor:0x1b1b1b,
+        ambientParticles:['dustMotes','dojoIncense'],
+        intensity:0.9
+      },
       dojoMode:'championsDojo'
     }
   },
@@ -461,6 +489,29 @@ window.MMA.Zones = {
       };
     }
     return null;
+  },
+  // Signature Room Themes helper
+  // Lightweight metadata accessor for the backlog's "Signature Room Themes"
+  // feature. Specific boss/feature rooms can define a roomTheme object with
+  // purely descriptive values (lighting tint, ambient particles, vignette
+  // colors, etc.). Zones does not own any rendering logic – other systems
+  // may opt into these hints to drive VFX, lighting, or HUD framing.
+  getRoomThemeConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.roomTheme) return null;
+    // Clone the theme shallowly so callers cannot accidentally mutate
+    // our zone data.
+    var theme = room.roomTheme;
+    return {
+      id: theme.id || (room.id + '_theme'),
+      label: theme.label || room.name || 'Themed Room',
+      lightingTint: theme.lightingTint || null,
+      vignetteColor: theme.vignetteColor || null,
+      ambientParticles: (theme.ambientParticles || []).slice(),
+      floorVariantKey: theme.floorVariantKey || null,
+      // Optional intensity knob for systems that want a single scalar.
+      intensity: theme.intensity != null ? theme.intensity : 1.0
+    };
   },
   // Compute damage bonus (0 to 0.10) based on current hype (0-1)
   computeCrowdDamageBonus: function(hype) {
@@ -754,6 +805,29 @@ window.MMA.Zones = {
       // Set basic zone message
       scene.registry.set('gameMessage', 'ZONE ' + zone + ' - ' + room.name);
       scene.time.delayedCall(2000, function(){ scene.registry.set('gameMessage', ''); });
+      // Signature Room Theme metadata: purely descriptive hooks for boss rooms
+      // and other special encounters. Rendering/VFX systems can read these
+      // values to tint lighting, spawn ambient particles, or adjust framing.
+      var themeCfg = this.getRoomThemeConfig(room.id);
+      if (themeCfg) {
+        scene.registry.set('roomThemeActive', true);
+        scene.registry.set('roomThemeId', themeCfg.id);
+        scene.registry.set('roomThemeLabel', themeCfg.label);
+        scene.registry.set('roomThemeLightingTint', themeCfg.lightingTint);
+        scene.registry.set('roomThemeVignetteColor', themeCfg.vignetteColor);
+        scene.registry.set('roomThemeAmbientParticles', themeCfg.ambientParticles || []);
+        scene.registry.set('roomThemeFloorVariantKey', themeCfg.floorVariantKey || null);
+        scene.registry.set('roomThemeIntensity', themeCfg.intensity != null ? themeCfg.intensity : 1.0);
+      } else {
+        scene.registry.set('roomThemeActive', false);
+        scene.registry.set('roomThemeId', '');
+        scene.registry.set('roomThemeLabel', '');
+        scene.registry.set('roomThemeLightingTint', null);
+        scene.registry.set('roomThemeVignetteColor', null);
+        scene.registry.set('roomThemeAmbientParticles', []);
+        scene.registry.set('roomThemeFloorVariantKey', null);
+        scene.registry.set('roomThemeIntensity', 1.0);
+      }
       // Crowd dynamics registry values
       var crowd = this.getCrowdInfo(roomId);
       if (crowd) {

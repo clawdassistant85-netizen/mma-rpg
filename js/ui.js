@@ -1,5 +1,102 @@
 window.MMA = window.MMA || {};
 window.MMA.UI = {
+  // Mood Lighting System - ambient arena lights shift color based on combat state
+  moodLighting: {
+    currentMood: 'neutral', // neutral, friendly, intense, boss, victory, defeat
+    overlay: null,
+    active: false,
+    // Mood transitions: neutral during exploration, warm orange during friendly, cool blue during intense fights, red during boss fights
+    moods: {
+      neutral: 'mood-neutral',
+      friendly: 'mood-friendly',
+      intense: 'mood-intense',
+      boss: 'mood-boss',
+      victory: 'mood-victory',
+      defeat: 'mood-defeat'
+    }
+  },
+  // Get or create mood lighting overlay element
+  getMoodLightingOverlay: function() {
+    if (!this.moodLighting.overlay) {
+      var el = document.getElementById('mood-lighting-overlay');
+      if (el) {
+        this.moodLighting.overlay = el;
+      }
+    }
+    return this.moodLighting.overlay;
+  },
+  // Set mood lighting state
+  setMood: function(mood) {
+    var validMoods = ['neutral', 'friendly', 'intense', 'boss', 'victory', 'defeat'];
+    if (validMoods.indexOf(mood) === -1) mood = 'neutral';
+    
+    // Don't re-apply same mood
+    if (mood === this.moodLighting.currentMood && this.moodLighting.active) return;
+    
+    this.moodLighting.currentMood = mood;
+    var overlay = this.getMoodLightingOverlay();
+    if (!overlay) return;
+    
+    // Remove all mood classes
+    var moods = this.moodLighting.moods;
+    for (var key in moods) {
+      overlay.classList.remove(moods[key]);
+    }
+    
+    // Add new mood class
+    overlay.classList.add(moods[mood]);
+    this.moodLighting.active = mood !== 'neutral';
+  },
+  // Quick mood setters for common states
+  setMoodNeutral: function() { this.setMood('neutral'); },
+  setMoodFriendly: function() { this.setMood('friendly'); },
+  setMoodIntense: function() { this.setMood('intense'); },
+  setMoodBoss: function() { this.setMood('boss'); },
+  setMoodVictory: function() { this.setMood('victory'); },
+  setMoodDefeat: function() { this.setMood('defeat'); },
+  // Auto-update mood based on combat state (call this in game loop)
+  updateMoodFromCombat: function(scene) {
+    if (!scene || !scene.enemies || !scene.player) return;
+    
+    // Check for boss fight
+    var hasBoss = false;
+    for (var i = 0; i < scene.enemies.length; i++) {
+      var enemy = scene.enemies[i];
+      if (enemy && (enemy.isBoss || enemy.boss)) {
+        hasBoss = true;
+        break;
+      }
+    }
+    
+    if (hasBoss) {
+      this.setMood('boss');
+      return;
+    }
+    
+    // Check combat intensity based on enemies and player HP
+    var enemyCount = 0;
+    var playerHpPercent = scene.player.stats.hp / scene.player.stats.maxHp;
+    
+    for (var j = 0; j < scene.enemies.length; j++) {
+      if (scene.enemies[j] && scene.enemies[j].stats && scene.enemies[j].stats.hp > 0) {
+        enemyCount++;
+      }
+    }
+    
+    // In combat (enemies present and player not in exploration mode)
+    if (enemyCount > 0) {
+      // Intense if player HP is low or multiple enemies
+      if (playerHpPercent < 0.3 || enemyCount >= 2) {
+        this.setMood('intense');
+      } else {
+        // Normal fight
+        this.setMood('intense');
+      }
+    } else {
+      // No enemies - neutral/exploration
+      this.setMood('neutral');
+    }
+  },
   // Danger Proximity Warning - screen edge flashes when enemies are about to attack
   dangerWarning: {
     active: false,
@@ -4457,5 +4554,167 @@ window.MMA.UI = {
   flashCritical: function(scene, intensity) { this.triggerScreenFlash(scene, 'critical', intensity); },
   flashFinishing: function(scene, intensity) { this.triggerScreenFlash(scene, 'finishing', intensity); },
   flashHeal: function(scene) { this.triggerScreenFlash(scene, 'heal', 1); },
-  flashDamage: function(scene) { this.triggerScreenFlash(scene, 'damage', 1); }
+  flashDamage: function(scene) { this.triggerScreenFlash(scene, 'damage', 1); },
+
+  // Mood Lighting System - ambient arena lights shift color based on combat state
+  moodLighting: {
+    active: false,
+    currentMood: 'neutral', // neutral, friendly, intense, boss
+    container: null,
+    overlay: null,
+    targetColor: null,
+    currentColor: null,
+    transitionDuration: 1500,
+    // Mood colors
+    moods: {
+      neutral: { color: 'rgba(0, 0, 0, 0)', name: 'Neutral' },
+      friendly: { color: 'rgba(255, 180, 100, 0.15)', name: 'Friendly' },
+      intense: { color: 'rgba(100, 150, 255, 0.12)', name: 'Intense' },
+      boss: { color: 'rgba(255, 50, 50, 0.18)', name: 'Boss Fight' }
+    }
+  },
+  // Get or create mood lighting overlay
+  getMoodLightingOverlay: function() {
+    if (!this.moodLighting.overlay) {
+      var el = document.getElementById('mood-lighting-overlay');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'mood-lighting-overlay';
+        el.style.cssText = 'position:absolute;inset:0;pointer-events:none;opacity:0;z-index:5;transition:background-color 1.5s ease;';
+        document.getElementById('game-shell').appendChild(el);
+      }
+      this.moodLighting.overlay = el;
+    }
+    return this.moodLighting.overlay;
+  },
+  // Set mood lighting state based on combat context
+  setMoodLighting: function(scene, mood) {
+    var ml = this.moodLighting;
+    var moods = ml.moods;
+    
+    // Validate mood
+    if (!moods[mood]) mood = 'neutral';
+    
+    // Don't change if already in this mood
+    if (ml.currentMood === mood && ml.active) return;
+    
+    ml.currentMood = mood;
+    ml.active = true;
+    
+    var overlay = this.getMoodLightingOverlay();
+    if (!overlay) return;
+    
+    // Get target color
+    var moodData = moods[mood];
+    ml.targetColor = moodData.color;
+    
+    // Apply with transition
+    overlay.style.transition = 'background-color ' + ml.transitionDuration + 'ms ease';
+    overlay.style.backgroundColor = ml.targetColor;
+    
+    // Update transition back to default for subsequent changes
+    var self = this;
+    setTimeout(function() {
+      if (overlay && overlay.style) {
+        overlay.style.transition = 'background-color 800ms ease';
+      }
+    }, ml.transitionDuration + 50);
+    
+    // Debug/log mood change (can be removed in production)
+    // console.log('Mood Lighting:', moodData.name);
+  },
+  // Update mood lighting based on current combat state
+  updateMoodLighting: function(scene) {
+    var ml = this.moodLighting;
+    
+    // If mood lighting is disabled or no scene, return
+    if (!scene || !scene.player || !scene.enemies) return;
+    
+    var player = scene.player;
+    var enemies = scene.enemies;
+    
+    // Determine appropriate mood
+    var newMood = 'neutral';
+    
+    // Check if in boss fight
+    var hasBoss = false;
+    var activeEnemies = 0;
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (e && e.active !== false) {
+        activeEnemies++;
+        if (e.isBoss || e.boss) {
+          hasBoss = true;
+        }
+      }
+    }
+    
+    if (hasBoss) {
+      newMood = 'boss';
+    } else if (activeEnemies > 0) {
+      // Check player HP for intensity
+      var hpPercent = (player.stats.hp / player.stats.maxHp) || 1;
+      
+      if (hpPercent < 0.3) {
+        // Low HP - more intense
+        newMood = 'intense';
+      } else if (activeEnemies >= 2) {
+        // Multiple enemies - moderate intensity
+        newMood = 'intense';
+      } else {
+        // Single enemy, healthy - light intensity (not quite neutral)
+        newMood = 'intense';
+      }
+    } else {
+      // No active enemies
+      newMood = 'neutral';
+    }
+    
+    // Apply mood
+    this.setMoodLighting(scene, newMood);
+  },
+  // Quick mood transition for special events
+  triggerMoodFlash: function(scene, mood, duration) {
+    if (!duration) duration = 500;
+    
+    var ml = this.moodLighting;
+    var moods = ml.moods;
+    
+    if (!moods[mood]) mood = 'intense';
+    
+    var overlay = this.getMoodLightingOverlay();
+    if (!overlay) return;
+    
+    // Store original mood
+    var originalMood = ml.currentMood;
+    var originalColor = ml.targetColor;
+    
+    // Apply flash color
+    overlay.style.transition = 'background-color 150ms ease';
+    overlay.style.backgroundColor = moods[mood].color;
+    
+    // Revert after duration
+    var self = this;
+    setTimeout(function() {
+      overlay.style.transition = 'background-color ' + ml.transitionDuration + 'ms ease';
+      overlay.style.backgroundColor = originalColor || 'rgba(0, 0, 0, 0)';
+      ml.currentMood = originalMood;
+    }, duration);
+  },
+  // Disable mood lighting
+  disableMoodLighting: function() {
+    var ml = this.moodLighting;
+    ml.active = false;
+    
+    var overlay = this.getMoodLightingOverlay();
+    if (overlay) {
+      overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';
+    }
+  },
+  // Get current mood name (for debugging/display)
+  getCurrentMood: function() {
+    var ml = this.moodLighting;
+    var moods = ml.moods;
+    return moods[ml.currentMood] ? moods[ml.currentMood].name : 'Unknown';
+  }
 };

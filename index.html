@@ -261,6 +261,23 @@
       transition: opacity 50ms ease;
     }
     
+    /* Mood Lighting Overlay - ambient color shifts based on combat state */
+    #mood-lighting-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 26;
+      transition: opacity 800ms ease, background-color 1200ms ease;
+    }
+    /* Different mood states */
+    #mood-lighting-overlay.mood-neutral { background-color: rgba(0, 0, 0, 0); opacity: 0; }
+    #mood-lighting-overlay.mood-friendly { background-color: rgba(255, 180, 80, 0.08); opacity: 1; }
+    #mood-lighting-overlay.mood-intense { background-color: rgba(100, 150, 255, 0.1); opacity: 1; }
+    #mood-lighting-overlay.mood-boss { background-color: rgba(255, 50, 50, 0.15); opacity: 1; }
+    #mood-lighting-overlay.mood-victory { background-color: rgba(255, 215, 0, 0.12); opacity: 1; }
+    #mood-lighting-overlay.mood-defeat { background-color: rgba(80, 80, 80, 0.2); opacity: 1; }
+    
     /* Weight Class Indicator - DOM-based HUD element */
     #weight-class-indicator {
       position: fixed;
@@ -330,6 +347,7 @@
     <div id="ui-layer" aria-hidden="true">
       <div id="screen-flash-overlay"></div>
       <div id="health-pulse-overlay"></div>
+      <div id="mood-lighting-overlay"></div>
       <div id="danger-warning-overlay"></div>
       <div id="stamina-break-overlay"></div>
       <div id="weight-class-indicator" title="Weight class affects speed/power">

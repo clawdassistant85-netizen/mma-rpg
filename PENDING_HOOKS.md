@@ -8,6 +8,102 @@ document it here. The Reviewer agent will integrate these.
 - **Description**: what change is needed
 - **Priority**: P0/P1/P2
 
+## 2026-03-14 - Trickster Enemy Implementation
+
+- **Module**: Enemies
+- **Target file**: progress.log
+- **Description**: Need to append implementation entry: "Implemented Trickster enemy (vanish/reappear behind player) - 4% spawn chance in zone 2+, pink/magenta color, ghost icon, dissolve particle effects, 1.25x backstab damage"
+- **Priority**: P2
+- **Note**: File allowlist restricted to js/enemies.js only - cannot write to progress.log directly
+
+### Heartstopper Moment Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/combat.js, js/sprites.js
+- **Description**: On finishing blows, display dramatic EKG heartbeat line that flatlines as enemy falls. Different EKG patterns for different enemy types (steady for elites, erratic for bosses). Requires combat.js to trigger on KO, vfx.js for EKG animation rendering, sprites.js for any additional KO pose effects.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Pain Wave Ripple Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/combat.js, js/sprites.js
+- **Description**: Heavy attacks trigger concentric pain wave ripples across damaged enemy's body. Wave color matches damage type (red for strikes, blue for grapples), intensity scales with attack power. Requires combat.js to trigger on heavy attacks, vfx.js for wave particle rendering.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Signature Stagger System Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/enemies.js, js/player.js, js/ui.js
+- **Description**: Hidden stagger threshold builds faster with consistent attack rhythm. At 100%, enemy crumples for free hit. Requires combat.js to track attack intervals and calculate rhythm bonus, enemies.js for stagger state and crumple animation trigger, player.js for player-version stagger tracking, ui.js for stagger meter display.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Weight Class Advantage Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/enemies.js, js/player.js
+- **Description**: Rock-paper-scissors damage modifiers based on attacker/receiver weight class. Requires combat.js to calculate damage multipliers, enemies.js to store enemy weight class, player.js for player weight class tracking.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Do-or-Die Room Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/combat.js, js/player.js, js/scenes/GameScene.js
+- **Description**: Special room variant where player starts with 1 HP but deals 3x damage. Requires zones.js to flag room type, combat.js for damage multiplier, player.js for HP reset, GameScene.js for room entry handling.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Momentum Bank Feature
+- **Module**: Player (js/player.js)
+- **Target file**: js/combat.js, js/main.js
+- **Description**: Between rooms, player can bank unused Momentum stacks as Stored Momentum. Requires player.js to manage bank, combat.js for momentum tracking, main.js for persistence.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Showstopper Enemy Feature
+- **Module**: Enemies (js/enemies.js)
+- **Target file**: js/combat.js, js/vfx.js, js/sprites.js
+- **Description**: Rare boss variant that "pauses" player mid-attack for 1 second. Requires enemies.js for pause ability, combat.js to handle pause state, vfx.js for clockwork gear visual, sprites.js for enemy pose during pause.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Sore Loser AI Feature
+- **Module**: Enemies (js/enemies.js)
+- **Target file**: js/combat.js
+- **Description**: Defeated enemies (below 10% HP) gain desperate final attack burst (+50% speed, -30% accuracy). Requires enemies.js to trigger at low HP, combat.js to apply modifiers.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Trickster Teleport Feature
+- **Module**: Enemies (js/enemies.js)
+- **Target file**: js/combat.js, js/sprites.js, js/vfx.js
+- **Description**: Special enemy that vanishes and reappears behind player. Requires enemies.js for teleport ability, sprites.js for dissolve/reappear animations, vfx.js for particle effects.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Blood Moon Arena Feature
+- **Module**: Zones (js/zones.js)
+- **Target file**: js/combat.js, js/enemies.js, js/items.js
+- **Description**: Rare underground zone variant spawning at night (real-time) with +15% enemy damage and double loot drops. Requires zones.js to flag room type, combat.js for damage modifier, enemies.js for loot table boost, items.js for drop handling.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
+### Championship Legacy Hall Feature
+- **Module**: UI (js/ui.js)
+- **Target file**: js/player.js, js/scenes/GameScene.js
+- **Description**: Trophy room displaying defeated boss portraits with fight stats, unlocks concept art/lore. Requires ui.js for display, player.js for boss defeat tracking, GameScene.js for room navigation.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-14
+
 ### Signature Finisher Repertoire Feature
 - **Module**: Player (js/player.js)
 - **Target file**: js/combat.js, js/ui.js
