@@ -34,9 +34,18 @@ var PauseScene = new Phaser.Class({
     Phaser.Scene.call(this, { key: 'PauseScene' });
   },
 
+  _setMobileControlsPointerEvents: function(enabled) {
+    var ids = ['dpad', 'action-cluster', 'mobile-pause-btn'];
+    ids.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.pointerEvents = enabled ? '' : 'none';
+    });
+  },
+
   create: function() {
     try {
     var self = this;
+    this._setMobileControlsPointerEvents(false);
     var W = CONFIG.CANVAS_W;
     var H = CONFIG.CANVAS_H;
 
@@ -283,6 +292,7 @@ var PauseScene = new Phaser.Class({
   },
 
   closePause: function() {
+    this._setMobileControlsPointerEvents(true);
     // Tell GameScene to resume physics + game logic
     var gameScene = this.scene.get('GameScene');
     if (gameScene && gameScene.resumeFromPause) {
