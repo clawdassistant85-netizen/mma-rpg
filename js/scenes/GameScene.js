@@ -91,7 +91,7 @@ var GameScene = new Phaser.Class({
 
     this.scene.launch('HUDScene');
     MMA.UI.bindMobilePauseButton(this);
-    MMA.UI.setPauseButtonVisible(true);
+    this.syncPauseButtonVisibility(true);
     if (typeof MMA.UI.showTouchControls === 'function') MMA.UI.showTouchControls(true);
     if (typeof MMA.UI.setActionButtonLabels === 'function') MMA.UI.setActionButtonLabels(false);
     this.hideGameOverRestartUI();
@@ -209,6 +209,11 @@ var GameScene = new Phaser.Class({
     this.scene.stop('HUDScene');
     this.scene.start('DefeatScene');
   },
+  syncPauseButtonVisibility: function(show) {
+    if (this._lastPauseButtonVisible === show) return;
+    this._lastPauseButtonVisible = show;
+    if (typeof MMA.UI.setPauseButtonVisible === 'function') MMA.UI.setPauseButtonVisible(show);
+  },
   _setupNetworkHandlers: function() {
     var self = this;
 
@@ -308,11 +313,6 @@ var GameScene = new Phaser.Class({
         self.player2 = null;
       }
     });
-  },
-  syncPauseButtonVisibility: function(show) {
-    if (this._lastPauseButtonVisible === show) return;
-    this._lastPauseButtonVisible = show;
-    MMA.UI.setPauseButtonVisible(show);
   },
 
   resumeFromPause: function() {
@@ -444,7 +444,7 @@ var GameScene = new Phaser.Class({
         this.gameOverAt = time;
         this.showGameOverRestartUI();
       }
-      MMA.UI.setPauseButtonVisible(false);
+      this.syncPauseButtonVisibility(false);
       if (Phaser.Input.Keyboard.JustDown(this.restartKey) || time - this.gameOverAt > 3000) {
         this.startDefeatScene();
       }
@@ -459,7 +459,7 @@ var GameScene = new Phaser.Class({
         if (MMA.Network.isHost()) MMA.Network.sendEnemyStates(this.enemies);
       }
     }
-    MMA.UI.setPauseButtonVisible(!this.paused && !this.roomTransitioning && !this.gameOver);
+    this.syncPauseButtonVisibility(!this.paused && !this.roomTransitioning && !this.gameOver);
     if (this.paused || this.roomTransitioning) return;
 
     if (this.groundState.active) {

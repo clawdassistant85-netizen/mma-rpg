@@ -317,6 +317,48 @@
       text-shadow: 0 2px 8px rgba(0,0,0,0.8);
       border: 2px solid rgba(68, 255, 68, 0.3);
     }
+    
+    /* Move Input Display - shows last 6 button inputs */
+    #move-input-display {
+      position: fixed;
+      bottom: 190px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.7);
+      border-radius: 12px;
+      z-index: 32;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 200ms ease;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    #move-input-display.visible {
+      opacity: 1;
+    }
+    #move-input-display .input-slot {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      background: rgba(60, 60, 60, 0.6);
+      transition: transform 100ms ease, background 100ms ease;
+    }
+    #move-input-display .input-slot.latest {
+      transform: scale(1.15);
+      background: rgba(80, 80, 80, 0.9);
+      box-shadow: 0 0 8px rgba(255, 200, 80, 0.4);
+    }
+    #move-input-display .input-slot.strike { background: rgba(255, 80, 80, 0.5); }
+    #move-input-display .input-slot.grapple { background: rgba(80, 120, 255, 0.5); }
+    #move-input-display .input-slot.special { background: rgba(255, 200, 80, 0.5); }
+    #move-input-display .input-slot.dodge { background: rgba(80, 255, 160, 0.5); }
+    #move-input-display .input-slot.block { background: rgba(180, 180, 180, 0.5); }
     #fight-timer-display.visible {
       display: block;
       opacity: 1;
@@ -408,6 +450,15 @@
         <span class="timer-label">TIME</span>
         <span class="timer-value">00:00</span>
       </div>
+      <!-- Move Input Display - shows last 6 button inputs -->
+      <div id="move-input-display">
+        <div class="input-slot"></div>
+        <div class="input-slot"></div>
+        <div class="input-slot"></div>
+        <div class="input-slot"></div>
+        <div class="input-slot"></div>
+        <div class="input-slot"></div>
+      </div>
       <div id="ground-overlay"><div class="ground-text">GROUND GAME</div><div id="ground-timer"><div id="ground-timer-fill"></div></div></div>
       <div id="ground-banner">TAKEDOWN!</div>
       <button id="dom-restart-btn" type="button">RESTART (ENTER)</button>
@@ -430,17 +481,17 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=43"></script>
-  <script src="js/sprites.js?v=43"></script>
-  <script src="js/combat.js?v=43"></script>
-  <script src="js/enemies.js?v=43"></script>
-  <script src="js/zones.js?v=43"></script>
-  <script src="js/player.js?v=43"></script>
-  <script src="js/items.js?v=43"></script>
-  <script src="js/outfits.js?v=43"></script>
-  <script src="js/vfx.js?v=43"></script>
-  <script src="js/ui.js?v=43"></script>
-  <script src="js/progression.js?v=43"></script>
+  <script src="js/config.js?v=44"></script>
+  <script src="js/sprites.js?v=44"></script>
+  <script src="js/combat.js?v=44"></script>
+  <script src="js/enemies.js?v=44"></script>
+  <script src="js/zones.js?v=44"></script>
+  <script src="js/player.js?v=44"></script>
+  <script src="js/items.js?v=44"></script>
+  <script src="js/outfits.js?v=44"></script>
+  <script src="js/vfx.js?v=44"></script>
+  <script src="js/ui.js?v=44"></script>
+  <script src="js/progression.js?v=44"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -693,20 +744,20 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=43"></script>
-  <script src="js/saveSystem.js?v=43"></script>
-  <script src="js/narrator.js?v=43"></script>
-  <script src="js/scenes/TitleScene.js?v=43"></script>
-  <script src="js/scenes/BootScene.js?v=43"></script>
-  <script src="js/scenes/GameScene.js?v=43"></script>
-  <script src="js/scenes/HUDScene.js?v=43"></script>
-  <script src="js/scenes/PauseScene.js?v=43"></script>
-  <script src="js/scenes/OutfitScene.js?v=43"></script>
-  <script src="js/scenes/UnlockScene.js?v=43"></script>
-  <script src="js/scenes/VictoryScene.js?v=43"></script>
-  <script src="js/scenes/DefeatScene.js?v=43"></script>
-  <script src="js/network.js?v=43"></script>
-  <script src="js/scenes/LobbyScene.js?v=43"></script>
-  <script src="js/main.js?v=43"></script>
+<script src="js/sounds.js?v=44"></script>
+  <script src="js/saveSystem.js?v=44"></script>
+  <script src="js/narrator.js?v=44"></script>
+  <script src="js/scenes/TitleScene.js?v=44"></script>
+  <script src="js/scenes/BootScene.js?v=44"></script>
+  <script src="js/scenes/GameScene.js?v=44"></script>
+  <script src="js/scenes/HUDScene.js?v=44"></script>
+  <script src="js/scenes/PauseScene.js?v=44"></script>
+  <script src="js/scenes/OutfitScene.js?v=44"></script>
+  <script src="js/scenes/UnlockScene.js?v=44"></script>
+  <script src="js/scenes/VictoryScene.js?v=44"></script>
+  <script src="js/scenes/DefeatScene.js?v=44"></script>
+  <script src="js/network.js?v=44"></script>
+  <script src="js/scenes/LobbyScene.js?v=44"></script>
+  <script src="js/main.js?v=44"></script>
 </body>
 </html>

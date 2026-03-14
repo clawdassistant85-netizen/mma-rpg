@@ -31,6 +31,36 @@ window.MMA.UI = {
     bar: null,
     label: null
   },
+  _domCache: {
+    actionButtons: {},
+    standupBtn: null,
+    mobilePauseBtn: null
+  },
+  getActionButton: function(action) {
+    if (!action) return null;
+    var btn = this._domCache.actionButtons[action];
+    if (!btn || !btn.isConnected) {
+      btn = document.querySelector('.action-btn[data-action="' + action + '"]');
+      this._domCache.actionButtons[action] = btn || null;
+    }
+    return btn;
+  },
+  getStandUpButton: function() {
+    var btn = this._domCache.standupBtn;
+    if (!btn || !btn.isConnected) {
+      btn = document.getElementById('standup-btn');
+      this._domCache.standupBtn = btn || null;
+    }
+    return btn;
+  },
+  getMobilePauseButton: function() {
+    var btn = this._domCache.mobilePauseBtn;
+    if (!btn || !btn.isConnected) {
+      btn = document.getElementById('mobile-pause-btn');
+      this._domCache.mobilePauseBtn = btn || null;
+    }
+    return btn;
+  },
   resetFightStats: function() {
     this.fightStats = {
       damageDealt: 0,
@@ -1699,7 +1729,7 @@ window.MMA.UI = {
     this.cooldownActive = anyActive;
   },
   _updateCooldownUI: function(action) {
-    var btn = document.querySelector('.action-btn[data-action="' + action + '"]');
+    var btn = this.getActionButton(action);
     if (!btn) return;
     var cd = this.cooldowns[action];
     var overlay = btn.querySelector('.cooldown-overlay');
@@ -1965,7 +1995,7 @@ window.MMA.UI = {
       labels.grapple = subName;  // Show actual submission name
       
       Object.keys(labels).forEach(function(action) {
-        var btn = document.querySelector('.action-btn[data-action="' + action + '"]');
+        var btn = window.MMA.UI.getActionButton(action);
         if (btn) btn.textContent = labels[action];
       });
       
@@ -1978,7 +2008,7 @@ window.MMA.UI = {
         var slotIndex = actionToSlot[action];
         var moveKey = loadout[slotIndex] || 'jab';
         var move = roster[moveKey];
-        var btn = document.querySelector('.action-btn[data-action="' + action + '"]');
+        var btn = window.MMA.UI.getActionButton(action);
         if (btn && move) {
           btn.textContent = move.name;
         } else if (btn) {
@@ -2015,7 +2045,7 @@ window.MMA.UI = {
   },
   // Update stand up button based on ground state
   updateStandUpButton: function(scene) {
-    var btn = document.getElementById('standup-btn');
+    var btn = this.getStandUpButton();
     if (!btn) return;
     
     if (scene && scene.groundState && scene.groundState.active) {
@@ -2051,7 +2081,7 @@ window.MMA.UI = {
     return bestKey;
   },
   updateSpecialButton: function(scene, forceGround) {
-    var btn = document.querySelector('.action-btn[data-action="special"]');
+    var btn = this.getActionButton('special');
     if (!btn) return;
     var onGround = !!forceGround || !!(scene && scene.groundState && scene.groundState.active);
     if (onGround) {
@@ -2069,21 +2099,25 @@ window.MMA.UI = {
     btn.textContent = (move && move.name) ? move.name : 'Special';
   },
   bindMobilePauseButton: function(scene) {
-    var btn = document.getElementById('mobile-pause-btn');
-    if (!btn || btn._mmaBound) return;
+    var btn = this.getMobilePauseButton();
+    if (!btn) return;
+    btn._mmaScene = scene;
+    if (btn._mmaBound) return;
     btn._mmaBound = true;
     btn.addEventListener('click', function(e) {
+      var activeScene = btn._mmaScene;
       e.preventDefault();
-      if (!scene || scene.gameOver || scene.roomTransitioning || scene.paused || scene.scene.isActive('PauseScene')) return;
-      scene.registry.set('unlockedMoves', scene.player.unlockedMoves.slice());
-      scene.registry.set('playerStats', Object.assign({}, scene.player.stats));
-      scene.physics.pause();
-      scene.paused = true;
-      scene.scene.launch('PauseScene');
+      if (!activeScene || !activeScene.scene || !activeScene.scene.isActive || !activeScene.scene.isActive()) return;
+      if (activeScene.gameOver || activeScene.roomTransitioning || activeScene.paused || activeScene.scene.isActive('PauseScene')) return;
+      activeScene.registry.set('unlockedMoves', activeScene.player.unlockedMoves.slice());
+      activeScene.registry.set('playerStats', Object.assign({}, activeScene.player.stats));
+      activeScene.physics.pause();
+      activeScene.paused = true;
+      activeScene.scene.launch('PauseScene');
     });
   },
   setPauseButtonVisible: function(show) {
-    var btn = document.getElementById('mobile-pause-btn');
+    var btn = this.getMobilePauseButton();
     if (!btn) return;
     btn.style.display = show ? 'block' : 'none';
   },

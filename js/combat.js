@@ -97,6 +97,11 @@ window.MMA.Combat = {
   TRANSITION_CANCEL_COOLDOWN_REDUCTION_PCT: 0.45,
   SHADOW_CLONE_MIRROR_MULTIPLIER: 0.5,
   SHADOW_CLONE_MIN_DAMAGE: 6,
+  BREATHING_EXERTION_WINDOW_MS: 2600,
+  BREATHING_EXERTION_THRESHOLD: 5,
+  BREATHING_WINDED_DURATION_MS: 5000,
+  BREATHING_REGEN_MULTIPLIER: 0.5,
+  BREATHING_TECHNIQUE_HOLD_MS: 2000,
   INJURY_MAX_STACKS: 4,
   INJURY_ARM_DAMAGE_BONUS_PER_STACK: 0.03,
   INJURY_LEG_DAMAGE_BONUS_PER_STACK: 0.04,
@@ -1156,6 +1161,7 @@ window.MMA.Combat = {
     if (!scene.player.cooldowns[cdKey]) scene.player.cooldowns[cdKey] = 0;
     if (scene.player.cooldowns[cdKey] > 0 || s.stamina < gm.staminaCost) return;
     s.stamina -= gm.staminaCost;
+    this.registerBreathingExertion(scene, 1);
     scene.player.cooldowns[cdKey] = gm.cooldown;
     var enemy = scene.groundState.enemy;
     if (!enemy || !enemy.active || enemy.state === 'dead') return scene.endGroundState('enemy-dead');
@@ -1282,6 +1288,7 @@ window.MMA.Combat = {
     }
     
     s.stamina -= staminaCost;
+    this.registerBreathingExertion(scene, 1);
     
     // Calculate submission success chance based on:
     // - Enemy ground defense
@@ -1559,6 +1566,84 @@ window.MMA.Combat = {
     scene.registry.set('score', score + this.FINISH_HIM_SCORE_BONUS);
     return { damage: boostedDamage, finishHim: true };
   },
+  ensureBreathingState: function(scene) {
+    scene.player.breathingState = scene.player.breathingState || {
+      exertionHits: 0,
+      firstExertionAt: 0,
+      windedUntil: 0,
+      holdStartedAt: 0,
+      patchedRegen: false
+    };
+    return scene.player.breathingState;
+  },
+  patchBreathingRegenHook: function(scene) {
+    var state = this.ensureBreathingState(scene);
+    if (state.patchedRegen) return;
+    if (!MMA.Player || typeof MMA.Player.regenStaminaTick !== 'function') return;
+    if (MMA.Player._breathingWrapped) {
+      state.patchedRegen = true;
+      return;
+    }
+
+    var original = MMA.Player.regenStaminaTick;
+    MMA.Player.regenStaminaTick = function(sceneArg) {
+      var before = sceneArg && sceneArg.player && sceneArg.player.stats ? sceneArg.player.stats.stamina : null;
+      original(sceneArg);
+      if (!sceneArg || !sceneArg.player || !sceneArg.player.stats || typeof before !== 'number') return;
+      var breathing = sceneArg.player.breathingState;
+      if (!breathing || !breathing.windedUntil) return;
+      if (sceneArg.time.now >= breathing.windedUntil) return;
+      var after = sceneArg.player.stats.stamina;
+      var gained = Math.max(0, after - before);
+      if (gained <= 0) return;
+      var reduced = gained * window.MMA.Combat.BREATHING_REGEN_MULTIPLIER;
+      sceneArg.player.stats.stamina = Math.min(sceneArg.player.stats.maxStamina, before + reduced);
+    };
+    MMA.Player._breathingWrapped = true;
+    state.patchedRegen = true;
+  },
+  registerBreathingExertion: function(scene, amount) {
+    var state = this.ensureBreathingState(scene);
+    var now = scene.time.now;
+    var add = Math.max(1, amount || 1);
+    if (!state.firstExertionAt || now - state.firstExertionAt > this.BREATHING_EXERTION_WINDOW_MS) {
+      state.firstExertionAt = now;
+      state.exertionHits = 0;
+    }
+    state.exertionHits += add;
+
+    if (state.exertionHits >= this.BREATHING_EXERTION_THRESHOLD) {
+      var newlyWinded = now >= state.windedUntil;
+      state.windedUntil = now + this.BREATHING_WINDED_DURATION_MS;
+      state.exertionHits = 0;
+      state.firstExertionAt = now;
+      if (newlyWinded) MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 86, 'WINDED! REGEN -50%', '#ff9e9e');
+    }
+
+    return state;
+  },
+  updateBreathingTechnique: function(scene) {
+    var state = this.ensureBreathingState(scene);
+    var now = scene.time.now;
+    var blocking = this.isBlocking(scene);
+
+    if (!blocking) {
+      state.holdStartedAt = 0;
+      if (state.windedUntil && now >= state.windedUntil) state.windedUntil = 0;
+      return state;
+    }
+
+    if (!state.holdStartedAt) state.holdStartedAt = now;
+    if (state.windedUntil && now < state.windedUntil && now - state.holdStartedAt >= this.BREATHING_TECHNIQUE_HOLD_MS) {
+      state.windedUntil = 0;
+      state.exertionHits = 0;
+      state.firstExertionAt = 0;
+      state.holdStartedAt = 0;
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 104, 'BREATHING TECHNIQUE!', '#8be9fd');
+    }
+
+    return state;
+  },
   executeTaunt: function(scene) {
     if (scene.groundState && scene.groundState.active) return;
     if (scene.gameOver || scene.paused || scene.roomTransitioning) return;
@@ -1581,6 +1666,7 @@ window.MMA.Combat = {
     }
 
     scene.player.stats.stamina -= this.TAUNT_STAMINA_COST;
+    this.registerBreathingExertion(scene, 1);
     cd.taunt = this.TAUNT_COOLDOWN_MS;
 
     if (!best) {
@@ -1607,7 +1693,10 @@ window.MMA.Combat = {
     var adrenalinePrimed = this.isAdrenalinePrimed(scene);
     if (!cd[moveKey]) cd[moveKey] = 0;
     if (cd[moveKey] > 0 || (!intuitionPrimed && !adrenalinePrimed && s.stamina < move.staminaCost) || scene.gameOver) return;
-    if (!intuitionPrimed && !adrenalinePrimed) s.stamina -= move.staminaCost;
+    if (!intuitionPrimed && !adrenalinePrimed) {
+      s.stamina -= move.staminaCost;
+      this.registerBreathingExertion(scene, 1);
+    }
     cd[moveKey] = move.cooldown;
     this.markAttackForTransitionCancel(scene, moveKey, move.staminaCost);
     if (window.sfx) { if (moveKey === 'jab' || moveKey === 'cross') window.sfx.punch(); else if (moveKey === 'lowKick' || moveKey === 'headKick') window.sfx.kick(); }
@@ -1792,7 +1881,10 @@ window.MMA.Combat = {
     if (cds[bestMoveKey] > 0) return;
     var required = Math.ceil(move.staminaCost * 1.5);
     if (!intuitionPrimed && !adrenalinePrimed && scene.player.stats.stamina < required) return MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'NOT ENOUGH STAMINA', '#ff4444');
-    if (!intuitionPrimed && !adrenalinePrimed) scene.player.stats.stamina -= required;
+    if (!intuitionPrimed && !adrenalinePrimed) {
+      scene.player.stats.stamina -= required;
+      this.registerBreathingExertion(scene, 2);
+    }
     cds[bestMoveKey] = move.cooldown;
     this.markAttackForTransitionCancel(scene, bestMoveKey, required);
     var DT = CONFIG.DISPLAY_TILE, px = scene.player.x + scene.lastDir.x * DT * 0.7, py = scene.player.y + scene.lastDir.y * DT * 0.7;
@@ -2000,6 +2092,7 @@ window.MMA.Combat = {
     }
 
     scene.player.stats.stamina -= this.RECOVERY_TECH_STAMINA_COST;
+    this.registerBreathingExertion(scene, 1);
     scene.player.stunnedUntil = 0;
 
     var DT = CONFIG.DISPLAY_TILE;
@@ -2036,6 +2129,8 @@ window.MMA.Combat = {
     return true;
   },
   handleInput: function(scene, delta) {
+    this.patchBreathingRegenHook(scene);
+    this.updateBreathingTechnique(scene);
     this.refreshChainCounterState(scene);
     this.refreshMomentumShiftState(scene);
     this.refreshCounterFlowState(scene);

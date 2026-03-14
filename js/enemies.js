@@ -184,6 +184,25 @@ window.MMA.Enemies = {
   },
 
   // Get scouting info for UI display
+  // Opponent Weight Indicator Feature
+  // Define weight class thresholds based on enemy max HP (example values)
+  WEIGHT_CLASS: {
+    LIGHT: { maxHp: 200, icon: '🪶' }, // feather icon
+    MEDIUM: { maxHp: 400, icon: '✊' }, // fist icon
+    HEAVY: { maxHp: 800, icon: '🪨' }, // rock icon
+    BOSS: { maxHp: Infinity, icon: '👑' } // crown for bosses
+  },
+  // Determine weight class for an enemy instance
+  getWeightClass: function(enemy) {
+    var hp = enemy && enemy.maxHp ? enemy.maxHp : 0;
+    var classes = this.WEIGHT_CLASS;
+    for (var key in classes) {
+      if (hp <= classes[key].maxHp) {
+        return { class: key, icon: classes[key].icon };
+      }
+    }
+    return { class: 'UNKNOWN', icon: '?' };
+  },
   getScoutInfo: function(typeKey) {
     var level = this.getScoutLevel(typeKey);
     var data = this.SCOUTING_SYSTEM.getScoutData(typeKey);
@@ -1415,6 +1434,18 @@ window.MMA.Enemies = {
     INTENSITY_SCALE: 0.15     // How much recent damage affects tremble intensity
   },
 
+  // Critical Health Pulse: enemies below 20% HP pulse red to signal they're close to defeat
+  // Creates satisfying "finishing blow" anticipation and helps players prioritize weakened enemies
+  CRITICAL_PULSE_CONFIG: {
+    HP_THRESHOLD: 0.20,        // Trigger critical pulse at 20% HP
+    PULSE_COLOR: 0xff0044,    // Red-pink critical color
+    PULSE_ALPHA_MIN: 0.4,     // Minimum alpha during pulse
+    PULSE_ALPHA_MAX: 0.8,     // Maximum alpha during pulse
+    PULSE_DURATION: 400,       // Duration of each pulse cycle (ms)
+    PULSE_TEXT: 'CRITICAL!',   // Text shown when entering critical state
+    PULSE_TEXT_COLOR: '#ff0044'
+  },
+
   // Desperation Enrage: non-boss enemies rage when below 25% HP
   ENRAGE_CONFIG: {
     HP_THRESHOLD: 0.25,        // Trigger at 25% HP
@@ -1480,12 +1511,84 @@ window.MMA.Enemies = {
     });
   },
 
+  // Apply critical health pulse effect - red pulsing when enemy below 20% HP
+  applyCriticalPulse: function(enemy, scene) {
+    if (!enemy || !scene) return;
+    // Ensure enemy has hp stats
+    if (!enemy.stats || typeof enemy.stats.hp !== 'number' || typeof enemy.stats.maxHp !== 'number') return;
+    var cfg = this.CRITICAL_PULSE_CONFIG;
+    var hpPct = enemy.stats.hp / enemy.stats.maxHp;
+    
+    // If above threshold, clear any existing critical effect
+    if (hpPct > cfg.HP_THRESHOLD) {
+      if (enemy._criticalPulseTween) {
+        enemy._criticalPulseTween.stop();
+        enemy._criticalPulseTween = null;
+      }
+      // Clear critical tint if applied
+      if (enemy._isCritical) {
+        enemy._isCritical = false;
+        // Restore original tint if elite/boss/nemesis
+        if (enemy.type && enemy.type.isElite && enemy.type.eliteData && enemy.type.eliteData.colorGlow) {
+          enemy.setTint(enemy.type.eliteData.colorGlow);
+        } else if (enemy.isBoss) {
+          enemy.setTint(0xffd700);
+        } else if (enemy.type && enemy.type.isNemesis) {
+          enemy.setTint(this.NEMESIS_CONFIG.GLOW_COLOR);
+        } else if (enemy.type && enemy.type.isRivalEcho) {
+          enemy.setTint(this.RIVAL_ECHO_CONFIG.ECHO_COLOR);
+        } else if (enemy.type && enemy.type.aiPattern === 'regen') {
+          enemy.setTint(0x22ff66);
+        } else {
+          enemy.clearTint();
+        }
+      }
+      return;
+    }
+    
+    // Already in critical state with active tween - don't recreate
+    if (enemy._isCritical && enemy._criticalPulseTween) return;
+    
+    // Mark as critical
+    enemy._isCritical = true;
+    
+    // Store original tint to restore later
+    if (!enemy._originalCriticalTint) {
+      // Don't override if already has special tint
+      if (!enemy.isBoss && !(enemy.type && enemy.type.isElite) && !(enemy.type && enemy.type.isNemesis)) {
+        enemy._originalCriticalTint = enemy.tint || 0xffffff;
+      }
+    }
+    
+    // Apply critical tint
+    enemy.setTint(cfg.PULSE_COLOR);
+    
+    // Create pulsing alpha tween
+    if (scene.tweens && !enemy._criticalPulseTween) {
+      enemy._criticalPulseTween = scene.tweens.add({
+        targets: enemy,
+        alpha: cfg.PULSE_ALPHA_MIN,
+        duration: cfg.PULSE_DURATION / 2,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+    }
+    
+    // Show CRITICAL text once when first entering critical state
+    if (!enemy._criticalTextShown && typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      enemy._criticalTextShown = true;
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 55, cfg.PULSE_TEXT, cfg.PULSE_TEXT_COLOR);
+    }
+  },
+
   // Call this each frame for all enemies (to be hooked into the main update loop elsewhere)
   updateFearTrembleAll: function(scene, delta) {
     if (!scene || !scene.enemies) return;
     for (var i = 0; i < scene.enemies.length; i++) {
       var enemy = scene.enemies[i];
       this.applyFearTremble(enemy, scene);
+      this.applyCriticalPulse(enemy, scene);
     }
   },
 

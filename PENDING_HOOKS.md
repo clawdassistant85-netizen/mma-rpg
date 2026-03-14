@@ -8,13 +8,23 @@ document it here. The Reviewer agent will integrate these.
 - **Description**: what change is needed
 - **Priority**: P0/P1/P2
 
+## 2026-03-14 - Critical Health Pulse Feature
+
+- **Module**: Enemies
+- **Target file**: progress.log
+- **Description**: Need to append implementation entry: "[2026-03-14 16:58] Spark ⚡ implemented Critical Health Pulse feature in js/enemies.js - enemies below 20% HP now pulse red with alpha animation to signal they're close to defeat. Creates satisfying finishing blow anticipation."
+- **Priority**: P2
+- **Status**: ✅ Logged in progress.log (existing entry present as `[2026-03-14 17:08 EDT] Spark ⚡ — Implemented Critical Health Pulse...`)
+- **Note**: No reviewer action still needed.
+
 ## 2026-03-14 - Trickster Enemy Implementation
 
 - **Module**: Enemies
 - **Target file**: progress.log
 - **Description**: Need to append implementation entry: "Implemented Trickster enemy (vanish/reappear behind player) - 4% spawn chance in zone 2+, pink/magenta color, ghost icon, dissolve particle effects, 1.25x backstab damage"
 - **Priority**: P2
-- **Note**: File allowlist restricted to js/enemies.js only - cannot write to progress.log directly
+- **Status**: ✅ Logged in progress.log (existing entry present as `[2026-03-14 04:13 PM EDT] IMPLEMENTED: Trickster enemy...`)
+- **Note**: No reviewer action still needed.
 
 ### Heartstopper Moment Feature
 - **Module**: VFX (js/vfx.js)

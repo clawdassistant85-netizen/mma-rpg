@@ -71,7 +71,7 @@ var BootScene = new Phaser.Class({
     this._updateLoadBar('Style Aura');
   },
   _bootStep_auraHooks: function() {
-    // this.installBossChromaAuraHook(); // heaviest — patches preUpdate, 15+ prop checks per sprite per frame
+    this.installBossChromaAuraHook();
     this._updateLoadBar('Boss Aura');
   },
   _bootStep_combatHooks: function() {

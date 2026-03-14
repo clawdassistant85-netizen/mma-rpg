@@ -254,7 +254,10 @@ window.MMA.Zones = {
         ambientParticles:['dustMotes','dojoIncense'],
         intensity:0.9
       },
-      dojoMode:'championsDojo'
+      dojoMode:'championsDojo',
+      // Tournament Entry Drill: warmup rhythm minigame before endless waves
+      tournamentEntryDrill:true,
+      tournamentEntryDrillDifficulty:'standard'
     }
   },
   getRoom: function(roomId){ return this.ZONE1_ROOMS[roomId] || this.ZONE2_ROOMS[roomId] || this.ZONE3_ROOMS[roomId] || this.ZONE4_ROOMS[roomId]; },
@@ -708,6 +711,34 @@ window.MMA.Zones = {
       crowdSizeScale: Math.min(3, 0.001 * (crowd.crowdSize || 0) + 0.25)
     };
   },
+  // Tournament Entry Drill helpers
+  // Lightweight, metadata-driven implementation of the backlog's
+  // "Tournament Entry Drill" feature. Certain tournament-style rooms
+  // (like the Champion's Dojo) can opt in via tournamentEntryDrill
+  // flags. Zones exposes simple config that UI/combat layers can use
+  // to run a 10-second warmup rhythm minigame and award small, scoped
+  // damage bonuses based on performance grade.
+  getTournamentEntryDrillConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.tournamentEntryDrill) return null;
+    var difficulty = room.tournamentEntryDrillDifficulty || 'standard';
+    // All drills share the same duration and grade mapping for now; we
+    // keep this table here so future tournament rooms can tweak values
+    // without changing consuming systems.
+    var duration = 10; // seconds
+    var gradeBonuses = {
+      perfect:{ damageMultiplier:1.05, label:'+5% damage for this tournament run' },
+      great:{ damageMultiplier:1.03, label:'+3% damage for this tournament run' },
+      good:{ damageMultiplier:1.01, label:'+1% damage for this tournament run' },
+      miss:{ damageMultiplier:1.0, label:'No bonus' }
+    };
+    return {
+      active:true,
+      difficulty:difficulty,
+      durationSeconds:duration,
+      gradeBonuses:gradeBonuses
+    };
+  },
   // Rival Crossroads helpers
   // Metadata-only implementation of the backlog's "Rival Crossroads" feature.
   // Specific rooms (usually mid-zone hubs) can advertise multiple branch
@@ -1071,6 +1102,26 @@ window.MMA.Zones = {
         scene.registry.set('rivalCrossroadsBranches', []);
         // We deliberately keep rivalCrossroadsChosenBranch sticky across rooms
         // so downstream systems can continue to read it.
+      }
+      // Tournament Entry Drill metadata: tournament-style rooms can register
+      // a short rhythm warmup minigame before brackets/gauntlets. Zones only
+      // exposes config + flavor text; input handling and scoring live in
+      // combat/UI systems.
+      var drillCfg = this.getTournamentEntryDrillConfig(room.id);
+      if (drillCfg && drillCfg.active) {
+        scene.registry.set('tournamentDrillActive', true);
+        scene.registry.set('tournamentDrillDifficulty', drillCfg.difficulty);
+        scene.registry.set('tournamentDrillDurationSeconds', drillCfg.durationSeconds);
+        scene.registry.set('tournamentDrillGradeBonuses', drillCfg.gradeBonuses);
+        scene.time.delayedCall(2250, function(){
+          scene.registry.set('gameMessage', 'Tournament Warmup: 10-second rhythm drill before the bracket – better timing, better damage.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('tournamentDrillActive', false);
+        scene.registry.set('tournamentDrillDifficulty', '');
+        scene.registry.set('tournamentDrillDurationSeconds', 0);
+        scene.registry.set('tournamentDrillGradeBonuses', {});
       }
       // Training Room metadata: used by player/combat/UI systems for minigames
       if (room.trainingTypes && room.trainingTypes.length) {
