@@ -43,7 +43,6 @@ var PauseScene = new Phaser.Class({
   },
 
   create: function() {
-    try {
     var self = this;
     this._setMobileControlsPointerEvents(false);
     var W = CONFIG.CANVAS_W;
@@ -163,6 +162,10 @@ var PauseScene = new Phaser.Class({
     }).setDepth(10);
 
     var unlockedMoves = this.registry.get('unlockedMoves') || ['jab', 'cross'];
+    var unlockedSet = {};
+    unlockedMoves.forEach(function(moveKey) {
+      unlockedSet[moveKey] = true;
+    });
 
     var ROW_H   = 24;
     var COL_W   = Math.floor(PANEL_W / 2);
@@ -230,19 +233,21 @@ var PauseScene = new Phaser.Class({
     for (var i = 0; i < 4; i++) {
       var moveKey = loadout[i] || 'jab';
       var moveInfo = PAUSE_MOVE_CONTROLS[moveKey] || { label: moveKey };
+      var isUnlocked = !!unlockedSet[moveKey];
       var slotX = PANEL_X + 14 + i * ((PANEL_W - 28) / 4);
       var slotBg = this.add.graphics();
       slotBg.fillStyle(0x222222, 0.8);
       slotBg.fillRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
-      slotBg.lineStyle(1, slotColors[i], 0.6);
+      slotBg.lineStyle(1, isUnlocked ? slotColors[i] : '#555555', 0.6);
       slotBg.strokeRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
+      this.add(slotBg);
       
       var slotNum = this.add.text(slotX + 10, loadoutY + 20, (i + 1) + ':', {
-        fontSize: '10px', color: '#888888'
+        fontSize: '10px', color: isUnlocked ? '#888888' : '#555555'
       }).setDepth(10);
       
       this.add.text(slotX + 24, loadoutY + 24, moveInfo.label, {
-        fontSize: '11px', color: '#ffffff'
+        fontSize: '11px', color: isUnlocked ? '#ffffff' : '#777777'
       }).setDepth(10);
     }
     
@@ -277,9 +282,6 @@ var PauseScene = new Phaser.Class({
         self.closePause();
       }
     });
-    } catch(e) {
-      console.error('PauseScene crash:', e);
-    }
   },
 
   update: function() {

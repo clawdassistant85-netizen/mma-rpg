@@ -178,6 +178,25 @@ window.MMA.Sprites = {
   },
   REACTION_FACE_TEXTURES: {},
   TATTOO_TEXTURES: {},
+  RESONANCE_CONFIG: {
+    moveHistoryLimit: 8,
+    dominantWindow: 4,
+    pulseSpeed: 0.0065,
+    alpha: 0.2,
+    ringAlpha: 0.14,
+    flareAlpha: 0.12,
+    scale: 1.18,
+    ringScale: 1.28,
+    flareScale: 1.1,
+    colors: {
+      striker: 0xff5a5a,
+      grappler: 0x5aa8ff,
+      hybrid: 0xb678ff,
+      signature: 0xffd166,
+      default: 0xa98bff
+    }
+  },
+  RESONANCE_TEXTURES: {},
   VISUAL_ROLE_ALIASES: {
     trainer: 'npc_trainer',
     coach: 'npc_coach',
@@ -546,6 +565,34 @@ window.MMA.Sprites = {
       textureTattoo(set.grapple, { type: 'grapple', color: (palette && palette.grapple) || 0x5dade2, alpha: 0.86 });
       textureTattoo(set.special, { type: 'special', color: (palette && palette.special) || 0xf7dc6f, alpha: 0.9 });
       window.MMA.Sprites.TATTOO_TEXTURES[baseKey] = set;
+    }
+    function textureResonance(key, color, alphaScale, variant) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var outerAlpha = typeof alphaScale === 'number' ? alphaScale : 0.18;
+      var innerAlpha = Math.min(0.6, outerAlpha + 0.12);
+      var mode = variant || 'core';
+      g.clear();
+      if (mode === 'ring') {
+        g.lineStyle(2, color, Math.min(0.9, outerAlpha + 0.34));
+        g.strokeEllipse(24, 36, 30, 44);
+        g.strokeEllipse(24, 36, 18, 28);
+        g.lineStyle(1, 0xffffff, 0.2);
+        g.beginPath(); g.moveTo(7, 37); g.lineTo(15, 24); g.lineTo(24, 34); g.lineTo(33, 21); g.lineTo(41, 37); g.strokePath();
+      } else if (mode === 'flare') {
+        g.fillStyle(color, outerAlpha * 0.7);
+        g.fillTriangle(24, 8, 14, 28, 22, 24);
+        g.fillTriangle(24, 8, 34, 28, 26, 24);
+        g.fillTriangle(12, 38, 19, 60, 22, 42);
+        g.fillTriangle(36, 38, 29, 60, 26, 42);
+        g.fillStyle(color, outerAlpha * 0.42);
+        g.fillEllipse(24, 38, 24, 34);
+      } else {
+        g.fillStyle(color, outerAlpha); g.fillEllipse(24, 36, 34, 50);
+        g.fillStyle(color, innerAlpha); g.fillEllipse(24, 36, 20, 32);
+        g.lineStyle(2, color, 0.74); g.strokeEllipse(24, 36, 26, 40);
+        g.lineStyle(1, 0xffffff, 0.24); g.strokeEllipse(24, 36, 32, 46);
+      }
+      g.generateTexture(key, 48, 72); g.destroy();
     }
     function texturePickup(key) {
       var g = self.make.graphics({ x:0, y:0, add:false });
@@ -1032,6 +1079,27 @@ window.MMA.Sprites = {
       striker: { core: 'aura_striker', ring: 'aura_striker_ring', flare: 'aura_striker_flare' },
       grappler: { core: 'aura_grappler', ring: 'aura_grappler_ring', flare: 'aura_grappler_flare' },
       balanced: { core: 'aura_balanced', ring: 'aura_balanced_ring', flare: 'aura_balanced_flare' }
+    };
+    var resonanceCfg = window.MMA.Sprites.RESONANCE_CONFIG || {};
+    var resonanceColors = resonanceCfg.colors || {};
+    textureResonance('resonance_striker', resonanceColors.striker || 0xff5a5a, resonanceCfg.alpha || 0.2, 'core');
+    textureResonance('resonance_striker_ring', resonanceColors.striker || 0xff5a5a, resonanceCfg.ringAlpha || 0.14, 'ring');
+    textureResonance('resonance_striker_flare', resonanceColors.striker || 0xff5a5a, resonanceCfg.flareAlpha || 0.12, 'flare');
+    textureResonance('resonance_grappler', resonanceColors.grappler || 0x5aa8ff, resonanceCfg.alpha || 0.2, 'core');
+    textureResonance('resonance_grappler_ring', resonanceColors.grappler || 0x5aa8ff, resonanceCfg.ringAlpha || 0.14, 'ring');
+    textureResonance('resonance_grappler_flare', resonanceColors.grappler || 0x5aa8ff, resonanceCfg.flareAlpha || 0.12, 'flare');
+    textureResonance('resonance_hybrid', resonanceColors.hybrid || 0xb678ff, resonanceCfg.alpha || 0.2, 'core');
+    textureResonance('resonance_hybrid_ring', resonanceColors.hybrid || 0xb678ff, resonanceCfg.ringAlpha || 0.14, 'ring');
+    textureResonance('resonance_hybrid_flare', resonanceColors.hybrid || 0xb678ff, resonanceCfg.flareAlpha || 0.12, 'flare');
+    textureResonance('resonance_signature', resonanceColors.signature || 0xffd166, resonanceCfg.alpha || 0.22, 'core');
+    textureResonance('resonance_signature_ring', resonanceColors.signature || 0xffd166, resonanceCfg.ringAlpha || 0.16, 'ring');
+    textureResonance('resonance_signature_flare', resonanceColors.signature || 0xffd166, resonanceCfg.flareAlpha || 0.14, 'flare');
+    window.MMA.Sprites.RESONANCE_TEXTURES = {
+      striker: { core: 'resonance_striker', ring: 'resonance_striker_ring', flare: 'resonance_striker_flare' },
+      grappler: { core: 'resonance_grappler', ring: 'resonance_grappler_ring', flare: 'resonance_grappler_flare' },
+      hybrid: { core: 'resonance_hybrid', ring: 'resonance_hybrid_ring', flare: 'resonance_hybrid_flare' },
+      signature: { core: 'resonance_signature', ring: 'resonance_signature_ring', flare: 'resonance_signature_flare' },
+      default: { core: 'resonance_hybrid', ring: 'resonance_hybrid_ring', flare: 'resonance_hybrid_flare' }
     };
     texturePickup('item_pickup');
     texturePickup('pickup_health');

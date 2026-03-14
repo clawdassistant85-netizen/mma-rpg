@@ -44,6 +44,173 @@ window.MMA.Enemies = {
     APPROACH_TEXT: 'The hunter tracks you...'
   },
 
+  // Opponent Scouting Report: allows players to scout boss enemies before fighting
+  // Reveals attack patterns, recommended counters, and suggested fighting style
+  // Costs in-game currency (10g per scout), multiple scouts unlock more details
+  SCOUTING_SYSTEM: {
+    STORAGE_KEY: 'mma_rpg_scouted_enemies',
+    COST_PER_SCOUT: 10,                 // Gold cost to scout an enemy
+    MAX_SCOUT_LEVELS: 3,                // Max scouting depth (basic/full/complete)
+    
+    // Scouting data for each enemy type
+    SCOUT_DATA: {
+      // Boss: MMA Champ
+      'mmaChamp': {
+        name: 'MMA Champ',
+        tier1: {
+          attacks: 'Fast combinations, takes damage well',
+          weakness: 'Vulnerable to grappling when winded',
+          style: 'Balanced striker/grappler'
+        },
+        tier2: {
+          attacks: 'Uses ground-and-pound, strong clinch game',
+          weakness: 'Slow to recover after takedowns',
+          style: 'Prefers controlling opponents'
+        },
+        tier3: {
+          attacks: 'Signature spinning backfist, powerful hooks',
+          weakness: 'Opens up after heavy strikes, predictable patterns',
+          style: 'Aggressive pressure fighter'
+        }
+      },
+      // Rival
+      'shadowRival': {
+        name: 'Shadow Rival',
+        tier1: {
+          attacks: 'Copies your fighting style',
+          weakness: 'Slower reaction when you switch styles',
+          style: 'Adaptive mirror'
+        },
+        tier2: {
+          attacks: 'Uses your most frequent moves against you',
+          weakness: "Cannot adapt to unfamiliar techniques",
+          style: 'Pattern learner'
+        },
+        tier3: {
+          attacks: 'Unpredictable when you vary your combos',
+          weakness: 'Needs time to "read" your attacks',
+          style: 'Mind games expert'
+        }
+      },
+      // Showstopper
+      'showstopper': {
+        name: 'Showstopper',
+        tier1: {
+          attacks: 'Pauses player mid-attack briefly',
+          weakness: ' telegraphed by gear spinning',
+          style: 'Time manipulation'
+        },
+        tier2: {
+          attacks: 'Clockwork gears appear before freeze',
+          weakness: 'Predictable timing after first use',
+          style: 'Technical control'
+        },
+        tier3: {
+          attacks: 'Freezes for 1 second, then strikes hard',
+          weakness: 'Vulnerable during freeze animation',
+          style: 'Punishment specialist'
+        }
+      },
+      // Default fallback for other enemies
+      'default': {
+        name: 'Unknown Enemy',
+        tier1: {
+          attacks: 'Basic attacks',
+          weakness: 'Unknown - discover through combat',
+          style: 'Unknown'
+        },
+        tier2: {
+          attacks: 'Standard combo patterns',
+          weakness: 'Find patterns by observing',
+          style: 'Typical fighter'
+        },
+        tier3: {
+          attacks: 'Full attack repertoire',
+          weakness: 'Study attack patterns carefully',
+          style: 'Fully revealed'
+        }
+      }
+    },
+    
+    // Get scout data for an enemy type
+    getScoutData: function(typeKey) {
+      return this.SCOUT_DATA[typeKey] || this.SCOUT_DATA['default'];
+    }
+  },
+
+  // Check if an enemy has been scouted (returns scout level 0-3)
+  getScoutLevel: function(typeKey) {
+    try {
+      var data = localStorage.getItem(this.SCOUTING_SYSTEM.STORAGE_KEY);
+      var scouted = data ? JSON.parse(data) : {};
+      return scouted[typeKey] || 0;
+    } catch(e) { return 0; }
+  },
+
+  // Check if enemy is scouted (any level)
+  isEnemyScouted: function(typeKey) {
+    return this.getScoutLevel(typeKey) > 0;
+  },
+
+  // Get scouting cost for next level
+  getScoutCost: function(typeKey) {
+    var currentLevel = this.getScoutLevel(typeKey);
+    if (currentLevel >= this.SCOUTING_SYSTEM.MAX_SCOUT_LEVELS) return 0;
+    return this.SCOUTING_SYSTEM.COST_PER_SCOUT * (currentLevel + 1);
+  },
+
+  // Attempt to scout an enemy (returns {success: bool, message: string, newLevel: number})
+  scoutEnemy: function(typeKey, playerGold) {
+    var currentLevel = this.getScoutLevel(typeKey);
+    if (currentLevel >= this.SCOUTING_SYSTEM.MAX_SCOUT_LEVELS) {
+      return { success: false, message: 'Fully scouted!', newLevel: currentLevel };
+    }
+    
+    var cost = this.getScoutCost(typeKey);
+    if (playerGold < cost) {
+      return { success: false, message: 'Need ' + cost + 'g to scout!', newLevel: currentLevel };
+    }
+    
+    // Deduct gold and save scout level
+    var newLevel = currentLevel + 1;
+    try {
+      var data = localStorage.getItem(this.SCOUTING_SYSTEM.STORAGE_KEY);
+      var scouted = data ? JSON.parse(data) : {};
+      scouted[typeKey] = newLevel;
+      localStorage.setItem(this.SCOUTING_SYSTEM.STORAGE_KEY, JSON.stringify(scouted));
+    } catch(e) {}
+    
+    return { success: true, message: 'Scouted! (' + newLevel + '/' + this.SCOUTING_SYSTEM.MAX_SCOUT_LEVELS + ')', newLevel: newLevel, cost: cost };
+  },
+
+  // Get scouting info for UI display
+  getScoutInfo: function(typeKey) {
+    var level = this.getScoutLevel(typeKey);
+    var data = this.SCOUTING_SYSTEM.getScoutData(typeKey);
+    
+    var info = {
+      name: data.name || typeKey,
+      level: level,
+      maxLevel: this.SCOUTING_SYSTEM.MAX_SCOUT_LEVELS,
+      nextCost: this.getScoutCost(typeKey),
+      isFullyScouted: level >= this.SCOUTING_SYSTEM.MAX_SCOUT_LEVELS,
+      tiers: []
+    };
+    
+    // Add tier info based on scout level
+    if (level >= 1) {
+      info.tiers.push({ label: 'BASICS', text: data.tier1 });
+    }
+    if (level >= 2) {
+      info.tiers.push({ label: 'PATTERNS', text: data.tier2 });
+    }
+    if (level >= 3) {
+      info.tiers.push({ label: 'COMPLETE', text: data.tier3 });
+    }
+    
+    return info;
+  },
+
   // Get current bounty level from storage
   getBountyLevel: function() {
     try {
@@ -1202,6 +1369,9 @@ window.MMA.Enemies = {
     // Enemy Combo Memory: defense bonus against player's learned patterns
     var comboMemoryDef = this.getComboMemoryDefenseMult(enemy, moveKey);
 
+    // Weight Class Advantage: light vs heavy / heavy vs light damage dynamic.
+    var weightAdvDef = (this.getWeightClassDefenseMult) ? this.getWeightClassDefenseMult(enemy, moveKey, scene) : 1;
+
     // Track damage for Enemy Fear Tremble intensity scaling
     if (enemy && damageDealt > 0) {
       if (!enemy._recentDamage) enemy._recentDamage = 0;
@@ -1210,7 +1380,7 @@ window.MMA.Enemies = {
       enemy._recentDamage = Math.min(enemy._recentDamage, 50);
     }
 
-    return adaptiveDef * styleCounterDef * vengeanceDef * territoryDef * predatorDef * comboMemoryDef;
+    return adaptiveDef * styleCounterDef * vengeanceDef * territoryDef * predatorDef * comboMemoryDef * weightAdvDef;
   },
 
   // Show adaptive feedback text
@@ -3055,6 +3225,137 @@ window.MMA.Enemies = {
     return 0xe83030;
   },
 
+  // Opponent Weight Read: enemies display subtle weight class indicators above their heads.
+  // Light enemies move faster but are squishier; heavy enemies hit harder but are slower.
+  WEIGHT_READ: {
+    ENABLED: true,
+    ICONS: { light: '🪶', medium: '🥊', heavy: '🧱' },
+    // Stat tradeoffs applied at spawn (before global spawn scaling)
+    LIGHT: { hpMult: 0.90, dmgMult: 0.95, speedMult: 1.12 },
+    MEDIUM: { hpMult: 1.00, dmgMult: 1.00, speedMult: 1.00 },
+    HEAVY: { hpMult: 1.15, dmgMult: 1.10, speedMult: 0.90 }
+  },
+
+  // Weight Class Advantage: rock-paper-scissors-ish damage dynamic.
+  // - Light attacks (jabs/quick kicks) hit HEAVY enemies harder, but do worse vs LIGHT enemies.
+  // - Heavy attacks (haymakers/throws) hit LIGHT enemies harder, but do worse vs HEAVY enemies.
+  // Implemented as a defense multiplier in onPlayerAttack (lower = more damage).
+  WEIGHT_CLASS_ADVANTAGE: {
+    ENABLED: true,
+    // Multipliers are applied to damage; we translate into defense multipliers via 1 / mult.
+    LIGHT_ATTACK_VS_HEAVY: 1.20,
+    LIGHT_ATTACK_VS_LIGHT: 0.85,
+    HEAVY_ATTACK_VS_LIGHT: 1.20,
+    HEAVY_ATTACK_VS_HEAVY: 0.85,
+    FEEDBACK_COOLDOWN_MS: 900,
+    FEEDBACK_TEXT: 'WEIGHT ADV!',
+    FEEDBACK_COLOR: '#ffffff',
+    LIGHT_MOVES: {
+      jab: 1, cross: 1,
+      lowKick: 1
+    },
+    HEAVY_MOVES: {
+      hook: 1, uppercut: 1, bodyShot: 1, elbowStrike: 1, spinningBackFist: 1,
+      headKick: 1, roundhouseKick: 1, kneeStrike: 1,
+      takedown: 1, singleLegTakedown: 1, single_leg_takedown: 1, hipThrow: 1,
+      armbar: 1, guillotine: 1, triangleChoke: 1, kimura: 1, rnc: 1
+    }
+  },
+
+  _inferWeightClassFromBase: function(baseTypeKey, typeKey) {
+    var k = baseTypeKey || typeKey;
+    // Heavy hitters / tanks
+    if (k === 'barBrawler' || k === 'wrestler' || k === 'bjjBlackBelt' || k === 'enforcer' || k === 'tank' || k === 'showstopper' || k === 'shadowRival' || k === 'mmaChamp') return 'heavy';
+    // Light/fast archetypes
+    if (k === 'streetThug' || k === 'striker' || k === 'kickboxer' || k === 'muayThaiFighter' || k === 'coach' || k === 'drunkMonk' || k === 'feintMaster' || k === 'glitcher' || k === 'trickster') return 'light';
+    // Default
+    return 'medium';
+  },
+
+  // Apply weight class + stat tradeoffs to the type object (idempotent).
+  applyWeightReadToType: function(type, baseTypeKey, typeKey) {
+    if (!this.WEIGHT_READ || !this.WEIGHT_READ.ENABLED) return type;
+    if (!type || type._weightReadApplied) return type;
+
+    type.weightClass = type.weightClass || this._inferWeightClassFromBase(baseTypeKey, typeKey);
+    var cls = type.weightClass;
+    var cfg = (cls === 'heavy') ? this.WEIGHT_READ.HEAVY : (cls === 'light') ? this.WEIGHT_READ.LIGHT : this.WEIGHT_READ.MEDIUM;
+
+    type.hp = Math.max(1, Math.round(type.hp * cfg.hpMult));
+    type.maxHp = type.hp;
+    type.attackDamage = Math.max(1, Math.round(type.attackDamage * cfg.dmgMult));
+    type.speed = Math.max(10, Math.round(type.speed * cfg.speedMult));
+
+    type._weightReadApplied = true;
+    return type;
+  },
+
+  _getAttackWeightClass: function(moveKey) {
+    var cfg = this.WEIGHT_CLASS_ADVANTAGE;
+    if (!cfg || !cfg.ENABLED || !moveKey) return 'medium';
+    if (cfg.LIGHT_MOVES && cfg.LIGHT_MOVES[moveKey]) return 'light';
+    if (cfg.HEAVY_MOVES && cfg.HEAVY_MOVES[moveKey]) return 'heavy';
+    return 'medium';
+  },
+
+  // Returns defense multiplier based on enemy weight class and move weight (lower = more damage).
+  getWeightClassDefenseMult: function(enemy, moveKey, scene) {
+    var cfg = this.WEIGHT_CLASS_ADVANTAGE;
+    if (!cfg || !cfg.ENABLED) return 1;
+    if (!enemy || !enemy.type || !enemy.type.weightClass) return 1;
+
+    var enemyW = enemy.type.weightClass;
+    var moveW = this._getAttackWeightClass(moveKey);
+    if (enemyW === 'medium' || moveW === 'medium') return 1;
+
+    var dmgMult = 1;
+    if (moveW === 'light') {
+      if (enemyW === 'heavy') dmgMult = cfg.LIGHT_ATTACK_VS_HEAVY;
+      else if (enemyW === 'light') dmgMult = cfg.LIGHT_ATTACK_VS_LIGHT;
+    } else if (moveW === 'heavy') {
+      if (enemyW === 'light') dmgMult = cfg.HEAVY_ATTACK_VS_LIGHT;
+      else if (enemyW === 'heavy') dmgMult = cfg.HEAVY_ATTACK_VS_HEAVY;
+    }
+
+    // Cosmetic feedback (throttled per enemy).
+    try {
+      if (dmgMult !== 1 && scene && typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        var now = Date.now();
+        var cd = cfg.FEEDBACK_COOLDOWN_MS || 900;
+        if (!enemy._weightAdvToastAt || (now - enemy._weightAdvToastAt) >= cd) {
+          enemy._weightAdvToastAt = now;
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 70, cfg.FEEDBACK_TEXT, cfg.FEEDBACK_COLOR || '#ffffff');
+        }
+      }
+    } catch (e) {}
+
+    // Translate damage multiplier into defense multiplier.
+    return (dmgMult && dmgMult !== 0) ? (1 / dmgMult) : 1;
+  },
+
+  getWeightIconForEnemy: function(enemy) {
+    if (!enemy || !enemy.type) return null;
+    var cls = enemy.type.weightClass || 'medium';
+    return (this.WEIGHT_READ && this.WEIGHT_READ.ICONS) ? (this.WEIGHT_READ.ICONS[cls] || this.WEIGHT_READ.ICONS.medium) : null;
+  },
+
+  updateWeightIcons: function(scene) {
+    if (!scene || !scene.enemies) return;
+    var self = this;
+    scene.enemies.forEach(function(enemy) {
+      if (!enemy || !enemy._weightIcon) return;
+      enemy._weightIcon.x = enemy.x;
+      enemy._weightIcon.y = enemy.y - enemy.displayHeight/2 - 32;
+      // Weight class shouldn't change, but if it did, keep text updated.
+      var t = self.getWeightIconForEnemy(enemy) || '';
+      if (t !== enemy._weightIconLastText) {
+        enemy._weightIcon.setText(t);
+        enemy._weightIconLastText = t;
+      }
+      enemy._weightIcon.setVisible(enemy.active && enemy.state !== 'dead');
+    });
+  },
+
   // Role Icon mapping for Enemy Role Call feature
   getRoleIcon: function(enemy) {
     if (!enemy || !enemy.type) return '⚔';
@@ -3276,6 +3577,9 @@ window.MMA.Enemies = {
     // Comeback Kid: if you died to this archetype last run, weaken it slightly and grant +Focus.
     this.applyComebackIfAny(scene, typeKey, type);
 
+    // Opponent Weight Read: assign weight class + apply small stat tradeoffs (light/medium/heavy).
+    type = self.applyWeightReadToType(type, baseTypeKey, typeKey);
+
     type.attackDamage = Math.max(1, Math.round(type.attackDamage * 0.36)); type.attackCooldownMax = Math.round(type.attackCooldownMax * 1.8); type.speed = Math.round(type.speed * 0.85);
     if (typeof type.groundDefense !== 'number') type.groundDefense = 0.25;
     if (typeof type.groundEscape !== 'number') type.groundEscape = 0.2;
@@ -3456,6 +3760,20 @@ window.MMA.Enemies = {
     roleIcon.setDepth(e.depth + 1);
     e._roleIcon = roleIcon;
     e._roleIconLastText = e._roleIconBase;
+
+    // Opponent Weight Read: icon above the role icon for quick threat profile reading.
+    if (self.WEIGHT_READ && self.WEIGHT_READ.ENABLED) {
+      var wIconTxt = self.getWeightIconForEnemy(e);
+      var wIcon = scene.add.text(0, 0, wIconTxt || '', {
+        fontSize: '13px',
+        fontFamily: 'Arial'
+      });
+      wIcon.setOrigin(0.5);
+      wIcon.setAlpha(0.85);
+      wIcon.setDepth(e.depth + 1);
+      e._weightIcon = wIcon;
+      e._weightIconLastText = wIconTxt;
+    }
 
     return e;
   },
@@ -3659,6 +3977,9 @@ window.MMA.Enemies = {
     if (runThrottled) {
       // Role icons: text labels, no need to run at 60fps
       this.updateRoleIcons(scene, delta);
+
+      // Weight read icons: cosmetic, can also be throttled.
+      this.updateWeightIcons(scene);
 
       // Comeback Kid: if the player just died, record the archetype that finished them.
       self.recordComebackLossIfNeeded(scene);
@@ -4466,6 +4787,8 @@ window.MMA.Enemies = {
     enemy._damageTrailHistory = [];
     // Destroy role icon on death
     if (enemy._roleIcon) { enemy._roleIcon.destroy(); enemy._roleIcon = null; }
+    // Destroy weight icon on death
+    if (enemy._weightIcon) { enemy._weightIcon.destroy(); enemy._weightIcon = null; }
     MMA.Items.spawnDropsForEnemy(scene, enemy);
     scene.enemies = scene.enemies.filter(function(e){ return e !== enemy; });
     scene.time.delayedCall(320, function() {
@@ -4848,24 +5171,52 @@ window.MMA.Enemies.AI = {
   subHunter: function(enemy, player, scene, dt){ var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
     // Ensure escapeMeter exists
     if (enemy.escapeMeter === undefined) enemy.escapeMeter = 0;
+    
+    // Initialize cached submission escape keys on scene (once)
+    if (scene && scene._mmaSubmitKeys === undefined) {
+      scene._mmaSubmitKeys = {
+        space: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
+        shift: scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT)
+      };
+    }
+    
     // Submission state with escape mechanic
     if (enemy.aiState === 'submitting') {
       enemy.setVelocity(0,0);
       enemy.submitTimer -= dt;
-      // Damage over time to player
-      if (player && player.stats) player.stats.hp -= Math.floor(enemy.type.attackDamage * 0.4 * (dt/1000) * (window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(enemy, scene) : 1));
-      // Escape handling: player can mash Space (or any key) to escape
-      if (scene && scene.input && scene.input.keyboard) {
-        var space = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-        if (Phaser.Input.Keyboard.JustDown(space) || space.isDown) {
+      
+      // Damage over time to player - clamp HP to not go below 0
+      if (player && player.stats) {
+        var dotDamage = Math.floor(enemy.type.attackDamage * 0.4 * (dt/1000) * (window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(enemy, scene) : 1));
+        player.stats.hp = Math.max(0, player.stats.hp - dotDamage);
+      }
+      
+      // Escape handling: player can mash SPACE or SHIFT to escape (using JustDown, not isDown)
+      if (scene && scene._mmaSubmitKeys) {
+        var spaceKey = scene._mmaSubmitKeys.space;
+        var shiftKey = scene._mmaSubmitKeys.shift;
+        var escaped = false;
+        
+        if (Phaser.Input.Keyboard.JustDown(spaceKey) || Phaser.Input.Keyboard.JustDown(shiftKey)) {
           enemy.escapeMeter++;
+          
+          // Throttle escape progress toast to max 2 times/sec (500ms)
+          var now = Date.now();
+          if (!enemy._lastEscapeToastAt || (now - enemy._lastEscapeToastAt) >= 500) {
+            enemy._lastEscapeToastAt = now;
+            if (player) {
+              MMA.UI.showDamageText(scene, player.x, player.y - 60, 'ESCAPE ' + enemy.escapeMeter + '/5', '#ffff00');
+            }
+          }
         }
-        // Threshold for escape (e.g., 5 presses)
+        
+        // Threshold for escape (5 presses)
         if (enemy.escapeMeter >= 5) {
           // Escape succeeded
           enemy.aiState = 'reset';
           enemy.resetTimer = 500;
           enemy.escapeMeter = 0;
+          enemy._lastEscapeToastAt = 0;
           MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, 'ESCAPED!', '#00ff00');
           scene.registry.set('gameMessage', 'You escaped the submission!');
           scene.time.delayedCall(1500, function(){ scene.registry.set('gameMessage', ''); });
@@ -4873,11 +5224,14 @@ window.MMA.Enemies.AI = {
         }
       }
       if (enemy.submitTimer <= 0) {
-        // Submission completed without escape
+        // Submission completed without escape - clamp HP to not go below 0
         enemy.aiState = 'reset';
         enemy.resetTimer = 500;
-        // Apply big damage burst to player
-        if (player && player.stats) player.stats.hp -= Math.max(10, Math.floor(enemy.type.attackDamage * 2 * (window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(enemy, scene) : 1)));
+        // Apply big damage burst to player - clamp HP to not go below 0
+        if (player && player.stats) {
+          var burstDamage = Math.max(10, Math.floor(enemy.type.attackDamage * 2 * (window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(enemy, scene) : 1)));
+          player.stats.hp = Math.max(0, player.stats.hp - burstDamage);
+        }
         MMA.UI.showDamageText(scene, player.x, player.y - 50, 'SUBMISSION HIT!', '#ff0000');
         scene.registry.set('gameMessage', 'You were submitted!');
         scene.time.delayedCall(1800, function(){ scene.registry.set('gameMessage', ''); });
@@ -4908,8 +5262,10 @@ window.MMA.Enemies.AI = {
           enemy.aiState = 'submitting';
           enemy.submitTimer = 2000; // 2s window
           enemy.attackCooldown = enemy.type.attackCooldownMax;
+          enemy.escapeMeter = 0;
+          enemy._lastEscapeToastAt = 0;
           MMA.UI.showDamageText(scene, player.x, player.y - 40, 'SUBMISSION!', '#ff00ff');
-          scene.registry.set('gameMessage', 'Submission! Mash Space!');
+          scene.registry.set('gameMessage', 'Submission! Mash SPACE or SHIFT!');
           scene.time.delayedCall(2000, function(){ scene.registry.set('gameMessage', ''); });
         }
       } else if (dist < min) {

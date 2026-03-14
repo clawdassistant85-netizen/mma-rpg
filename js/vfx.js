@@ -1,9 +1,40 @@
 window.MMA = window.MMA || {};
 window.MMA.VFX = {
+  _removeTrackedObject: function(scene, obj) {
+    if (!scene || !scene._mmaVfxObjects || !obj) return;
+    var idx = scene._mmaVfxObjects.indexOf(obj);
+    if (idx !== -1) scene._mmaVfxObjects.splice(idx, 1);
+  },
+
+  _ensureSceneVfxCleanup: function(scene) {
+    if (!scene || !scene.events || scene._mmaVfxCleanupInstalled) return;
+    scene._mmaVfxCleanupInstalled = true;
+
+    var cleanup = function() {
+      var objects = scene._mmaVfxObjects || [];
+      while (objects.length) {
+        var obj = objects.pop();
+        if (obj && obj.active && typeof obj.destroy === 'function') obj.destroy();
+      }
+      scene._mmaVfxObjects = [];
+      scene._mmaVfxCleanupInstalled = false;
+    };
+
+    scene.events.once('shutdown', cleanup);
+    scene.events.once('destroy', cleanup);
+  },
+
   _track: function(scene, obj) {
     if (!scene || !obj) return obj;
+    this._ensureSceneVfxCleanup(scene);
     if (!scene._mmaVfxObjects) scene._mmaVfxObjects = [];
-    scene._mmaVfxObjects.push(obj);
+    if (scene._mmaVfxObjects.indexOf(obj) === -1) scene._mmaVfxObjects.push(obj);
+    if (typeof obj.once === 'function') {
+      var self = this;
+      obj.once('destroy', function() {
+        self._removeTrackedObject(scene, obj);
+      });
+    }
     return obj;
   },
 
@@ -444,6 +475,10 @@ window.MMA.VFX.clearWeatherEffects = function(scene) {
   scene.fogLayer = null;
   scene.lightingOverlay = null;
   scene.windLayer = null;
+
+  if (scene.events && typeof scene.events.listenerCount === 'function') {
+    console.log('scene update listeners after weather clear:', scene.events.listenerCount('update'));
+  }
 };
 
 window.MMA.VFX.weatherEffects = {

@@ -66,6 +66,7 @@ var BootScene = new Phaser.Class({
     this._updateLoadBar('Variant Hooks');
   },
   _bootStep_portraitHooks: function() {
+    this.installResonanceAuraHook();
     // this.installStyleAuraHook();
     this._updateLoadBar('Style Aura');
   },
@@ -96,8 +97,7 @@ var BootScene = new Phaser.Class({
     if (this._loadBar) this._loadBar.destroy();
     if (this._loadBarBg) this._loadBarBg.destroy();
     window.gameReady = true;
-    this.scene.start('GameScene');
-    this.scene.stop('BootScene');
+    this.scene.start('GameScene'); // scene.start stops the current scene automatically
   },
   registerIdleAnimations: function() {
     var self = this;
@@ -706,6 +706,168 @@ var BootScene = new Phaser.Class({
     };
 
     Phaser.Physics.Arcade.Sprite.prototype._mmaTechniqueTattooHookInstalled = true;
+  },
+  installResonanceAuraHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaResonanceAuraHookInstalled) return;
+
+    function getResonanceConfig() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.RESONANCE_CONFIG) || {};
+    }
+
+    function getResonanceTextures() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.RESONANCE_TEXTURES) || {};
+    }
+
+    function ensureResonanceAura(sprite) {
+      if (!sprite || !sprite.scene || !sprite.active) return null;
+      if (sprite._mmaResonanceAura && sprite._mmaResonanceAura.core && sprite._mmaResonanceAura.core.active) return sprite._mmaResonanceAura;
+      var textures = getResonanceTextures().default || {};
+      if (!textures.core) return null;
+      var aura = {
+        core: sprite.scene.add.image(sprite.x, sprite.y, textures.core),
+        ring: sprite.scene.add.image(sprite.x, sprite.y, textures.ring),
+        flare: sprite.scene.add.image(sprite.x, sprite.y, textures.flare)
+      };
+      aura.core.setBlendMode(Phaser.BlendModes.ADD);
+      aura.ring.setBlendMode(Phaser.BlendModes.SCREEN);
+      aura.flare.setBlendMode(Phaser.BlendModes.ADD);
+      aura.core.setVisible(false);
+      aura.ring.setVisible(false);
+      aura.flare.setVisible(false);
+      sprite._mmaResonanceAura = aura;
+      return aura;
+    }
+
+    function setResonanceVisible(aura, visible) {
+      if (!aura) return;
+      aura.core.setVisible(visible);
+      aura.ring.setVisible(visible);
+      aura.flare.setVisible(visible);
+    }
+
+    function readMoveHistory(sprite) {
+      var history = sprite && sprite._mmaMoveHistory;
+      return Array.isArray(history) ? history : [];
+    }
+
+    function categorizeMove(moveKey) {
+      var token = String(moveKey || '').toLowerCase();
+      if (!token) return 'default';
+      if (token.indexOf('signature') !== -1 || token.indexOf('special') !== -1 || token.indexOf('super') !== -1 || token.indexOf('finisher') !== -1) return 'signature';
+      if (token.indexOf('grapple') !== -1 || token.indexOf('throw') !== -1 || token.indexOf('slam') !== -1 || token.indexOf('submission') !== -1 || token.indexOf('clinch') !== -1 || token.indexOf('armbar') !== -1 || token.indexOf('triangle') !== -1 || token.indexOf('take') !== -1) return 'grappler';
+      if (token.indexOf('jab') !== -1 || token.indexOf('cross') !== -1 || token.indexOf('hook') !== -1 || token.indexOf('kick') !== -1 || token.indexOf('haymaker') !== -1 || token.indexOf('uppercut') !== -1 || token.indexOf('strike') !== -1) return 'striker';
+      return 'default';
+    }
+
+    function getDominantResonance(sprite) {
+      var cfg = getResonanceConfig();
+      var history = readMoveHistory(sprite).slice(-(cfg.dominantWindow || 4));
+      if (!history.length) return 'default';
+      var counts = { striker: 0, grappler: 0, signature: 0, default: 0 };
+      for (var i = 0; i < history.length; i++) counts[categorizeMove(history[i])] = (counts[categorizeMove(history[i])] || 0) + 1;
+      if ((counts.signature || 0) >= 2 || (history.length && categorizeMove(history[history.length - 1]) === 'signature')) return 'signature';
+      if ((counts.striker || 0) > 0 && (counts.grappler || 0) > 0) return 'hybrid';
+      if ((counts.grappler || 0) > (counts.striker || 0)) return 'grappler';
+      if ((counts.striker || 0) > 0) return 'striker';
+      return 'default';
+    }
+
+    function recordMove(sprite, moveKey) {
+      if (!sprite || !moveKey) return;
+      var cfg = getResonanceConfig();
+      var limit = cfg.moveHistoryLimit || 8;
+      sprite._mmaMoveHistory = readMoveHistory(sprite);
+      sprite._mmaMoveHistory.push(String(moveKey));
+      if (sprite._mmaMoveHistory.length > limit) sprite._mmaMoveHistory = sprite._mmaMoveHistory.slice(sprite._mmaMoveHistory.length - limit);
+      sprite._mmaResonanceLastMoveAt = sprite.scene && sprite.scene.time ? sprite.scene.time.now : 0;
+    }
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+
+      var isPlayer = !!(this.scene && this.scene.player === this);
+      if (!this.active || !this.scene || !this._mmaBaseTextureKey || !isPlayer) {
+        if (this._mmaResonanceAura) setResonanceVisible(this._mmaResonanceAura, false);
+        return;
+      }
+
+      var history = readMoveHistory(this);
+      if (!history.length) {
+        if (this._mmaResonanceAura) setResonanceVisible(this._mmaResonanceAura, false);
+        return;
+      }
+
+      var texturesByType = getResonanceTextures();
+      var resonanceKey = getDominantResonance(this);
+      var layers = texturesByType[resonanceKey] || texturesByType.default;
+      if (!layers || !layers.core) return;
+      var aura = ensureResonanceAura(this);
+      if (!aura) return;
+      setResonanceVisible(aura, true);
+
+      if (aura.core.texture && aura.core.texture.key !== layers.core) aura.core.setTexture(layers.core);
+      if (aura.ring.texture && aura.ring.texture.key !== layers.ring) aura.ring.setTexture(layers.ring);
+      if (aura.flare.texture && aura.flare.texture.key !== layers.flare) aura.flare.setTexture(layers.flare);
+
+      var cfg = getResonanceConfig();
+      var pulse = 0.72 + Math.abs(Math.sin(time * (cfg.pulseSpeed || 0.0065))) * 0.28;
+      var freshness = this._mmaResonanceLastMoveAt ? Phaser.Math.Clamp(1 - ((time - this._mmaResonanceLastMoveAt) / 2200), 0.18, 1) : 0.28;
+      var complexity = Phaser.Math.Clamp(history.length / (cfg.moveHistoryLimit || 8), 0.2, 1);
+      var baseScaleX = this.scaleX || 1;
+      var baseScaleY = this.scaleY || 1;
+      var sway = Math.sin(time * 0.0038 + this.x * 0.01);
+
+      aura.core.setPosition(this.x, this.y + 1);
+      aura.ring.setPosition(this.x, this.y - 1 + sway * 1.4);
+      aura.flare.setPosition(this.x, this.y - 3 - Math.abs(sway) * 1.6);
+      aura.core.setDepth((this.depth || 0) - 1);
+      aura.ring.setDepth((this.depth || 0) - 2);
+      aura.flare.setDepth((this.depth || 0) - 3);
+      aura.core.setFlipX(!!this.flipX);
+      aura.ring.setFlipX(!!this.flipX);
+      aura.flare.setFlipX(!!this.flipX);
+      aura.core.setScale(baseScaleX * ((cfg.scale || 1.18) + complexity * 0.08 + pulse * 0.04), baseScaleY * (((cfg.scale || 1.18) - 0.1) + complexity * 0.05));
+      aura.ring.setScale(baseScaleX * ((cfg.ringScale || 1.28) + complexity * 0.1 + pulse * 0.06), baseScaleY * (((cfg.ringScale || 1.28) - 0.14) + complexity * 0.06));
+      aura.flare.setScale(baseScaleX * ((cfg.flareScale || 1.1) + complexity * 0.06), baseScaleY * (((cfg.flareScale || 1.1) - 0.08) + pulse * 0.05));
+      aura.core.setAlpha((cfg.alpha || 0.2) * freshness + pulse * 0.08);
+      aura.ring.setAlpha((cfg.ringAlpha || 0.14) * freshness + pulse * 0.06);
+      aura.flare.setAlpha((cfg.flareAlpha || 0.12) * freshness + complexity * 0.06);
+      aura.ring.setAngle(sway * 5);
+      aura.flare.setAngle(-sway * 8);
+      this._mmaResonanceKey = resonanceKey;
+    };
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      if (this._mmaResonanceAura) {
+        this._mmaResonanceAura.core.destroy();
+        this._mmaResonanceAura.ring.destroy();
+        this._mmaResonanceAura.flare.destroy();
+        this._mmaResonanceAura = null;
+      }
+      return originalDestroy.call(this, fromScene);
+    };
+
+    function wrapCombatMethod(methodName, moveResolver) {
+      if (!window.MMA || !window.MMA.Combat) return;
+      var original = window.MMA.Combat[methodName];
+      if (typeof original !== 'function' || original._mmaResonanceWrapped) return;
+      var wrapped = function(scene) {
+        var result = original.apply(this, arguments);
+        var moveKey = moveResolver ? moveResolver.apply(this, arguments) : methodName;
+        if (scene && scene.player) recordMove(scene.player, moveKey);
+        return result;
+      };
+      wrapped._mmaResonanceWrapped = true;
+      window.MMA.Combat[methodName] = wrapped;
+    }
+
+    wrapCombatMethod('executeMove', function(scene, moveKey) { return moveKey; });
+    wrapCombatMethod('executeSpecialMove', function() { return 'special'; });
+    wrapCombatMethod('executeGroundMove', function(scene, moveKey) { return moveKey; });
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaResonanceAuraHookInstalled = true;
   },
   installStyleAuraHook: function() {
     if (Phaser.Physics.Arcade.Sprite.prototype._mmaStyleAuraHookInstalled) return;

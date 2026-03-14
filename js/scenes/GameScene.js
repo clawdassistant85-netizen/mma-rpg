@@ -20,6 +20,9 @@ var GameScene = new Phaser.Class({
     this.gameOverAt = 0;
     this.rapidFireState = null;
     this.defeatSceneQueued = false;
+    this._lastHudRegistryUpdate = 0;
+    this._lastSpecialButtonUpdate = 0;
+    this._lastPauseButtonVisible = null;
   },
 
   create: function() {
@@ -32,6 +35,9 @@ var GameScene = new Phaser.Class({
     this.defeatSceneQueued = false;
     this.groundState = { active: false, enemy: null, timer: 0, escapeTick: 0 };
     this.rapidFireState = null;
+    this._lastHudRegistryUpdate = 0;
+    this._lastSpecialButtonUpdate = 0;
+    this._lastPauseButtonVisible = null;
 
     this._savedGameData = null;
     var allowLocalSave = !(window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient());
@@ -86,8 +92,8 @@ var GameScene = new Phaser.Class({
     this.scene.launch('HUDScene');
     MMA.UI.bindMobilePauseButton(this);
     MMA.UI.setPauseButtonVisible(true);
-    MMA.UI.showTouchControls(true);
-    MMA.UI.setActionButtonLabels(false);
+    if (typeof MMA.UI.showTouchControls === 'function') MMA.UI.showTouchControls(true);
+    if (typeof MMA.UI.setActionButtonLabels === 'function') MMA.UI.setActionButtonLabels(false);
     this.hideGameOverRestartUI();
     this.registry.set('playerStats', Object.assign({}, this.player.stats));
     this.registry.set('unlockedMoves', this.player.unlockedMoves.slice());
@@ -303,6 +309,12 @@ var GameScene = new Phaser.Class({
       }
     });
   },
+  syncPauseButtonVisibility: function(show) {
+    if (this._lastPauseButtonVisible === show) return;
+    this._lastPauseButtonVisible = show;
+    MMA.UI.setPauseButtonVisible(show);
+  },
+
   resumeFromPause: function() {
     this.physics.resume();
     this.paused = false;
@@ -516,9 +528,15 @@ var GameScene = new Phaser.Class({
     // Update Focus Meter UI
     var focusState = this.player.focusState || { meter: 0 };
     var focusMax = window.MMA.Combat ? window.MMA.Combat.FOCUS_MAX : 100;
-    MMA.UI.updateFocusMeter(this, focusState.meter, focusMax);
+    if (typeof MMA.UI.updateFocusMeter === 'function') MMA.UI.updateFocusMeter(this, focusState.meter, focusMax);
 
-    MMA.UI.updateHUDRegistry(this);
-    MMA.UI.updateSpecialButton(this);
+    if (!this._lastHudRegistryUpdate || time - this._lastHudRegistryUpdate >= 100) {
+      this._lastHudRegistryUpdate = time;
+      MMA.UI.updateHUDRegistry(this);
+    }
+    if (!this._lastSpecialButtonUpdate || time - this._lastSpecialButtonUpdate >= 250) {
+      this._lastSpecialButtonUpdate = time;
+      MMA.UI.updateSpecialButton(this);
+    }
   }
 });

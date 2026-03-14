@@ -95,6 +95,8 @@ window.MMA.Combat = {
   TRANSITION_CANCEL_WINDOW_MS: 220,
   TRANSITION_CANCEL_STAMINA_PENALTY_PCT: 0.2,
   TRANSITION_CANCEL_COOLDOWN_REDUCTION_PCT: 0.45,
+  SHADOW_CLONE_MIRROR_MULTIPLIER: 0.5,
+  SHADOW_CLONE_MIN_DAMAGE: 6,
   INJURY_MAX_STACKS: 4,
   INJURY_ARM_DAMAGE_BONUS_PER_STACK: 0.03,
   INJURY_LEG_DAMAGE_BONUS_PER_STACK: 0.04,
@@ -1344,6 +1346,34 @@ window.MMA.Combat = {
       }
     }
   },
+  getEnemyMirrorSourceDamage: function(enemy) {
+    if (!enemy) return this.SHADOW_CLONE_MIN_DAMAGE;
+    var candidates = [
+      enemy.lastAttackDamage,
+      enemy.lastDamageDealt,
+      enemy.combatState && enemy.combatState.lastAttackDamage,
+      enemy.combatState && enemy.combatState.lastMoveDamage,
+      enemy.type && enemy.type.attackDamage,
+      enemy.type && enemy.type.damage
+    ];
+    for (var i = 0; i < candidates.length; i++) {
+      var value = candidates[i];
+      if (typeof value === 'number' && isFinite(value) && value > 0) return value;
+    }
+    return this.SHADOW_CLONE_MIN_DAMAGE;
+  },
+  applyShadowCloneMirror: function(scene, enemy, triggerActive) {
+    if (!triggerActive || !enemy || !enemy.active || enemy.state === 'dead') {
+      return { mirrorDamage: 0, triggered: false };
+    }
+    var sourceDamage = this.getEnemyMirrorSourceDamage(enemy);
+    var mirrorDamage = Math.max(this.SHADOW_CLONE_MIN_DAMAGE, Math.round(sourceDamage * this.SHADOW_CLONE_MIRROR_MULTIPLIER));
+    enemy.stats.hp -= mirrorDamage;
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 192, 'SHADOW CLONE!', '#ff4d6d');
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 210, 'MIRROR -' + mirrorDamage, '#ff8fa3');
+    MMA.VFX.flashEnemyHit(scene, enemy, 120);
+    return { mirrorDamage: mirrorDamage, triggered: true };
+  },
   MOVE_ROSTER: {
     // Starting moves
     jab:{ name:'Jab', type:'strike', damage:8, staminaCost:5, cooldown:400, unlockLevel:1, unlockType:'start' },
@@ -1639,6 +1669,8 @@ window.MMA.Combat = {
         var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
+        var shadowClone = this.applyShadowCloneMirror(scene, enemy, rolled.crit || finishHimAdjusted.finishHim);
+        dmg += shadowClone.mirrorDamage;
         // Health Bar Damage Trail: record damage for visual effect
         if (MMA.Enemies.recordDamageTrail) MMA.Enemies.recordDamageTrail(enemy, dmg);
         this.resetMomentumShiftHits(scene);
@@ -1807,6 +1839,8 @@ window.MMA.Combat = {
         var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
+        var shadowClone = this.applyShadowCloneMirror(scene, enemy, rolled.crit || finishHimAdjusted.finishHim);
+        dmg += shadowClone.mirrorDamage;
         // Health Bar Damage Trail: record damage for visual effect
         if (MMA.Enemies.recordDamageTrail) MMA.Enemies.recordDamageTrail(enemy, dmg);
         this.resetMomentumShiftHits(scene);
