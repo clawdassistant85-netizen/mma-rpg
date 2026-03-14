@@ -165,6 +165,17 @@ window.MMA.Enemies = {
     CRITICAL_HEAL_MULT: 1.7
   },
 
+  // Gimmick Specialist: Glitcher "teleports" (blinks) behind the player.
+  // Visual cue: cyan tint, brief fade-out/fade-in and "BLINK!" text.
+  GLITCHER_CONFIG: {
+    COOLDOWN_MS: 3600,
+    MIN_DIST: 60,
+    MAX_DIST: 220,
+    BEHIND_DISTANCE: 85,
+    STRIKE_DELAY_MS: 180,
+    STRIKE_MULT: 1.15
+  },
+
   // Loyalty Bond / Vengeance Mode: when a non-boss ally dies, nearby enemies enter VENGEANCE
   // Coach Enemy: support-type enemy that boosts nearby allies (+15% attack speed per Coach in room)
   COACH_CONFIG: {
@@ -414,6 +425,9 @@ window.MMA.Enemies = {
 
     // Gimmick Specialist: Regenerator (slow heal over time; punishes passive play)
     regenerator:{name:'Regenerator',hp:85,maxHp:85,speed:78,attackDamage:12,attackCooldownMax:1250,attackRange:60,chaseRange:240,color:0x22ff66,xpReward:60,teachesMove:null,zone:2,aiPattern:'regen',groundDefense:0.35,groundEscape:0.25},
+
+    // Gimmick Specialist: Glitcher (blink teleport behind player + quick strike)
+    glitcher:{name:'Glitcher',hp:80,maxHp:80,speed:92,attackDamage:14,attackCooldownMax:1050,attackRange:62,chaseRange:270,color:0x00e5ff,xpReward:65,teachesMove:null,zone:2,aiPattern:'glitcher',groundDefense:0.30,groundEscape:0.25},
 
     // Tutor Enemy: trainer-type that teaches a technique upon victory.
     // Also "mirrors" the player's recent attacks (best-effort) to force adaptation.
@@ -828,6 +842,18 @@ window.MMA.Enemies = {
         var currentType = pool[replaceIdx];
         if (currentType !== 'mmaChamp' && currentType !== 'shadowRival' && currentType !== 'coach') {
           pool[replaceIdx] = 'tutor';
+        }
+      }
+    }
+
+    // Gimmick Specialist: Glitcher spawn (zone 2+) (replaces a non-boss spawn)
+    if (z >= 2 && positions && positions.length && pool && pool.length) {
+      var glitchChance = 0.05 + (z - 2) * 0.015; // 5% in zone2 → up to ~8%
+      if (Math.random() < glitchChance) {
+        var replaceIdx = Math.floor(Math.random() * pool.length);
+        var currentType = pool[replaceIdx];
+        if (currentType !== 'mmaChamp' && currentType !== 'shadowRival' && currentType !== 'coach' && currentType !== 'tutor') {
+          pool[replaceIdx] = 'glitcher';
         }
       }
     }
@@ -1621,6 +1647,81 @@ window.MMA.Enemies.AI = {
           if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
             MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, moveKey ? ('MIRROR: ' + moveKey) : 'TUTOR STRIKE!', '#66ff33');
           }
+        }
+      } else {
+        enemy.setVelocity((dx / dist) * enemy.type.speed * speedMod, (dy / dist) * enemy.type.speed * speedMod);
+      }
+    } else {
+      enemy.setVelocity(0, 0);
+    }
+
+    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
+  },
+
+  // Glitcher AI: occasionally blinks behind the player, then does a quick strike.
+  glitcher: function(enemy, player, scene, dt) {
+    var cfg = window.MMA.Enemies.GLITCHER_CONFIG;
+    var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+    var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
+    var vengeanceMult = window.MMA.Enemies.getVengeanceDamageMult(enemy);
+
+    if (enemy._blinkCd === undefined) enemy._blinkCd = 500 + Math.random() * 800;
+    if (enemy._blinkCd > 0) enemy._blinkCd -= dt;
+
+    // Handle scheduled post-blink strike
+    if (enemy.aiState === 'blinkStrike') {
+      enemy.setVelocity(0, 0);
+      enemy._blinkStrikeTimer -= dt;
+      if (enemy._blinkStrikeTimer <= 0) {
+        enemy.aiState = null;
+        if (enemy.hasAttackToken || enemy.isBoss) {
+          var dmg = Math.round(enemy.type.attackDamage * cfg.STRIKE_MULT * vulnMult * (window.MMA.Enemies.getPackDamageMultiplier ? window.MMA.Enemies.getPackDamageMultiplier(enemy, scene) : 1) * vengeanceMult);
+          MMA.Player.damage(scene, dmg);
+          if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+            MMA.UI.showDamageText(scene, player.x, player.y - 30, 'GLITCH HIT!', '#00e5ff');
+          }
+        }
+      }
+      if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
+      return;
+    }
+
+    // Attempt blink when within range window and cooldown ready
+    if (dist >= cfg.MIN_DIST && dist <= cfg.MAX_DIST && enemy._blinkCd <= 0 && enemy.attackCooldown <= 0) {
+      // Teleport behind player (opposite direction of vector from enemy -> player)
+      var ux = dx / dist, uy = dy / dist;
+      var targetX = player.x - ux * cfg.BEHIND_DISTANCE;
+      var targetY = player.y - uy * cfg.BEHIND_DISTANCE;
+
+      // Visual blink
+      if (enemy.setTint) enemy.setTint(0x00e5ff);
+      if (scene && scene.tweens) {
+        scene.tweens.add({ targets: enemy, alpha: 0.15, duration: 80, yoyo: true, repeat: 1, ease: 'Sine.easeInOut' });
+      }
+      enemy.x = targetX;
+      enemy.y = targetY;
+
+      if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        MMA.UI.showDamageText(scene, enemy.x, enemy.y - 40, 'BLINK!', '#00e5ff');
+      }
+
+      enemy.aiState = 'blinkStrike';
+      enemy._blinkStrikeTimer = cfg.STRIKE_DELAY_MS;
+      enemy._blinkCd = cfg.COOLDOWN_MS;
+      enemy.attackCooldown = enemy.type.attackCooldownMax * 0.9 * attackMod;
+      return;
+    }
+
+    // Default behavior: chase like a fast striker
+    if (dist < enemy.type.chaseRange) {
+      if (dist < enemy.type.attackRange) {
+        enemy.setVelocity(0, 0);
+        if ((enemy.hasAttackToken || enemy.isBoss) && enemy.attackCooldown <= 0) {
+          enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod;
+          var dmg = Math.round(enemy.type.attackDamage * vulnMult * (window.MMA.Enemies.getPackDamageMultiplier ? window.MMA.Enemies.getPackDamageMultiplier(enemy, scene) : 1) * vengeanceMult);
+          MMA.Player.damage(scene, dmg);
         }
       } else {
         enemy.setVelocity((dx / dist) * enemy.type.speed * speedMod, (dy / dist) * enemy.type.speed * speedMod);
