@@ -1686,21 +1686,48 @@ window.MMA.UI = {
     this.updateGroundHUD(scene);
   },
   setActionButtonLabels: function(groundActive, scene) {
-    var labels = groundActive ? {
-      jab: 'G&P',
-      heavy: 'Elbow',
-      grapple: 'Submit',
-      special: 'Stand Up'
-    } : {
-      jab: 'Jab',
-      heavy: 'Heavy',
-      grapple: 'Grapple',
-      special: 'Special'
-    };
-    Object.keys(labels).forEach(function(action) {
-      var btn = document.querySelector('.action-btn[data-action="' + action + '"]');
-      if (btn) btn.textContent = labels[action];
-    });
+    var roster = window.MMA.Combat.MOVE_ROSTER;
+    var loadout = ['jab', 'cross', 'takedown', 'hook'];
+    var unlocked = [];
+    
+    // Get loadout from player if available
+    if (scene && scene.player && scene.player.moveLoadout) {
+      loadout = scene.player.moveLoadout;
+    }
+    if (scene && scene.player && scene.player.unlockedMoves) {
+      unlocked = scene.player.unlockedMoves;
+    }
+    
+    // Map actions to loadout slots
+    var slotMap = { jab: 0, heavy: 1, grapple: 2, special: 3 };
+    
+    if (groundActive) {
+      // Ground game - show G&P, Elbow, Submissions, Stand Up
+      var labels = {
+        jab: 'G&P',
+        heavy: 'Elbow',
+        grapple: 'Submit',
+        special: 'Stand Up'
+      };
+      Object.keys(labels).forEach(function(action) {
+        var btn = document.querySelector('.action-btn[data-action="' + action + '"]');
+        if (btn) btn.textContent = labels[action];
+      });
+    } else {
+      // Standing - use loadout to show moves
+      var actionToSlot = { jab: 0, heavy: 1, grapple: 2, special: 3 };
+      Object.keys(actionToSlot).forEach(function(action) {
+        var slotIndex = actionToSlot[action];
+        var moveKey = loadout[slotIndex] || 'jab';
+        var move = roster[moveKey];
+        var btn = document.querySelector('.action-btn[data-action="' + action + '"]');
+        if (btn && move) {
+          btn.textContent = move.name;
+        } else if (btn) {
+          btn.textContent = action === 'jab' ? 'Jab' : (action === 'heavy' ? 'Heavy' : (action === 'grapple' ? 'Grapple' : 'Special'));
+        }
+      });
+    }
     this.updateSpecialButton(scene || null, !!groundActive);
   },
   getBestSpecialMoveKey: function(scene) {

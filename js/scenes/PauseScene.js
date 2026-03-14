@@ -12,7 +12,7 @@ var PAUSE_MOVE_CONTROLS = {
   spinningBackFist: { key: '-', label: 'Spinning BF',     type: 'Strike'  },
   elbowStrike: { key: '-',     label: 'Elbow Strike',     type: 'Strike'  },
   kneeStrike:  { key: '-',     label: 'Knee Strike',      type: 'Strike'  },
-  takedown:    { key: 'L',     label: 'Takedown',         type: 'Grapple' },
+  takedown:    { key: 'L',     label: 'Takedown',        type: 'Grapple' },
   guardPass:   { key: '-',     label: 'Guard Pass',       type: 'Grapple' },
   mountCtrl:   { key: '-',     label: 'Mount Control',    type: 'Grapple' },
   singleLeg:   { key: '-',     label: 'Single Leg',       type: 'Grapple' },
@@ -21,7 +21,10 @@ var PAUSE_MOVE_CONTROLS = {
   rnc:         { key: '-',     label: 'RNC Choke',        type: 'Sub'     },
   kimura:      { key: '-',     label: 'Kimura',           type: 'Sub'     },
   armbar:      { key: '-',     label: 'Armbar',           type: 'Sub'     },
-  triangleChoke: { key: '-',   label: 'Triangle Choke',   type: 'Sub'     }
+  triangleChoke: { key: '-',   label: 'Triangle Choke',   type: 'Sub'     },
+  americana:   { key: '-',     label: 'Americana',        type: 'Sub'     },
+  heelHook:    { key: '-',     label: 'Heel Hook',        type: 'Sub'     },
+  kneebar:     { key: '-',     label: 'Kneebar',         type: 'Sub'     }
 };
 
 var PauseScene = new Phaser.Class({
@@ -94,8 +97,34 @@ var PauseScene = new Phaser.Class({
       strokeThickness: 2
     }).setDepth(10);
 
+    // ── Style levels (new system)
+    var strLvl = stats.strikingLevel || 1;
+    var graLvl = stats.grapplingLevel || 1;
+    var subLvl = stats.submissionLevel || 1;
+    var styleLine = 'STR ' + strLvl + ' | GRA ' + graLvl + ' | SUB ' + subLvl;
+    this.add.text(PANEL_X + 14, statsY + 34, styleLine, {
+      fontSize: '11px',
+      color: '#aaaaaa',
+      stroke: '#000000',
+      strokeThickness: 2
+    }).setDepth(10);
+    
+    // Show XP progress for each style
+    var strXP = stats.strikingXP || 0;
+    var graXP = stats.grapplingXP || 0;
+    var subXP = stats.submissionXP || 0;
+    var strXPNext = (strLvl) * 75;
+    var graXPNext = (graLvl) * 75;
+    var subXPNext = (subLvl) * 75;
+    this.add.text(PANEL_X + 14, statsY + 46, 'XP: ' + strXP + '/' + strXPNext + ' | ' + graXP + '/' + graXPNext + ' | ' + subXP + '/' + subXPNext, {
+      fontSize: '10px',
+      color: '#666666',
+      stroke: '#000000',
+      strokeThickness: 2
+    }).setDepth(10);
+
     // ── Outfit info
-    var outfitY = statsY + 36;
+    var outfitY = statsY + 70;
     var equippedOutfit = null;
     if (window.MMA && MMA.Outfits) {
       equippedOutfit = MMA.Outfits.getEquippedOutfit();
@@ -118,7 +147,7 @@ var PauseScene = new Phaser.Class({
     div2.strokePath();
 
     // ── Moves section
-    var movesHeaderY = statsY + 44;
+    var movesHeaderY = outfitY + 34;
     this.add.text(PANEL_X + 14, movesHeaderY, 'UNLOCKED MOVES', {
       fontSize: '12px', color: '#888888', stroke: '#000', strokeThickness: 2
     }).setDepth(10);
@@ -174,6 +203,45 @@ var PauseScene = new Phaser.Class({
       }).setDepth(10);
     });
 
+    // ── Loadout section
+    var gameScene = this.scene.get('GameScene');
+    var loadout = ['jab', 'cross', 'takedown', 'hook'];
+    if (gameScene && gameScene.player && gameScene.player.moveLoadout) {
+      loadout = gameScene.player.moveLoadout;
+    }
+    
+    var loadoutY = startY + Math.ceil(unlockedMoves.length / 2) * ROW_H + 20;
+    this.add.text(PANEL_X + 14, loadoutY, 'LOADOUT (J-K-L-U)', {
+      fontSize: '12px', color: '#44aaff', stroke: '#000', strokeThickness: 2
+    }).setDepth(10);
+    
+    var slotLabels = ['Jab', 'Cross', 'Takedown', 'Hook'];
+    var slotColors = ['#ff8844', '#ff8844', '#44aaff', '#44aaff'];
+    for (var i = 0; i < 4; i++) {
+      var moveKey = loadout[i] || 'jab';
+      var moveInfo = PAUSE_MOVE_CONTROLS[moveKey] || { label: moveKey };
+      var slotX = PANEL_X + 14 + i * ((PANEL_W - 28) / 4);
+      var slotBg = this.add.graphics();
+      slotBg.fillStyle(0x222222, 0.8);
+      slotBg.fillRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
+      slotBg.lineStyle(1, slotColors[i], 0.6);
+      slotBg.strokeRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
+      this.add(slotBg);
+      
+      var slotNum = this.add.text(slotX + 10, loadoutY + 20, (i + 1) + ':', {
+        fontSize: '10px', color: '#888888'
+      }).setDepth(10);
+      
+      this.add.text(slotX + 24, loadoutY + 24, moveInfo.label, {
+        fontSize: '11px', color: '#ffffff'
+      }).setDepth(10);
+    }
+    
+    // ── Ground game controls hint
+    var groundY = loadoutY + 60;
+    this.add.text(PANEL_X + 14, groundY, 'GROUND GAME: L for submissions, 1-4 to select', {
+      fontSize: '10px', color: '#cc44cc', stroke: '#000', strokeThickness: 2
+    }).setDepth(10);
 
     var closeBtn = this.add.text(W / 2, PANEL_Y + PANEL_H - 44, 'CLOSE', {
       fontSize: '16px',

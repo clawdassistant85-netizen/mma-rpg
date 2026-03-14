@@ -3,7 +3,7 @@
 
 const SAVE_KEY = 'mma-rpg-save';
 
-function saveGame(playerStats, playerUnlockedMoves, currentZone, currentRoomId) {
+function saveGame(playerStats, playerUnlockedMoves, currentZone, currentRoomId, moveLoadout, unlockedSubmissions) {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return;
     // Basic validation / cloning to avoid storing Phaser objects
@@ -16,9 +16,18 @@ function saveGame(playerStats, playerUnlockedMoves, currentZone, currentRoomId) 
         stamina: stats.stamina || 0,
         maxStamina: stats.maxStamina || 0,
         xp: stats.xp || 0,
-        level: stats.level || 1
+        level: stats.level || 1,
+        // Style XP (new system)
+        strikingXP: stats.strikingXP || 0,
+        grapplingXP: stats.grapplingXP || 0,
+        submissionXP: stats.submissionXP || 0,
+        strikingLevel: stats.strikingLevel || 1,
+        grapplingLevel: stats.grapplingLevel || 1,
+        submissionLevel: stats.submissionLevel || 1
       },
       playerUnlockedMoves: Array.isArray(playerUnlockedMoves) ? playerUnlockedMoves.slice() : [],
+      moveLoadout: Array.isArray(moveLoadout) && moveLoadout.length === 4 ? moveLoadout.slice() : ['jab', 'cross', 'takedown', 'hook'],
+      unlockedSubmissions: Array.isArray(unlockedSubmissions) ? unlockedSubmissions.slice() : ['rnc'],
       currentZone: typeof currentZone === 'number' ? currentZone : 1,
       currentRoomId: currentRoomId || 'room1',
       outfitData: outfitData
@@ -46,9 +55,18 @@ function loadGame() {
         stamina: data.playerStats.stamina || 0,
         maxStamina: data.playerStats.maxStamina || 0,
         xp: data.playerStats.xp || 0,
-        level: data.playerStats.level || 1
+        level: data.playerStats.level || 1,
+        // Style XP (new system)
+        strikingXP: data.playerStats.strikingXP || 0,
+        grapplingXP: data.playerStats.grapplingXP || 0,
+        submissionXP: data.playerStats.submissionXP || 0,
+        strikingLevel: data.playerStats.strikingLevel || 1,
+        grapplingLevel: data.playerStats.grapplingLevel || 1,
+        submissionLevel: data.playerStats.submissionLevel || 1
       },
       playerUnlockedMoves: Array.isArray(data.playerUnlockedMoves) ? data.playerUnlockedMoves.slice() : [],
+      moveLoadout: Array.isArray(data.moveLoadout) && data.moveLoadout.length === 4 ? data.moveLoadout.slice() : ['jab', 'cross', 'takedown', 'hook'],
+      unlockedSubmissions: Array.isArray(data.unlockedSubmissions) ? data.unlockedSubmissions.slice() : ['rnc'],
       currentZone: typeof data.currentZone === 'number' ? data.currentZone : 1,
       currentRoomId: data.currentRoomId || 'room1',
       outfitData: data.outfitData || null

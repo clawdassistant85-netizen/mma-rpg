@@ -166,6 +166,39 @@ window.MMA.Enemies = {
   },
 
   // Loyalty Bond / Vengeance Mode: when a non-boss ally dies, nearby enemies enter VENGEANCE
+  // Coach Enemy: support-type enemy that boosts nearby allies (+15% attack speed per Coach in room)
+  COACH_CONFIG: {
+    BOOST_RADIUS: 200,
+    ATTACK_SPEED_BONUS: 0.15
+  },
+
+  // Apply coach boost to allies in scene
+  applyCoachBoost: function(scene) {
+    if (!scene.enemies) return;
+    // Find all coach enemies
+    var coaches = scene.enemies.filter(function(e){ return e.type && e.type.id === 'coach'; });
+    if (coaches.length===0) return;
+    // For each non-coach enemy, check distance to any coach
+    scene.enemies.forEach(function(enemy){
+      if (enemy.type && enemy.type.id === 'coach') return;
+      var boosted = false;
+      coaches.forEach(function(coach){
+        var dx = enemy.x - coach.x;
+        var dy = enemy.y - coach.y;
+        var dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist <= MMA.Enemies.COACH_CONFIG.BOOST_RADIUS) {
+          boosted = true;
+        }
+      });
+      if (boosted) {
+        // Apply attack speed multiplier if not already
+        enemy.attackSpeed = (enemy.baseAttackSpeed||enemy.attackSpeed||1) * (1 + MMA.Enemies.COACH_CONFIG.ATTACK_SPEED_BONUS);
+      } else {
+        // Reset to base if previously boosted
+        if (enemy.baseAttackSpeed) enemy.attackSpeed = enemy.baseAttackSpeed;
+      }
+    });
+  },
   VENGEANCE_CONFIG: {
     RADIUS: 170,               // pixels - range to trigger vengeance
     DURATION: 5000,           // 5 seconds duration

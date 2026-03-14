@@ -17,6 +17,10 @@ var HUDScene = new Phaser.Class({
     this.xpText = this.add.text(CONFIG.CANVAS_W - 8, 8, 'LVL 1 | XP 0/100', {
       fontSize: '13px', color: '#e8c830'
     }).setOrigin(1, 0);
+    // Style levels display
+    this.styleText = this.add.text(CONFIG.CANVAS_W - 8, 24, 'STR 1 | GRA 1 | SUB 1', {
+      fontSize: '10px', color: '#aaaaaa'
+    }).setOrigin(1, 0);
     // Controls hint
     this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H - 20,
       'WASD: Move | J: Jab | K: Cross | L: Take | U: Hook | I: LowKick | O: Uppercut | P: Body',
@@ -35,6 +39,11 @@ var HUDScene = new Phaser.Class({
     this.hpBar.width  = Math.max(0, (stats.hp  / stats.maxHp)  * 200);
     this.staBar.width = Math.max(0, (stats.stamina / stats.maxStamina) * 200);
     this.xpText.setText('LVL ' + stats.level + ' | XP ' + stats.xp + '/' + (stats.level * 100));
+    // Show style levels
+    var strLvl = stats.strikingLevel || 1;
+    var graLvl = stats.grapplingLevel || 1;
+    var subLvl = stats.submissionLevel || 1;
+    this.styleText.setText('STR ' + strLvl + ' | GRA ' + graLvl + ' | SUB ' + subLvl);
     var msg = this.registry.get('gameMessage') || '';
     this.msgText.setText(msg);
   }

@@ -57,6 +57,11 @@ var GameScene = new Phaser.Class({
     this.specialKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.headKickKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.H);
     this.guillotineKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G);
+    // Submission selection keys (1-4 for ground game)
+    this.sub1Key = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
+    this.sub2Key = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
+    this.sub3Key = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.THREE);
+    this.sub4Key = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.FOUR);
     this.infoKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I);
     this.pauseKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.I);
     this.outfitKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
@@ -94,7 +99,7 @@ var GameScene = new Phaser.Class({
   },
   enterGroundState: function(enemy) {
     if (!enemy || !enemy.active) return;
-    this.groundState = { active: true, enemy: enemy, timer: 10000, escapeTick: 2000 };
+    this.groundState = { active: true, enemy: enemy, timer: 10000, escapeTick: 2000, waitingForSubmission: false, showingSubmissionPicker: false, submissionPickerShown: false };
     MMA.UI.setActionButtonLabels(true);
     MMA.UI.showGroundBanner('TAKEDOWN!');
     this.registry.set('gameMessage', 'GROUND GAME');
@@ -109,6 +114,10 @@ var GameScene = new Phaser.Class({
     this.groundState.active = false;
     this.groundState.enemy = null;
     this.groundState.timer = 0;
+    this.groundState.waitingForSubmission = false;
+    this.groundState.showingSubmissionPicker = false;
+    this.groundState.submissionPickerShown = false;
+    this.groundState.selectedSubmission = null;
     if (enemy && enemy.active) {
       enemy.x += 30;
       this.player.x -= 30;

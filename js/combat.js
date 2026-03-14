@@ -360,6 +360,29 @@ window.MMA.Combat = {
     var map = { heavy: 'cross', grapple: 'takedown' };
     moveKey = map[moveKey] || moveKey;
     if (moveKey === 'special') return scene.endGroundState('player-standup');
+    
+    // Handle submission selection - show submission picker if not already showing
+    if (moveKey === 'takedown') {
+      // Check if we have unlocked submissions - show the submission picker
+      var unlockedSubs = scene.player.unlockedSubmissions || ['rnc'];
+      if (!scene.groundState.showingSubmissionPicker) {
+        this.showSubmissionPicker(scene);
+        return;
+      }
+      // If picker was shown and user selected, execute that submission
+      var selectedSub = scene.groundState.selectedSubmission;
+      if (selectedSub) {
+        var subMove = this.MOVE_ROSTER[selectedSub];
+        if (subMove) {
+          this.executeSubmission(scene, selectedSub, subMove);
+        }
+        scene.groundState.selectedSubmission = null;
+        scene.groundState.showingSubmissionPicker = false;
+        return;
+      }
+      return;
+    }
+    
     var gm = this.GROUND_MOVES[moveKey];
     if (!gm) return;
     var cdKey = 'ground_' + moveKey;
@@ -371,23 +394,11 @@ window.MMA.Combat = {
     var enemy = scene.groundState.enemy;
     if (!enemy || !enemy.active || enemy.state === 'dead') return scene.endGroundState('enemy-dead');
 
-    if (moveKey === 'takedown') {
-      var subChance = Phaser.Math.Clamp(0.2 + ((scene.player.stats.level || 1) * 0.03) - ((enemy.type.groundDefense || 0.2) * 0.2), 0.1, 0.65);
-      if (Math.random() < subChance) {
-        enemy.stats.hp = 0;
-        MMA.UI.showDamageText(scene, enemy.x, enemy.y - 36, 'SUBMISSION!', '#ff66ff');
-        MMA.Enemies.killEnemy(scene, enemy);
-        scene.endGroundState('submission');
-      } else {
-        MMA.UI.showDamageText(scene, enemy.x, enemy.y - 24, 'ESCAPED SUB!', '#ffaa66');
-      }
-      return;
-    }
-
     var dmg = gm.damage + (scene.player.attackBonus || 0);
     enemy.stats.hp -= dmg;
     MMA.UI.recordHitDealt(dmg, false, 1);
     MMA.UI.recordMoveUsage(moveKey); // Track move for Style DNA
+    MMA.Player.awardStyleXP(scene, moveKey); // Award style XP
     MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, '-' + dmg, '#ffd54f');
     MMA.VFX.flashEnemyHit(scene, enemy, 90);
     if (enemy.stats.hp <= 0) {
@@ -395,21 +406,124 @@ window.MMA.Combat = {
       scene.endGroundState('enemy-dead');
     }
   },
+  // Show submission picker UI when on ground
+  showSubmissionPicker: function(scene) {
+    // Only show if not already showing
+    if (scene.groundState.submissionPickerShown) return;
+    scene.groundState.submissionPickerShown = true;
+    
+    var unlockedSubs = scene.player.unlockedSubmissions || ['rnc'];
+    var roster = this.MOVE_ROSTER;
+    var enemy = scene.groundState.enemy;
+    
+    // Calculate submission chance based on enemy defense and submission difficulty
+    // Higher ground defense = harder to submit
+    var enemyDefense = enemy && enemy.type ? (enemy.type.groundDefense || 0.2) : 0.2;
+    
+    // Show UI text for submissions available
+    var W = scene.cameras.main.width;
+    var H = scene.cameras.main.height;
+    
+    // Show prompt
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 60, 'SELECT SUBMISSION', '#ff66ff');
+    
+    // Set up for next input to select submission
+    scene.groundState.waitingForSubmission = true;
+    scene.groundState.showingSubmissionPicker = true;
+  },
+  // Execute a specific submission
+  executeSubmission: function(scene, subKey, subMove) {
+    var enemy = scene.groundState.enemy;
+    if (!enemy || !enemy.active || enemy.state === 'dead') return scene.endGroundState('enemy-dead');
+    
+    var s = scene.player.stats;
+    var staminaCost = subMove.staminaCost || 20;
+    
+    if (s.stamina < staminaCost) {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'LOW STAMINA!', '#ff4444');
+      return;
+    }
+    
+    s.stamina -= staminaCost;
+    
+    // Calculate submission success chance based on:
+    // - Enemy ground defense
+    // - Submission difficulty (base chance varies by sub)
+    // - Player's submission level
+    var baseChances = {
+      rnc: 0.45,
+      guillotine: 0.40,
+      armbar: 0.35,
+      triangleChoke: 0.30,
+      kimura: 0.35,
+      americana: 0.30,
+      heelHook: 0.25,
+      kneebar: 0.28
+    };
+    
+    var enemyDefense = enemy && enemy.type ? (enemy.type.groundDefense || 0.2) : 0.2;
+    var subLevel = s.submissionLevel || 1;
+    var baseChance = baseChances[subKey] || 0.3;
+    
+    // Bonus from submission level
+    var levelBonus = (subLevel - 1) * 0.03;
+    
+    // Final chance
+    var successChance = Phaser.Math.Clamp(baseChance + levelBonus - (enemyDefense * 0.4), 0.1, 0.75);
+    
+    if (Math.random() < successChance) {
+      // Submission successful!
+      var dmg = subMove.damage || 30;
+      enemy.stats.hp -= dmg;
+      MMA.UI.recordHitDealt(dmg, false, 1);
+      MMA.Player.awardStyleXP(scene, subKey);
+      MMA.UI.recordMoveUsage(subKey);
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 36, subMove.name + '!', '#ff66ff');
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 54, 'SUBMISSION!', '#ff00ff');
+      MMA.VFX.flashEnemyHit(scene, enemy, 150);
+      
+      if (enemy.stats.hp <= 0) {
+        MMA.Enemies.killEnemy(scene, enemy);
+        scene.endGroundState('submission');
+      }
+    } else {
+      // Failed - enemy escapes
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 24, 'ESCAPED!', '#ffaa66');
+      // Small damage from failed attempt
+      enemy.stats.hp -= 5;
+      if (enemy.stats.hp <= 0) {
+        MMA.Enemies.killEnemy(scene, enemy);
+        scene.endGroundState('enemy-dead');
+      }
+    }
+  },
   MOVE_ROSTER: {
+    // Starting moves
     jab:{ name:'Jab', type:'strike', damage:8, staminaCost:5, cooldown:400, unlockLevel:1, unlockType:'start' },
     cross:{ name:'Cross', type:'strike', damage:12, staminaCost:8, cooldown:600, unlockLevel:1, unlockType:'start' },
+    // Level 2 (Striking)
     hook:{ name:'Hook', type:'strike', damage:15, staminaCost:10, cooldown:800, unlockLevel:2, unlockType:'level' },
     lowKick:{ name:'Low Kick', type:'strike', damage:10, staminaCost:7, cooldown:600, unlockLevel:2, unlockType:'level' },
+    // Level 3 (Striking + Grappling)
     uppercut:{ name:'Uppercut', type:'strike', damage:18, staminaCost:12, cooldown:900, unlockLevel:3, unlockType:'level' },
     takedown:{ name:'Takedown', type:'grapple', damage:5, staminaCost:20, cooldown:1200, unlockLevel:1, unlockType:'start' },
+    // Level 4 (Striking + Grappling)
     bodyShot:{ name:'Body Shot', type:'strike', damage:20, staminaCost:14, cooldown:850, unlockLevel:4, unlockType:'level' },
     guardPass:{ name:'Guard Pass', type:'grapple', damage:10, staminaCost:12, cooldown:1000, unlockLevel:4, unlockType:'level' },
+    // Level 5 (Striking + Grappling)
     headKick:{ name:'Head Kick', type:'strike', damage:25, staminaCost:18, cooldown:1000, unlockLevel:5, unlockType:'level' },
     guillotine:{ name:'Guillotine', type:'sub', damage:25, staminaCost:18, cooldown:1500, unlockLevel:5, unlockType:'level' },
     mountCtrl:{ name:'Mount Control', type:'grapple', damage:0, staminaCost:8, cooldown:800, unlockLevel:5, unlockType:'level' },
+    // Level 6 (Submissions)
     rnc:{ name:'RNC', type:'sub', damage:35, staminaCost:25, cooldown:2000, unlockLevel:6, unlockType:'level' },
     kimura:{ name:'Kimura', type:'sub', damage:27, staminaCost:20, cooldown:1800, unlockLevel:6, unlockType:'level' },
+    // Level 7 (Striking)
     spinningBackFist:{ name:'Spinning Back Fist', type:'strike', damage:30, staminaCost:20, cooldown:1200, unlockLevel:7, unlockType:'level' },
+    // New submissions (unlocked via style-based leveling)
+    americana:{ name:'Americana', type:'sub', damage:28, staminaCost:20, cooldown:1700, unlockLevel:5, unlockType:'style' },
+    heelHook:{ name:'Heel Hook', type:'sub', damage:32, staminaCost:24, cooldown:1900, unlockLevel:6, unlockType:'style' },
+    kneebar:{ name:'Kneebar', type:'sub', damage:30, staminaCost:22, cooldown:1800, unlockLevel:7, unlockType:'style' },
+    // Enemy-only moves
     elbowStrike:{ name:'Elbow Strike', type:'strike', damage:22, staminaCost:15, cooldown:900, unlockLevel:99, unlockType:'enemy', fromEnemy:'muayThaiFighter' },
     kneeStrike:{ name:'Knee Strike', type:'strike', damage:20, staminaCost:14, cooldown:850, unlockLevel:99, unlockType:'enemy', fromEnemy:'muayThaiFighter' },
     singleLeg:{ name:'Single Leg', type:'grapple', damage:5, staminaCost:15, cooldown:1100, unlockLevel:99, unlockType:'enemy', fromEnemy:'wrestler' },
@@ -634,6 +748,7 @@ window.MMA.Combat = {
         var comboCount = scene.player.comboState ? scene.player.comboState.index : 1;
         MMA.UI.recordHitDealt(dmg, rolled.crit, comboCount);
         MMA.UI.recordMoveUsage(moveKey); // Track move for Style DNA
+        MMA.Player.awardStyleXP(scene, moveKey); // Award style XP
         MMA.UI.incrementCombo();
         if (window.sfx) window.sfx.hit();
         MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, '-' + dmg, rolled.crit ? '#ff6b6b' : undefined);
@@ -736,6 +851,7 @@ window.MMA.Combat = {
         enemy.stats.hp -= dmg;
         // Track fight stats
         MMA.UI.recordHitDealt(dmg, rolled.crit, 1);
+        MMA.Player.awardStyleXP(scene, bestMoveKey); // Award style XP
         MMA.UI.incrementCombo();
         if (window.sfx) window.sfx.hit();
         MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, '-' + dmg, rolled.crit ? '#ff6b6b' : '#ffd54f');
@@ -793,6 +909,42 @@ window.MMA.Combat = {
       var cdMapStun = scene.player.cooldowns; Object.keys(cdMapStun).forEach(function(k){ if (cdMapStun[k] > 0) cdMapStun[k] = Math.max(0, cdMapStun[k] - delta); });
       return;
     }
+    
+    // Handle ground game submission selection
+    if (scene.groundState && scene.groundState.active && scene.groundState.waitingForSubmission) {
+      var unlockedSubs = scene.player.unlockedSubmissions || ['rnc'];
+      
+      // Number keys 1-4 to select submission
+      if (Phaser.Input.Keyboard.JustDown(scene.sub1Key)) {
+        scene.groundState.selectedSubmission = unlockedSubs[0] || 'rnc';
+        scene.groundState.waitingForSubmission = false;
+        return;
+      }
+      if (Phaser.Input.Keyboard.JustDown(scene.sub2Key) && unlockedSubs.length > 1) {
+        scene.groundState.selectedSubmission = unlockedSubs[1];
+        scene.groundState.waitingForSubmission = false;
+        return;
+      }
+      if (Phaser.Input.Keyboard.JustDown(scene.sub3Key) && unlockedSubs.length > 2) {
+        scene.groundState.selectedSubmission = unlockedSubs[2];
+        scene.groundState.waitingForSubmission = false;
+        return;
+      }
+      if (Phaser.Input.Keyboard.JustDown(scene.sub4Key) && unlockedSubs.length > 3) {
+        scene.groundState.selectedSubmission = unlockedSubs[3];
+        scene.groundState.waitingForSubmission = false;
+        return;
+      }
+      
+      // L key attempts the first submission (RNC by default)
+      if (Phaser.Input.Keyboard.JustDown(scene.takedownKey)) {
+        scene.groundState.selectedSubmission = unlockedSubs[0] || 'rnc';
+        scene.groundState.waitingForSubmission = false;
+        return;
+      }
+      return;
+    }
+    
     if (Phaser.Input.Keyboard.JustDown(scene.jabKey)) this.executeAttack(scene, 'jab');
     if (Phaser.Input.Keyboard.JustDown(scene.crossKey)) this.executeAttack(scene, 'cross');
     if (Phaser.Input.Keyboard.JustDown(scene.takedownKey)) this.executeAttack(scene, 'takedown');
