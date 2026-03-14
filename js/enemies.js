@@ -4141,7 +4141,7 @@ window.MMA.Enemies = {
       }
     }
     // Mark each enemy with token flag
-    scene.enemies.forEach(function(e) { e.hasAttackToken = (scene._enemyAttackToken && e === scene._enemyAttackToken.enemy); });
+    scene.enemies.forEach(function(e) { if (!e) return; e.hasAttackToken = (scene._enemyAttackToken && e === scene._enemyAttackToken.enemy); });
 
     var nowMs = Date.now(); // cache once — used in damage trail per enemy
     scene.enemies.forEach(function(e) {

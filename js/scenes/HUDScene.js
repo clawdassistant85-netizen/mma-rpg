@@ -23,7 +23,7 @@ var HUDScene = new Phaser.Class({
     }).setOrigin(1, 0);
     // Controls hint
     this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H - 20,
-      'WASD: Move | J: Jab | K: Cross | L: Take | U: Hook | I: LowKick | O: Uppercut | P: Body',
+      'WASD: Move | J: Jab | K: Cross | L: Take | U: Hook | N: LowKick | O: Uppercut | P: Body',
       { fontSize:'9px', color:'#888888' }).setOrigin(0.5, 1);
     this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H - 8,
       'SPACE: Head Kick | G: Guillotine',

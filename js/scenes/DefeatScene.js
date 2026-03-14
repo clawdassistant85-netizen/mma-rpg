@@ -100,30 +100,6 @@ var DefeatScene = new Phaser.Class({
       playTime: playTime,
       xpGained: xpGained
     });
-
-    this.timeStatText = this.add.text(centerX, centerY + 18, 'Time: 0m 0s', {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '20px',
-      color: '#cccccc',
-      align: 'center'
-    }).setOrigin(0.5).setDepth(15);
-
-    this.xpStatText = null;
-    if (xpGained > 0) {
-      this.xpStatText = this.add.text(centerX, centerY + 48, 'XP Earned: 0', {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '20px',
-        color: '#cccccc',
-        align: 'center'
-      }).setOrigin(0.5).setDepth(15);
-    }
-
-    this.animateStats({
-      enemiesDefeated: enemiesDefeated,
-      playTime: playTime,
-      xpGained: xpGained
-    });
-
     this.retryBtn = this.add.text(centerX, centerY + 120, '[ RETRY ]', {
       fontFamily: 'Arial, sans-serif',
       fontSize: '28px',

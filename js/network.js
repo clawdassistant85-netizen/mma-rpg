@@ -34,20 +34,31 @@ window.MMA.Network = {
       if (msg.type === 'peer_disconnected') self.ready = false;
       if (msg.type === 'peer_joined') self.ready = true;
       var handlers = self._handlers[msg.type];
-      if (handlers) handlers.forEach(function(fn) { fn(msg); });
+      if (handlers) handlers.forEach(function(fn) { try { fn(msg); } catch (err) { console.error('Network handler error for ' + msg.type, err); } });
     };
     this.ws.onclose = function() {
       self.connected = false;
       self.ready = false;
       self.roomCode = null;
       var handlers = self._handlers.peer_disconnected;
-      if (handlers) handlers.forEach(function(fn) { fn({}); });
+      if (handlers) handlers.forEach(function(fn) { try { fn({}); } catch (err) { console.error('Network handler error for peer_disconnected', err); } });
     };
   },
 
   on: function(type, fn) {
     if (!this._handlers[type]) this._handlers[type] = [];
     this._handlers[type].push(fn);
+    var self = this;
+    return function() {
+      self.off(type, fn);
+    };
+  },
+
+  off: function(type, fn) {
+    var handlers = this._handlers[type];
+    if (!handlers || !handlers.length) return;
+    this._handlers[type] = handlers.filter(function(handler) { return handler !== fn; });
+    if (!this._handlers[type].length) delete this._handlers[type];
   },
 
   send: function(type, data) {

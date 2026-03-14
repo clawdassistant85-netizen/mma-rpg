@@ -107,7 +107,6 @@ window.MMA.Player = {
     var vx = 0, vy = 0;
     var baseSpeed = CONFIG.PLAYER_SPEED + (scene.player.speedBonus || 0);
     // Weather effects: rain makes movement slippery
-    var weatherActive = scene.registry.get('weatherActive');
     var weatherSlippery = scene.registry.get('weatherSlippery');
     if (weatherSlippery) {
       baseSpeed *= 0.75; // 25% slower on wet surfaces

@@ -2196,31 +2196,30 @@ window.MMA.UI = {
     setTimeout(function() { el.classList.remove('active'); }, 900);
   },
   updateGroundHUD: function(scene) {
-    var overlay = document.getElementById('ground-overlay');
-    var timerFill = document.getElementById('ground-timer-fill');
-    var positionText = overlay ? overlay.querySelector('.position-text') : null;
-    if (!overlay || !timerFill) return;
+    // Cache DOM refs — getElementById on every frame causes unnecessary layout work
+    if (!this._groundHUDRefs || !this._groundHUDRefs.overlay || !this._groundHUDRefs.overlay.isConnected || !this._groundHUDRefs.timerFill || !this._groundHUDRefs.timerFill.isConnected) {
+      var overlay = document.getElementById('ground-overlay');
+      this._groundHUDRefs = {
+        overlay: overlay || null,
+        timerFill: document.getElementById('ground-timer-fill'),
+        positionText: overlay ? overlay.querySelector('.position-text') : null
+      };
+    }
+    var refs = this._groundHUDRefs;
+    if (!refs.overlay || !refs.timerFill) return;
     var active = !!(scene.groundState && scene.groundState.active);
-    overlay.style.display = active ? 'block' : 'none';
+    refs.overlay.style.display = active ? 'block' : 'none';
     if (active) {
       var pct = Math.max(0, Math.min(1, scene.groundState.timer / 10000));
-      timerFill.style.width = (pct * 100) + '%';
-      
-      // Show position text
-      if (positionText) {
+      refs.timerFill.style.width = (pct * 100) + '%';
+      if (refs.positionText) {
         var position = scene.groundState.position || 'fullGuard';
-        var positionLabels = {
-          fullGuard: 'FULL GUARD',
-          halfGuard: 'HALF GUARD',
-          sideControl: 'SIDE CONTROL',
-          mount: 'MOUNT',
-          backControl: 'BACK CONTROL'
-        };
-        positionText.textContent = positionLabels[position] || 'GROUND';
-        positionText.style.display = '';
+        var positionLabels = { fullGuard: 'FULL GUARD', halfGuard: 'HALF GUARD', sideControl: 'SIDE CONTROL', mount: 'MOUNT', backControl: 'BACK CONTROL' };
+        refs.positionText.textContent = positionLabels[position] || 'GROUND';
+        refs.positionText.style.display = '';
       }
-    } else if (positionText) {
-      positionText.style.display = 'none';
+    } else if (refs.positionText) {
+      refs.positionText.style.display = 'none';
     }
   },
   handleResponsiveLayout: function() {
