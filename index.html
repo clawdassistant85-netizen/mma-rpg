@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>MMA RPG</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230b0b0b'/%3E%3Ctext x='50%25' y='56%25' text-anchor='middle' font-size='34' font-family='Arial,sans-serif' fill='%23ffd447'%3EM%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/style.css?v=32">
+  <link rel="stylesheet" href="css/style.css?v=33">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -309,39 +309,38 @@
         <span class="wc-bonus">+Speed</span>
       </div>
       <div id="ground-overlay"><div class="ground-text">GROUND GAME</div><div id="ground-timer"><div id="ground-timer-fill"></div></div></div>
-      <button id="mobile-pause-btn" type="button" aria-label="Pause menu">⚙️</button>
       <div id="ground-banner">TAKEDOWN!</div>
       <button id="dom-restart-btn" type="button">RESTART (ENTER)</button>
-      <div id="dpad" class="touch-control" aria-label="D-pad">
-        <div class="dpad-base"></div>
-        <button class="dpad-btn dpad-up" data-dir="up" aria-label="Up">▲</button>
-        <button class="dpad-btn dpad-down" data-dir="down" aria-label="Down">▼</button>
-        <button class="dpad-btn dpad-left" data-dir="left" aria-label="Left">◀</button>
-        <button class="dpad-btn dpad-right" data-dir="right" aria-label="Right">▶</button>
-      </div>
-      <!-- Stand-up button (appears during ground game) -->
-      <button id="standup-btn" type="button" aria-label="Stand Up" style="position:fixed; left:130px; bottom:40px; width:60px; height:36px; border-radius:10px; border:0; background:rgba(100,100,200,0.7); color:#fff; font:bold 12px system-ui; pointer-events:auto; touch-action:none; display:none; z-index:100;">STAND</button>
-      <!-- Action buttons cluster -->
-      <div id="action-cluster" class="touch-control" aria-label="Action Buttons">
-        <button class="action-btn" data-action="jab" aria-label="Jab">Jab</button>
-        <button class="action-btn" data-action="heavy" aria-label="Heavy">Heavy</button>
-        <button class="action-btn" data-action="grapple" aria-label="Grapple">Grapple</button>
-        <button class="action-btn" data-action="special" aria-label="Special">Special</button>
-      </div>
+    </div>
+    <!-- Touch controls: OUTSIDE ui-layer so iOS Safari touch events aren't clipped -->
+    <button id="mobile-pause-btn" type="button" aria-label="Pause menu">⚙️</button>
+    <div id="dpad" class="touch-control" aria-label="D-pad">
+      <div class="dpad-base"></div>
+      <button class="dpad-btn dpad-up" data-dir="up" aria-label="Up">▲</button>
+      <button class="dpad-btn dpad-down" data-dir="down" aria-label="Down">▼</button>
+      <button class="dpad-btn dpad-left" data-dir="left" aria-label="Left">◀</button>
+      <button class="dpad-btn dpad-right" data-dir="right" aria-label="Right">▶</button>
+    </div>
+    <button id="standup-btn" type="button" aria-label="Stand Up" style="position:fixed; left:130px; bottom:40px; width:60px; height:36px; border-radius:10px; border:0; background:rgba(100,100,200,0.7); color:#fff; font:bold 12px system-ui; pointer-events:auto; touch-action:none; display:none; z-index:100;">STAND</button>
+    <div id="action-cluster" class="touch-control" aria-label="Action Buttons">
+      <button class="action-btn" data-action="jab" aria-label="Jab">Jab</button>
+      <button class="action-btn" data-action="heavy" aria-label="Heavy">Heavy</button>
+      <button class="action-btn" data-action="grapple" aria-label="Grapple">Grapple</button>
+      <button class="action-btn" data-action="special" aria-label="Special">Special</button>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=32"></script>
-  <script src="js/sprites.js?v=32"></script>
-  <script src="js/combat.js?v=32"></script>
-  <script src="js/enemies.js?v=32"></script>
-  <script src="js/zones.js?v=32"></script>
-  <script src="js/player.js?v=32"></script>
-  <script src="js/items.js?v=32"></script>
-  <script src="js/outfits.js?v=32"></script>
-  <script src="js/vfx.js?v=32"></script>
-  <script src="js/ui.js?v=32"></script>
-  <script src="js/progression.js?v=32"></script>
+  <script src="js/config.js?v=33"></script>
+  <script src="js/sprites.js?v=33"></script>
+  <script src="js/combat.js?v=33"></script>
+  <script src="js/enemies.js?v=33"></script>
+  <script src="js/zones.js?v=33"></script>
+  <script src="js/player.js?v=33"></script>
+  <script src="js/items.js?v=33"></script>
+  <script src="js/outfits.js?v=33"></script>
+  <script src="js/vfx.js?v=33"></script>
+  <script src="js/ui.js?v=33"></script>
+  <script src="js/progression.js?v=33"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -587,17 +586,17 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=32"></script>
-  <script src="js/saveSystem.js?v=32"></script>
-  <script src="js/narrator.js?v=32"></script>
-  <script src="js/scenes/TitleScene.js?v=32"></script>
-  <script src="js/scenes/BootScene.js?v=32"></script>
-  <script src="js/scenes/GameScene.js?v=32"></script>
-  <script src="js/scenes/HUDScene.js?v=32"></script>
-  <script src="js/scenes/PauseScene.js?v=32"></script>
-  <script src="js/scenes/OutfitScene.js?v=32"></script>
-  <script src="js/scenes/UnlockScene.js?v=32"></script>
-  <script src="js/scenes/VictoryScene.js?v=32"></script>
-  <script src="js/main.js?v=32"></script>
+<script src="js/sounds.js?v=33"></script>
+  <script src="js/saveSystem.js?v=33"></script>
+  <script src="js/narrator.js?v=33"></script>
+  <script src="js/scenes/TitleScene.js?v=33"></script>
+  <script src="js/scenes/BootScene.js?v=33"></script>
+  <script src="js/scenes/GameScene.js?v=33"></script>
+  <script src="js/scenes/HUDScene.js?v=33"></script>
+  <script src="js/scenes/PauseScene.js?v=33"></script>
+  <script src="js/scenes/OutfitScene.js?v=33"></script>
+  <script src="js/scenes/UnlockScene.js?v=33"></script>
+  <script src="js/scenes/VictoryScene.js?v=33"></script>
+  <script src="js/main.js?v=33"></script>
 </body>
 </html>
