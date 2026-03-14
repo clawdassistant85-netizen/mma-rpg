@@ -4,29 +4,95 @@ var BootScene = new Phaser.Class({
     Phaser.Scene.call(this, { key: 'BootScene' });
   },
   create: function() {
+    var self = this;
+    var W = this.cameras.main.width, H = this.cameras.main.height;
+    this._loadBg = this.add.rectangle(W/2, H/2, W, H, 0x000000);
+    this._loadText = this.add.text(W/2, H/2, 'Loading...', {
+      fontSize: '28px', color: '#ffffff', fontFamily: 'Arial'
+    }).setOrigin(0.5);
+    this._loadBar = this.add.rectangle(W/2, H/2 + 40, 0, 8, 0xffd700).setOrigin(0, 0.5);
+    this._loadBarBg = this.add.rectangle(W/2 - W*0.4, H/2 + 40, W*0.8, 8, 0x333333).setOrigin(0, 0.5);
+    this._loadStep = 0;
+    this._loadTotalSteps = 8;
+    this._runNextBootStep();
+  },
+  _updateLoadBar: function(stepName) {
+    this._loadStep++;
+    var pct = this._loadStep / this._loadTotalSteps;
+    this._loadBar.width = this.cameras.main.width * 0.8 * pct;
+    if (this._loadText) this._loadText.setText('Loading... ' + stepName);
+  },
+  _runNextBootStep: function() {
+    var self = this;
+    var steps = [
+      '_bootStep_textures',
+      '_bootStep_idleHook',
+      '_bootStep_variantHooks',
+      '_bootStep_portraitHooks',
+      '_bootStep_auraHooks',
+      '_bootStep_combatHooks',
+      '_bootStep_vfxHooks',
+      '_bootStep_launchGame',
+    ];
+    if (this._bootStepIdx === undefined) this._bootStepIdx = 0;
+    var stepName = steps[this._bootStepIdx];
+    if (!stepName) return;
+    this._bootStepIdx++;
+    this.time.addEvent({ delay: 0, callback: function() {
+      self[stepName]();
+      self._runNextBootStep();
+    }});
+  },
+  _bootStep_textures: function() {
     MMA.Sprites.makeAll(this);
+    this._updateLoadBar('Textures');
+  },
+  _bootStep_idleHook: function() {
     this.registerIdleAnimations();
     this.installIdleAnimationHook();
     this.installVisualVariantHook();
     this.installEquipmentVisualHook();
     this.installDamageStateHook();
+    this._updateLoadBar('Idle Animations');
+  },
+  _bootStep_variantHooks: function() {
     this.installLimbDamageHook();
     this.installPortraitHook();
     this.installReactionFaceHook();
     this.installTechniqueTattooHook();
+    this._updateLoadBar('Variant Hooks');
+  },
+  _bootStep_portraitHooks: function() {
     this.installStyleAuraHook();
+    this._updateLoadBar('Style Aura');
+  },
+  _bootStep_auraHooks: function() {
     this.installBossChromaAuraHook();
+    this._updateLoadBar('Boss Aura');
+  },
+  _bootStep_combatHooks: function() {
     this.installImpactSweatHook();
     this.installComboFireTrailHook();
     this.installArenaFootworkTrailHook();
     this.installShadowDoubleHook();
     this.installShadowDoubleDamageHook();
+    this._updateLoadBar('Combat Hooks');
+  },
+  _bootStep_vfxHooks: function() {
     this.installSignatureSilhouetteHook();
     this.installMuscleTensionHook();
     this.installExertionCueHook();
     this.installLastChancePulseHook();
     this.installFightIqAuraReadHook();
     this.installEnemyFearTrembleHook();
+    this._updateLoadBar('VFX Hooks');
+  },
+  _bootStep_launchGame: function() {
+    if (this._loadBg) this._loadBg.destroy();
+    if (this._loadText) this._loadText.destroy();
+    if (this._loadBar) this._loadBar.destroy();
+    if (this._loadBarBg) this._loadBarBg.destroy();
+    window.gameReady = true;
     this.scene.start('GameScene');
     this.scene.stop('BootScene');
   },

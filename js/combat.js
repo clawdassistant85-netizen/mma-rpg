@@ -92,6 +92,9 @@ window.MMA.Combat = {
   STYLE_MASTERY_THRESHOLD: 100,
   STYLE_MASTERY_DAMAGE_MULTIPLIER: 1.4,
   STYLE_MASTERY_DEFENSE_IGNORE: 0.25,
+  TRANSITION_CANCEL_WINDOW_MS: 220,
+  TRANSITION_CANCEL_STAMINA_PENALTY_PCT: 0.2,
+  TRANSITION_CANCEL_COOLDOWN_REDUCTION_PCT: 0.45,
   INJURY_MAX_STACKS: 4,
   INJURY_ARM_DAMAGE_BONUS_PER_STACK: 0.03,
   INJURY_LEG_DAMAGE_BONUS_PER_STACK: 0.04,
@@ -1576,6 +1579,7 @@ window.MMA.Combat = {
     if (cd[moveKey] > 0 || (!intuitionPrimed && !adrenalinePrimed && s.stamina < move.staminaCost) || scene.gameOver) return;
     if (!intuitionPrimed && !adrenalinePrimed) s.stamina -= move.staminaCost;
     cd[moveKey] = move.cooldown;
+    this.markAttackForTransitionCancel(scene, moveKey, move.staminaCost);
     if (window.sfx) { if (moveKey === 'jab' || moveKey === 'cross') window.sfx.punch(); else if (moveKey === 'lowKick' || moveKey === 'headKick') window.sfx.kick(); }
     var DT = CONFIG.DISPLAY_TILE, px = scene.player.x + scene.lastDir.x * DT * 0.5, py = scene.player.y + scene.lastDir.y * DT * 0.5;
     var hitbox = scene.add.image(px, py, 'hitbox').setDisplaySize(DT, DT).setAlpha(0.5);
@@ -1758,6 +1762,7 @@ window.MMA.Combat = {
     if (!intuitionPrimed && !adrenalinePrimed && scene.player.stats.stamina < required) return MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'NOT ENOUGH STAMINA', '#ff4444');
     if (!intuitionPrimed && !adrenalinePrimed) scene.player.stats.stamina -= required;
     cds[bestMoveKey] = move.cooldown;
+    this.markAttackForTransitionCancel(scene, bestMoveKey, required);
     var DT = CONFIG.DISPLAY_TILE, px = scene.player.x + scene.lastDir.x * DT * 0.7, py = scene.player.y + scene.lastDir.y * DT * 0.7;
     var hitbox = scene.add.image(px, py, 'hitbox').setDisplaySize(DT * 1.7, DT * 1.7).setAlpha(0.6);
     var enemies = scene.enemyGroup.getChildren(), hit = false;
@@ -1899,6 +1904,56 @@ window.MMA.Combat = {
     MMA.VFX.playAttackEffect(scene, 'cross', scene.player.x, scene.player.y - 4, px, py);
     scene.time.delayedCall(380, function(){ hitbox.destroy(); });
   },
+  ensureTransitionCancelState: function(scene) {
+    scene.player.transitionCancelState = scene.player.transitionCancelState || {
+      lastAttackAt: 0,
+      lastMoveKey: null,
+      lastMoveStaminaCost: 0,
+      lastProcessedDodgeAt: 0,
+      consumedAttackAt: 0
+    };
+    return scene.player.transitionCancelState;
+  },
+  markAttackForTransitionCancel: function(scene, moveKey, staminaCost) {
+    var state = this.ensureTransitionCancelState(scene);
+    state.lastAttackAt = scene.time.now;
+    state.lastMoveKey = moveKey || null;
+    state.lastMoveStaminaCost = Math.max(0, staminaCost || 0);
+    return state;
+  },
+  tryTransitionFrameCancel: function(scene) {
+    if (!scene || !scene.player || !scene.player.stats || !scene.player.cooldowns) return false;
+    var state = this.ensureTransitionCancelState(scene);
+    var lastDodgeAt = this.getLastDodgeTimestamp(scene);
+    if (!lastDodgeAt || lastDodgeAt <= state.lastProcessedDodgeAt) return false;
+    state.lastProcessedDodgeAt = lastDodgeAt;
+
+    if (!state.lastAttackAt || state.consumedAttackAt === state.lastAttackAt) return false;
+    if (lastDodgeAt < state.lastAttackAt) return false;
+
+    var elapsed = lastDodgeAt - state.lastAttackAt;
+    if (elapsed > this.TRANSITION_CANCEL_WINDOW_MS) return false;
+
+    var staminaPenalty = Math.max(1, Math.ceil((state.lastMoveStaminaCost || 0) * this.TRANSITION_CANCEL_STAMINA_PENALTY_PCT));
+    if (scene.player.stats.stamina < staminaPenalty) {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 90, 'NO STAMINA: FRAME CANCEL', '#ff8b8b');
+      return false;
+    }
+
+    scene.player.stats.stamina -= staminaPenalty;
+    state.consumedAttackAt = state.lastAttackAt;
+
+    var cooldowns = scene.player.cooldowns;
+    Object.keys(cooldowns).forEach(function(key) {
+      var v = cooldowns[key] || 0;
+      if (v <= 0) return;
+      cooldowns[key] = Math.max(0, Math.floor(v * (1 - window.MMA.Combat.TRANSITION_CANCEL_COOLDOWN_REDUCTION_PCT)));
+    });
+
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 108, 'FRAME CANCEL!', '#8ef9ff');
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 126, 'STAMINA -' + staminaPenalty, '#ffd6a5');
+    return true;
+  },
   tryStaggerRecoveryTech: function(scene) {
     if (!scene || !scene.player || !scene.player.stats) return false;
     if (!scene.player.stunnedUntil || scene.time.now >= scene.player.stunnedUntil) return false;
@@ -1952,6 +2007,7 @@ window.MMA.Combat = {
     this.refreshCounterFlowState(scene);
     this.refreshBreakthroughState(scene);
     this.applyGuardCrushChip(scene, delta);
+    this.tryTransitionFrameCancel(scene);
     if (scene.player.stunnedUntil && scene.time.now < scene.player.stunnedUntil) {
       var attemptedRecoveryTech =
         Phaser.Input.Keyboard.JustDown(scene.jabKey) ||

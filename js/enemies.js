@@ -1023,6 +1023,12 @@ window.MMA.Enemies = {
 
   // Wrapper around MMA.Player.damage so enemy systems can attribute hits (for Comeback Kid, etc)
   damagePlayer: function(attackerEnemy, scene, dmg) {
+    // Apply taunt damage bonus if enemy recently taunted
+    if (attackerEnemy && attackerEnemy._tauntDamageBonus) {
+      var tauntMult = this.getTauntDamageMultiplier(attackerEnemy);
+      dmg = Math.round(dmg * tauntMult);
+    }
+
     // Sore Loser AI: apply accuracy penalty (miss chance) when active
     if (attackerEnemy && attackerEnemy.soreLoserActive && attackerEnemy.soreLoserAccuracyPenalty) {
       // Roll for miss
@@ -1528,6 +1534,133 @@ window.MMA.Enemies = {
     DAMAGE_BONUS: 0.20,       // +20% damage dealt
     DEFENSE_PENALTY: 0.15,    // -15% defense (player hits harder)
     DEFENSE_MULT: 0.85        // Multiplier applied to defense (1 - 0.15 = 0.85)
+  },
+
+  // Enemy Taunt System: enemies occasionally taunt the player during combat
+  // Taunts can lower player Focus meter and boost enemy morale
+  TAUNT_CONFIG: {
+    ENABLED: true,
+    MIN_ZONE: 2,               // Taunts start appearing in zone 2+
+    COOLDOWN_MS: 8000,        // Minimum time between taunts per enemy
+    CHANCE: 0.003,            // Chance per frame to taunt (roughly once per 5-6 seconds)
+    FOCUS_REDUCTION: 8,        // Amount of Focus to drain from player
+    DAMAGE_BONUS: 0.10,       // +10% damage for taunting enemy after taunt
+    DURATION_MS: 3000,         // Duration of damage bonus
+    // Taunt lines by enemy type/AI pattern
+    TAUNT_LINES: {
+      // Aggressive/chase types
+      'chase': ['YOU CAN\'T HURT ME!', 'IS THAT ALL YOU GOT?', 'PATHETIC!', 'HIT HARDER!'],
+      // Combo attackers
+      'combo': ['TOO SLOW!', 'MISSED ME!', 'NICE TRY!', 'BOXING IS DEAD!'],
+      // Kickboxers
+      'kickboxer': ['LEGS FOR DAYS!', 'KICKS > PUNCHES!', 'MY RANGE!'],
+      // Grapple types
+      'grasper': ['GONNA GRIND YOU DOWN!', 'WANNABES DON\'T GRAPPLE!', 'GROUND GAME!'],
+      'thrower': ['WEIGHT CLASS!', 'LEARN TO THROW!', 'BUDDY SYSTEM!'],
+      'subHunter': ['TAP OR SLEEP!', 'SUBMISSION SPECIALIST!', 'ONE ARM BAR!'],
+      // Specialists
+      'tank': ['CAN\'T SCRATCH ME!', 'ARMORED UP!', 'FULL DEFENSE!'],
+      'enforcer': ['BIG AND MEAN!', 'BEHIND ME!', 'WRONG SIDE!'],
+      'regen': ['HEALING UP!', 'WEAR ME DOWN!', 'ALL DAY!'],
+      'glitcher': ['CAN\'T TOUCH THIS!', 'GLITCH MODE!', 'PHASE SHIFT!'],
+      'bully': ['SMALL FRY!', 'GO HOME KID!', 'SCARED YET?'],
+      // Default/generic
+      'default': ['COME ON!', 'LET\'S GO!', 'FIGHT ME!', 'BROWN NOSER!', 'DANCE!']
+    },
+    TAUNT_TEXT_COLOR: '#ffaa00',
+    TAUNT_EMOTE: '💢'
+  },
+
+  // Check if enemy should taunt
+  checkEnemyTaunt: function(enemy, scene, delta) {
+    var cfg = this.TAUNT_CONFIG;
+    if (!cfg || !cfg.ENABLED) return false;
+    if (!scene || !scene.player || !enemy) return false;
+    
+    var zone = scene.currentZone || 1;
+    if (zone < cfg.MIN_ZONE) return false;
+    
+    // Bosses and elites don't taunt (they have other mechanics)
+    if (enemy.isBoss || enemy.isElite) return false;
+    
+    // Can't taunt while staggered, fleeing, or dead
+    if (enemy.state === 'dead' || enemy.isFleeing || enemy.staggerTimer > 0) return false;
+    
+    // Check cooldown
+    if (!enemy._tauntCooldown) enemy._tauntCooldown = 0;
+    enemy._tauntCooldown -= delta;
+    if (enemy._tauntCooldown > 0) return false;
+    
+    // Check chance
+    if (Math.random() > cfg.CHANCE) return false;
+    
+    // Get taunt line based on AI pattern
+    var ai = enemy.type && enemy.type.aiPattern;
+    var lines = cfg.TAUNT_LINES[ai] || cfg.TAUNT_LINES['default'];
+    var line = lines[Math.floor(Math.random() * lines.length)];
+    
+    // Execute the taunt
+    this.executeEnemyTaunt(enemy, scene, line);
+    
+    return true;
+  },
+
+  // Execute enemy taunt
+  executeEnemyTaunt: function(enemy, scene, line) {
+    var cfg = this.TAUNT_CONFIG;
+    
+    // Set cooldown
+    enemy._tauntCooldown = cfg.COOLDOWN_MS;
+    
+    // Show taunt text above enemy
+    if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 60, cfg.TAUNT_EMOTE + ' ' + line, cfg.TAUNT_TEXT_COLOR);
+    }
+    
+    // Apply player Focus reduction
+    if (scene.player && scene.player.stats && cfg.FOCUS_REDUCTION > 0) {
+      scene.player.stats.focus = Math.max(0, (scene.player.stats.focus || 0) - cfg.FOCUS_REDUCTION);
+      // Update Focus UI if available
+      if (scene.registry) {
+        scene.registry.set('focus', scene.player.stats.focus);
+      }
+    }
+    
+    // Apply damage bonus to taunting enemy
+    if (cfg.DAMAGE_BONUS > 0) {
+      enemy._tauntDamageBonus = cfg.DAMAGE_BONUS;
+      enemy._tauntBonusTimer = cfg.DURATION_MS;
+    }
+    
+    // Visual effect: enemy pulses to show confidence
+    if (scene.tweens) {
+      scene.tweens.add({
+        targets: enemy,
+        alpha: 0.5,
+        scaleX: 1.1,
+        scaleY: 1.1,
+        duration: 150,
+        yoyo: true,
+        ease: 'Sine.easeInOut'
+      });
+    }
+  },
+
+  // Update taunt timers and effects
+  updateEnemyTaunts: function(enemy, delta) {
+    if (!enemy._tauntBonusTimer) return;
+    
+    enemy._tauntBonusTimer -= delta;
+    if (enemy._tauntBonusTimer <= 0) {
+      enemy._tauntBonusTimer = 0;
+      enemy._tauntDamageBonus = 0;
+    }
+  },
+
+  // Get damage multiplier including taunt bonus
+  getTauntDamageMultiplier: function(enemy) {
+    if (!enemy) return 1;
+    return 1 + (enemy._tauntDamageBonus || 0);
   },
 
   // Injury System: tracking cumulative limb hits for stacking debuffs
@@ -3510,6 +3643,14 @@ window.MMA.Enemies = {
     scene.enemies.forEach(function(e) {
       if (e && e.active && e.type && e.type.isRivalEcho) {
         self.updateRivalEchoGhost(e);
+      }
+    });
+
+    // Enemy Taunt System: check for and update taunts
+    scene.enemies.forEach(function(e) {
+      if (e && e.active && e.state !== 'dead') {
+        self.checkEnemyTaunt(e, scene, delta);
+        self.updateEnemyTaunts(e, delta);
       }
     });
 

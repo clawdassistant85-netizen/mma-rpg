@@ -518,6 +518,42 @@ window.MMA.Zones = {
     var maxBonus = 0.10;
     return Math.min(maxBonus, maxBonus * hype);
   },
+  // Blood Moon Arena helpers
+  // Rare underground arena variant that only appears during late-night
+  // real-world hours. When active, enemies hit harder but drop double loot.
+  // Zones keeps this purely metadata-driven; combat/loot systems can read
+  // the registry flags to tune damage and rewards without hardcoding room ids.
+  _isBloodMoonRealtimeWindow: function() {
+    // Keep the window intentionally narrow (roughly 9pm–3am local time)
+    // so Blood Moon nights feel special but not impossible to see.
+    try {
+      var now = new Date();
+      var hour = now.getHours();
+      return (hour >= 21 || hour < 3);
+    } catch (e) {
+      // If the environment ever blocks Date access, fail closed so we
+      // never accidentally spam Blood Moon state.
+      return false;
+    }
+  },
+  getBloodMoonArenaConfig: function(room, scene) {
+    if (!room) return null;
+    // For now, limit Blood Moon to the main arena cage so the effect
+    // stays tightly themed. Other rooms can be opted-in later by adding
+    // metadata, but we keep this conservative for the first pass.
+    if (room.zone !== 3 || room.id !== 'oct3') return null;
+    if (!this._isBloodMoonRealtimeWindow()) return null;
+    // Make the event rare even within the time window so it feels like
+    // a true special variant instead of the default state.
+    if (Math.random() > 0.35) return null; // ~35% chance when in window
+    return {
+      active: true,
+      id: 'bloodMoonArena',
+      label: 'Blood Moon Arena',
+      enemyDamageMultiplier: 1.15,
+      lootDropMultiplier: 2.0
+    };
+  },
   // Arena Atmosphere Gauge helpers
   // Lightweight implementation of the backlog's "Arena Atmosphere Gauge"
   // feature. Arena-style rooms (zones 3 and 4) expose a synthesized
@@ -1284,6 +1320,29 @@ window.MMA.Zones = {
         scene.registry.set('hazardVisibilityMultiplier', 1.0);
         scene.registry.set('hazardVfxKey', '');
         scene.registry.set('hazardSfxKey', '');
+      }
+      // Blood Moon Arena metadata: rare night-only arena variant with
+      // higher enemy threat and double loot. We expose this as simple
+      // registry flags so combat and loot systems can layer the effect
+      // on top of existing arena logic without needing to know about
+      // real-world time or specific room ids.
+      var bloodCfg = this.getBloodMoonArenaConfig(room, scene);
+      if (bloodCfg && bloodCfg.active) {
+        scene.registry.set('bloodMoonActive', true);
+        scene.registry.set('bloodMoonId', bloodCfg.id || 'bloodMoonArena');
+        scene.registry.set('bloodMoonLabel', bloodCfg.label || 'Blood Moon Arena');
+        scene.registry.set('bloodMoonEnemyDamageMultiplier', bloodCfg.enemyDamageMultiplier || 1.15);
+        scene.registry.set('bloodMoonLootDropMultiplier', bloodCfg.lootDropMultiplier || 2.0);
+        scene.time.delayedCall(2475, function(){
+          scene.registry.set('gameMessage', 'Blood Moon Arena: enemies hit harder, but the rewards are doubled.');
+          scene.time.delayedCall(2800, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('bloodMoonActive', false);
+        scene.registry.set('bloodMoonId', '');
+        scene.registry.set('bloodMoonLabel', '');
+        scene.registry.set('bloodMoonEnemyDamageMultiplier', 1.0);
+        scene.registry.set('bloodMoonLootDropMultiplier', 1.0);
       }
       // Boss Rush Corridor metadata: sequential mini-boss waves with no healing between
       if (room.bossRushMode) {
