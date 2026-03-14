@@ -39,27 +39,19 @@ window.onload = function() {
     }
   }, 500);
 
-  // DOM-level START button — reliable on mobile/desktop regardless of Phaser input state
+  // Invisible full-screen tap target — tap anywhere or press Enter to start
   var btn = document.createElement('button');
   btn.id = 'dom-start-btn';
-  btn.textContent = '▶ START FIGHT';
+  btn.textContent = '';
   btn.style.cssText = [
     'position:absolute',
-    'left:50%',
-    'bottom:9%',
-    'transform:translateX(-50%)',
+    'inset:0',
     'z-index:200',
-    'padding:16px 34px',
-    'font-size:20px',
-    'font-weight:bold',
-    'font-family:Arial,sans-serif',
-    'color:#fff',
-    'background:linear-gradient(180deg,#e8c830,#b8960a)',
-    'border:3px solid #fff',
-    'border-radius:14px',
+    'width:100%',
+    'height:100%',
+    'background:transparent',
+    'border:none',
     'cursor:pointer',
-    'text-shadow:1px 1px 2px rgba(0,0,0,0.5)',
-    'box-shadow:0 4px 15px rgba(0,0,0,0.4)',
     'touch-action:manipulation',
     '-webkit-tap-highlight-color:transparent'
   ].join(';');
