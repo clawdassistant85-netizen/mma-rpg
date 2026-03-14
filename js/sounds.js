@@ -540,6 +540,84 @@
     stopMusic(fadeMs);
   };
 
+  MMA_AUDIO.bgm = {
+    play: function(zoneOrCue, cue) {
+      MMA_AUDIO.playBGM(zoneOrCue, cue);
+    },
+    stop: function(fadeMs) {
+      MMA_AUDIO.stopBGM(fadeMs);
+    }
+  };
+
+  MMA_AUDIO.ambient = {
+    currentAmbient: null,
+
+    _connectLayer: function(source, filter, gain) {
+      if (!source || !filter || !gain || !MMA_AUDIO.musicGain) return null;
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(MMA_AUDIO.musicGain);
+      source.start();
+      return { source: source, gain: gain };
+    },
+
+    crowd: function(ctx) {
+      var source = ctx.createBufferSource();
+      source.buffer = createNoiseBuffer(ctx, 3.4);
+      source.loop = true;
+      var filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 420;
+      filter.Q.value = 0.5;
+      var gain = ctx.createGain();
+      gain.gain.value = 0.04;
+      return this._connectLayer(source, filter, gain);
+    },
+
+    traffic: function(ctx) {
+      var source = ctx.createBufferSource();
+      source.buffer = createNoiseBuffer(ctx, 3.8);
+      source.loop = true;
+      var filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 180;
+      var gain = ctx.createGain();
+      gain.gain.value = 0.035;
+      return this._connectLayer(source, filter, gain);
+    },
+
+    gym: function(ctx) {
+      var source = ctx.createBufferSource();
+      source.buffer = createNoiseBuffer(ctx, 2.6);
+      source.loop = true;
+      var filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 620;
+      var gain = ctx.createGain();
+      gain.gain.value = 0.028;
+      return this._connectLayer(source, filter, gain);
+    },
+
+    play: function(type) {
+      var ctx = getAudioContext();
+      if (!ctx) return null;
+      ensureAudioGraph(ctx);
+      this.stop();
+      if (type === 'crowd') this.currentAmbient = this.crowd(ctx);
+      else if (type === 'gym') this.currentAmbient = this.gym(ctx);
+      else this.currentAmbient = this.traffic(ctx);
+      return this.currentAmbient;
+    },
+
+    stop: function() {
+      if (!this.currentAmbient) return;
+      try {
+        this.currentAmbient.source.stop();
+      } catch (err) {}
+      this.currentAmbient = null;
+    }
+  };
+
   MMA_AUDIO.playHit = function(kind) {
     if (kind === 'kick') sfx.kick();
     else if (kind === 'crit') sfx.crit();
@@ -548,6 +626,152 @@
   };
 
   window.sfx = sfx;
+
+  sfx.moves = {
+    jab: function() {
+      playBusTone([780, 420], 0.055, 'square', 0.11, 'sfx');
+      playBusTone(0, 0.028, 'noise', 0.038, 'sfx', { type:'bandpass', frequency:1700 });
+    },
+    cross: function() {
+      playBusTone([320, 130], 0.11, 'sawtooth', 0.15, 'sfx');
+      playBusTone(0, 0.08, 'noise', 0.06, 'sfx', { type:'lowpass', frequency:880 });
+    },
+    kick: function() {
+      playBusTone([620, 110], 0.14, 'triangle', 0.14, 'sfx');
+      playBusTone([170, 72], 0.16, 'sawtooth', 0.1, 'sfx');
+    },
+    grapple: function() {
+      playBusTone([220, 92], 0.09, 'square', 0.12, 'sfx');
+      playBusTone(0, 0.05, 'noise', 0.05, 'sfx', { type:'bandpass', frequency:620 });
+    },
+    submission: function() {
+      playBusTone([420, 110], 0.12, 'square', 0.11, 'sfx');
+      playBusTone(0, 0.08, 'noise', 0.05, 'sfx', { type:'highpass', frequency:1500 });
+    }
+  };
+
+  sfx.ui = {
+    highlight: function() {
+      playBusTone([620, 840], 0.04, 'sine', 0.08, 'sfx');
+    },
+    confirm: function() {
+      playBusTone(880, 0.06, 'sine', 0.08, 'sfx');
+      playBusTone(1100, 0.08, 'sine', 0.06, 'sfx');
+    },
+    back: function() {
+      playBusTone([420, 280], 0.07, 'triangle', 0.08, 'sfx');
+    },
+    error: function() {
+      playBusTone(180, 0.15, 'square', 0.1, 'sfx');
+    }
+  };
+
+  sfx.jingles = {
+    victory: function() {
+      var ctx = getAudioContext();
+      if (!ctx) return;
+      var now = ctx.currentTime;
+      playChord([262, 330], 0.12, 'sine', 0.08, 'sfx', now);
+      playChord([392, 523], 0.14, 'sine', 0.08, 'sfx', now + 0.16);
+      playChord([523, 659, 784], 0.28, 'triangle', 0.08, 'sfx', now + 0.34);
+    },
+    defeat: function() {
+      var ctx = getAudioContext();
+      if (!ctx) return;
+      var now = ctx.currentTime;
+      playChord([392, 330], 0.16, 'triangle', 0.07, 'sfx', now);
+      playChord([262, 220], 0.18, 'triangle', 0.07, 'sfx', now + 0.2);
+      playChord([196, 147], 0.24, 'triangle', 0.08, 'sfx', now + 0.42);
+    }
+  };
+
+  sfx.uiClick = function() {
+    sfx.ui.highlight();
+  };
+
+  sfx.uiConfirm = function() {
+    sfx.ui.confirm();
+  };
+
+  sfx.uiBack = function() {
+    sfx.ui.back();
+  };
+
+  sfx.uiError = function() {
+    sfx.ui.error();
+  };
+
+  var originalPunch = sfx.punch;
+  sfx.punch = function() {
+    if (MMA_AUDIO._suppressGenericAttackSfx) return;
+    originalPunch.call(sfx);
+  };
+
+  var originalKick = sfx.kick;
+  sfx.kick = function() {
+    if (MMA_AUDIO._suppressGenericAttackSfx) return;
+    originalKick.call(sfx);
+  };
+
+  function playMoveTypeSound(moveKey) {
+    var key = String(moveKey || '').toLowerCase();
+    if (!key) return;
+    if (key === 'jab') sfx.moves.jab();
+    else if (key === 'cross' || key === 'hook' || key === 'uppercut' || key === 'bodyshot' || key === 'elbowstrike' || key === 'spinningbackfist') sfx.moves.cross();
+    else if (key.indexOf('kick') !== -1 || key.indexOf('knee') !== -1) sfx.moves.kick();
+    else if (key.indexOf('armbar') !== -1 || key.indexOf('triangle') !== -1 || key.indexOf('kimura') !== -1 || key.indexOf('guillotine') !== -1 || key.indexOf('rnc') !== -1 || key.indexOf('submission') !== -1) sfx.moves.submission();
+    else if (key.indexOf('take') !== -1 || key.indexOf('throw') !== -1 || key.indexOf('grapple') !== -1 || key === 'takedown') sfx.moves.grapple();
+  }
+
+  function rememberPlayerAttack(scene, moveKey) {
+    if (!scene || !scene.player) return;
+    var now = scene.time && typeof scene.time.now === 'number' ? scene.time.now : Date.now();
+    scene.player._mmaLastAttackAt = now;
+    scene.player._mmaLastMoveKey = moveKey;
+    scene.player._mmaAttackRecoverAt = now + 280;
+  }
+
+  function installCombatAudioPatch() {
+    if (!window.MMA || !MMA.Combat || MMA.Combat._mmaMoveAudioPatched) return false;
+
+    var originalExecuteAttack = MMA.Combat.executeAttack;
+    MMA.Combat.executeAttack = function(scene, moveKey) {
+      rememberPlayerAttack(scene, moveKey);
+      MMA_AUDIO._suppressGenericAttackSfx = true;
+      try {
+        playMoveTypeSound(moveKey);
+        return originalExecuteAttack.call(this, scene, moveKey);
+      } finally {
+        MMA_AUDIO._suppressGenericAttackSfx = false;
+      }
+    };
+
+    var originalExecuteGroundMove = MMA.Combat.executeGroundMove;
+    MMA.Combat.executeGroundMove = function(scene, moveKey) {
+      rememberPlayerAttack(scene, moveKey);
+      if (moveKey && moveKey !== 'special' && moveKey !== 'standup') playMoveTypeSound(moveKey);
+      return originalExecuteGroundMove.call(this, scene, moveKey);
+    };
+
+    if (typeof MMA.Combat.executeSubmission === 'function') {
+      var originalExecuteSubmission = MMA.Combat.executeSubmission;
+      MMA.Combat.executeSubmission = function(scene, subKey, subMove) {
+        rememberPlayerAttack(scene, subKey);
+        playMoveTypeSound(subKey || 'submission');
+        return originalExecuteSubmission.call(this, scene, subKey, subMove);
+      };
+    }
+
+    MMA.Combat._mmaMoveAudioPatched = true;
+    return true;
+  }
+
+  function retryCombatAudioPatch(remaining) {
+    if (installCombatAudioPatch() || remaining <= 0) return;
+    window.setTimeout(function() {
+      retryCombatAudioPatch(remaining - 1);
+    }, 250);
+  }
 
   function installUiAudioPatch() {
     if (!window.MMA || !MMA.UI || MMA.UI._mmaAudioPatched) return false;
@@ -571,5 +795,6 @@
     }, 250);
   }
 
+  retryCombatAudioPatch(12);
   retryUiAudioPatch(12);
 })();

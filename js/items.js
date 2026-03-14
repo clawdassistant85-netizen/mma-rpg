@@ -28,6 +28,84 @@ window.MMA.Items = {
   },
 
   DROP_TABLES: {
+    streetThug: [
+      { key:'energyDrink', weight:28 },
+      { key:'proteinShake', weight:24 },
+      { key:'bandage', weight:16 },
+      { key:'footworkTape', weight:10 }
+    ],
+    barBrawler: [
+      { key:'proteinShake', weight:24 },
+      { key:'ironSkin', weight:18 },
+      { key:'bandage', weight:18 },
+      { key:'mouthguard', weight:10 }
+    ],
+    muayThaiFighter: [
+      { key:'adrenalineShot', weight:24 },
+      { key:'powerTonic', weight:20 },
+      { key:'ankleWraps', weight:16 },
+      { key:'icepack', weight:12 }
+    ],
+    kickboxer: [
+      { key:'adrenalineShot', weight:24 },
+      { key:'ankleWraps', weight:18 },
+      { key:'footworkTape', weight:16 },
+      { key:'icepack', weight:12 }
+    ],
+    striker: [
+      { key:'powerTonic', weight:24 },
+      { key:'energyDrink', weight:20 },
+      { key:'handWraps', weight:12 },
+      { key:'adrenalineShot', weight:14 }
+    ],
+    boxer: [
+      { key:'handWraps', weight:24 },
+      { key:'mouthguard', weight:18 },
+      { key:'powerTonic', weight:18 },
+      { key:'adrenalineShot', weight:10 }
+    ],
+    karateka: [
+      { key:'ankleWraps', weight:20 },
+      { key:'icepack', weight:16 },
+      { key:'powerTonic', weight:20 },
+      { key:'headgear', weight:8 }
+    ],
+    wrestler: [
+      { key:'ironSkin', weight:22 },
+      { key:'mouthguard', weight:18 },
+      { key:'cupProtector', weight:14 },
+      { key:'bandage', weight:16 }
+    ],
+    judoka: [
+      { key:'mouthguard', weight:18 },
+      { key:'cupProtector', weight:16 },
+      { key:'ironSkin', weight:20 },
+      { key:'championBalm', weight:8 }
+    ],
+    groundNPounder: [
+      { key:'championBalm', weight:10 },
+      { key:'proteinShake', weight:24 },
+      { key:'goldGloves', weight:8 },
+      { key:'icepack', weight:18 }
+    ],
+    bjjBlackBelt: [
+      { key:'blackBelt', weight:12 },
+      { key:'smellingSalts', weight:18 },
+      { key:'cupProtector', weight:14 },
+      { key:'championBalm', weight:10 }
+    ],
+    shadowRival: [
+      { key:'championBelt', weight:14 },
+      { key:'blackBelt', weight:18 },
+      { key:'goldGloves', weight:18 },
+      { key:'championBalm', weight:12 }
+    ],
+    mmaChamp: [
+      { key:'championBelt', weight:20 },
+      { key:'goldGloves', weight:20 },
+      { key:'blackBelt', weight:16 },
+      { key:'championBalm', weight:14 }
+    ],
     consumable: [
       { key:'energyDrink', weight:18 },
       { key:'proteinShake', weight:18 },
@@ -52,6 +130,14 @@ window.MMA.Items = {
       { key:'blackBelt', weight:34 },
       { key:'goldGloves', weight:42 }
     ]
+  },
+
+  RARITY_COLORS: {
+    common: '#ffffff',
+    uncommon: '#7ed957',
+    rare: '#77aaff',
+    epic: '#b18cff',
+    legendary: '#ffcc33'
   },
 
   CORNER_POWERUP_MAP: {
@@ -303,9 +389,21 @@ window.MMA.Items = {
 
     var isBoss = !!enemy.isBoss || enemy.typeKey === 'shadowRival';
     var isElite = !!(enemy.isElite || (enemy.type && enemy.type.isElite));
+    var enemyTable = this.DROP_TABLES[enemy.typeKey] || this.DROP_TABLES[enemy.baseTypeKey] || null;
     var dropKeys = [];
 
-    if (isBoss) {
+    if (enemyTable && enemyTable.length) {
+      if (isBoss) {
+        dropKeys.push(this._pickWeighted(enemyTable));
+        dropKeys.push(this._pickWeighted(this.DROP_TABLES.equipment));
+        if (Math.random() < 0.4) dropKeys.push(this._pickWeighted(this.DROP_TABLES.rare));
+      } else if (isElite) {
+        dropKeys.push(this._pickWeighted(enemyTable));
+        if (Math.random() < 0.35) dropKeys.push(this._pickWeighted(this.DROP_TABLES.equipment));
+      } else if (Math.random() < 0.35) {
+        dropKeys.push(this._pickWeighted(enemyTable));
+      }
+    } else if (isBoss) {
       dropKeys.push(this._pickWeighted(this.DROP_TABLES.equipment));
       if (Math.random() < 0.3) dropKeys.push(this._pickWeighted(this.DROP_TABLES.rare));
     } else if (isElite) {

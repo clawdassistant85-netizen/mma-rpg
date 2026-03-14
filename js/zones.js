@@ -2,24 +2,24 @@ window.MMA = window.MMA || {};
 window.MMA.Zones = {
   ZONE1_ROOMS: {
     room1:{id:'room1',zone:1,weatherOptions:['clear','clear','rain','night'],weightClass:'light',doors:{left:{col:0,row:5},right:{col:15,row:5},up:{col:7,row:0}},connections:{left:'room2',right:'room3',up:'room4'},spawnPositions:[{col:3,row:3},{col:12,row:3},{col:12,row:9}],enemyPool:['streetThug','streetThug','barBrawler'],name:'Alley Entrance'},
-    room2:{id:'room2',zone:1,weatherOptions:['clear','rain','wind'],weightClass:'light',doors:{right:{col:15,row:5}},connections:{right:'room1'},spawnPositions:[{col:3,row:3},{col:3,row:9}],enemyPool:['streetThug','barBrawler'],name:'Side Alley'},
-    room3:{id:'room3',zone:1,weatherOptions:['clear','clear','night','wind'],weightClass:'light',doors:{left:{col:0,row:5}},connections:{left:'room1'},spawnPositions:[{col:3,row:5},{col:12,row:3},{col:12,row:9}],enemyPool:['barBrawler','barBrawler','muayThaiFighter'],name:'Back Lot'},
-    room4:{id:'room4',zone:1,weatherOptions:['clear','rain'],weightClass:'light',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'room1',up:'gym1'},spawnPositions:[{col:3,row:8},{col:12,row:8}],enemyPool:['barBrawler','muayThaiFighter','muayThaiFighter'],name:'Storage Area'}
+    room2:{id:'room2',zone:1,weatherOptions:['clear','rain','wind','fog'],weightClass:'light',doors:{right:{col:15,row:5}},connections:{right:'room1'},spawnPositions:[{col:3,row:3},{col:3,row:9}],enemyPool:['streetThug','barBrawler'],name:'Side Alley'},
+    room3:{id:'room3',zone:1,weatherOptions:['clear','clear','night','wind','fog'],weightClass:'light',doors:{left:{col:0,row:5}},connections:{left:'room1'},spawnPositions:[{col:3,row:5},{col:12,row:3},{col:12,row:9}],enemyPool:['barBrawler','barBrawler','muayThaiFighter'],name:'Back Lot'},
+    room4:{id:'room4',zone:1,weatherOptions:['clear','rain','fog'],weightClass:'light',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'room1',up:'gym1'},spawnPositions:[{col:3,row:8},{col:12,row:8}],enemyPool:['barBrawler','muayThaiFighter','muayThaiFighter'],name:'Storage Area'}
   },
   ZONE2_ROOMS: {
     gym1:{id:'gym1',zone:2,weatherOptions:['clear'],weightClass:'middle',musicCue:'zone2',doors:{left:{col:0,row:5},right:{col:15,row:5},up:{col:7,row:0},down:{col:7,row:11}},connections:{left:'gym2',right:'gym3',up:'gym4',down:'room4'},spawnPositions:[{col:4,row:4},{col:11,row:4},{col:7,row:8}],enemyPool:['kickboxer','striker','coach'],name:'Sparring Ring'},
-    gym2:{id:'gym2',zone:2,weatherOptions:['clear'],weightClass:'heavy',musicCue:'zone2',doors:{right:{col:15,row:5},up:{col:7,row:0}},connections:{right:'gym1',up:'gymTraining'},spawnPositions:[{col:3,row:4},{col:3,row:8}],enemyPool:['wrestler','groundNPounder'],name:'Weight Room'},
+    gym2:{id:'gym2',zone:2,weatherOptions:['clear','dust'],weightClass:'heavy',musicCue:'zone2',doors:{right:{col:15,row:5},up:{col:7,row:0}},connections:{right:'gym1',up:'gymTraining'},spawnPositions:[{col:3,row:4},{col:3,row:8}],enemyPool:['wrestler','groundNPounder'],name:'Weight Room'},
     gym3:{id:'gym3',zone:2,weatherOptions:['clear'],weightClass:'light',musicCue:'zone2',doors:{left:{col:0,row:5}},connections:{left:'gym1'},spawnPositions:[{col:4,row:4},{col:11,row:8}],enemyPool:['striker','kickboxer'],name:'Locker Room'},
-    gym4:{id:'gym4',zone:2,weatherOptions:['clear'],weightClass:'middle',musicCue:'zone2',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym1',up:'gym5'},spawnPositions:[{col:3,row:3},{col:12,row:3},{col:3,row:8},{col:12,row:8}],enemyPool:['judoka','wrestler','coach'],trainingTypes:['speed','accuracy','endurance'],trainingLabel:'Mat Area Drills',name:'Mat Area'},
+    gym4:{id:'gym4',zone:2,weatherOptions:['clear','dust'],weightClass:'middle',musicCue:'zone2',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym1',up:'gym5'},spawnPositions:[{col:3,row:3},{col:12,row:3},{col:3,row:8},{col:12,row:8}],enemyPool:['judoka','wrestler','coach'],trainingTypes:['speed','accuracy','endurance'],trainingLabel:'Mat Area Drills',name:'Mat Area'},
     gym5:{id:'gym5',zone:2,weatherOptions:['clear'],weightClass:'middle',musicCue:'boss',isBossRoom:true,doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'gym4',up:'oct1'},spawnPositions:[{col:7,row:6}],enemyPool:['shadowRival'],name:"Coach's Office"},
-    gymTraining:{id:'gymTraining',zone:2,weatherOptions:['clear'],weightClass:'middle',musicCue:'zone2',doors:{down:{col:7,row:11}},connections:{down:'gym2'},spawnPositions:[{col:5,row:4},{col:9,row:4},{col:7,row:8}],enemyPool:['stunner','coach'],trainingTypes:['speed','accuracy','endurance'],trainingLabel:'Conditioning Corner',name:'Conditioning Corner'}
+    gymTraining:{id:'gymTraining',zone:2,weatherOptions:['clear','dust'],weightClass:'middle',musicCue:'zone2',doors:{down:{col:7,row:11}},connections:{down:'gym2'},spawnPositions:[{col:5,row:4},{col:9,row:4},{col:7,row:8}],enemyPool:['stunner','coach'],trainingTypes:['speed','accuracy','endurance'],trainingLabel:'Conditioning Corner',name:'Conditioning Corner'}
   },
   ZONE3_ROOMS: {
-    oct1:{id:'oct1',zone:3,weatherOptions:['night','clear'],weightClass:'middle',musicCue:'zone3',cornerPressure:true,crowdSize:180,baseHype:0.25,maxHype:0.7,crowdLabel:'Tunnel gamblers crowd',doors:{down:{col:7,row:11},right:{col:15,row:5},up:{col:7,row:0}},connections:{down:'gym5',right:'oct2',up:'oct3'},spawnPositions:[{col:4,row:4},{col:11,row:8}],enemyPool:['bully','bully'],name:'Tunnel Entrance',narratorStyle:'arenaPrelims'},
-    oct2:{id:'oct2',zone:3,weatherOptions:['night','wind'],weightClass:'heavy',musicCue:'zone3',cornerPressure:true,crowdSize:120,baseHype:0.2,maxHype:0.65,crowdLabel:'Back-alley railbirds',doors:{left:{col:0,row:5},up:{col:7,row:0}},connections:{left:'oct1',up:'survival1'},spawnPositions:[{col:3,row:4},{col:12,row:4},{col:8,row:8}],enemyPool:['bjjBlackBelt','bully'],name:'Back Alley',narratorStyle:'arenaPrelims'},
-    oct3:{id:'oct3',zone:3,weatherOptions:['night','clear'],weightClass:'heavy',musicCue:'zone3',cornerPressure:true,crowdSize:420,baseHype:0.55,maxHype:0.95,crowdLabel:'Pit crowd roaring',ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],doors:{down:{col:7,row:11},left:{col:0,row:5},up:{col:7,row:0}},connections:{down:'oct1',left:'survival1',up:'oct4'},spawnPositions:[{col:4,row:3},{col:11,row:3},{col:4,row:8},{col:11,row:8}],enemyPool:['bully','feintMaster','bjjBlackBelt'],name:'The Pit',narratorStyle:'arenaMain'},
+    oct1:{id:'oct1',zone:3,weatherOptions:['night','clear','fog'],weightClass:'middle',musicCue:'zone3',cornerPressure:true,crowdSize:180,baseHype:0.25,maxHype:0.7,crowdLabel:'Tunnel gamblers crowd',doors:{down:{col:7,row:11},right:{col:15,row:5},up:{col:7,row:0}},connections:{down:'gym5',right:'oct2',up:'oct3'},spawnPositions:[{col:4,row:4},{col:11,row:8}],enemyPool:['bully','bully'],name:'Tunnel Entrance',narratorStyle:'arenaPrelims'},
+    oct2:{id:'oct2',zone:3,weatherOptions:['night','wind','fog'],weightClass:'heavy',musicCue:'zone3',cornerPressure:true,crowdSize:120,baseHype:0.2,maxHype:0.65,crowdLabel:'Back-alley railbirds',doors:{left:{col:0,row:5},up:{col:7,row:0}},connections:{left:'oct1',up:'survival1'},spawnPositions:[{col:3,row:4},{col:12,row:4},{col:8,row:8}],enemyPool:['bjjBlackBelt','bully'],name:'Back Alley',narratorStyle:'arenaPrelims'},
+    oct3:{id:'oct3',zone:3,weatherOptions:['night','clear','fog'],weightClass:'heavy',musicCue:'zone3',cornerPressure:true,crowdSize:420,baseHype:0.55,maxHype:0.95,crowdLabel:'Pit crowd roaring',ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],doors:{down:{col:7,row:11},left:{col:0,row:5},up:{col:7,row:0}},connections:{down:'oct1',left:'survival1',up:'oct4'},spawnPositions:[{col:4,row:3},{col:11,row:3},{col:4,row:8},{col:11,row:8}],enemyPool:['bully','feintMaster','bjjBlackBelt'],name:'The Pit',narratorStyle:'arenaMain'},
     oct4:{id:'oct4',zone:3,weatherOptions:['night','clear'],weightClass:'heavy',musicCue:'boss',isBossRoom:true,cornerPressure:true,crowdSize:820,baseHype:0.85,maxHype:1.0,crowdLabel:'Championship pit crowd',ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct3',up:'dojo1'},spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:"Champion's Arena",narratorStyle:'arenaTitle'},
-    survival1:{id:'survival1',zone:3,weatherOptions:['night','clear'],weightClass:'middle',musicCue:'zone3',cornerPressure:true,crowdSize:260,baseHype:0.4,maxHype:0.8,crowdLabel:'VIP balcony chatter',doors:{right:{col:15,row:5},down:{col:7,row:11}},connections:{right:'oct3',down:'oct2'},spawnPositions:[{col:5,row:4},{col:10,row:4}],enemyPool:['feintMaster','feintMaster'],name:'VIP Lounge',narratorStyle:'arenaPrelims'}
+    survival1:{id:'survival1',zone:3,weatherOptions:['night','clear','fog'],weightClass:'middle',musicCue:'zone3',cornerPressure:true,crowdSize:260,baseHype:0.4,maxHype:0.8,crowdLabel:'VIP balcony chatter',doors:{right:{col:15,row:5},down:{col:7,row:11}},connections:{right:'oct3',down:'oct2'},spawnPositions:[{col:5,row:4},{col:10,row:4}],enemyPool:['feintMaster','feintMaster'],name:'VIP Lounge',narratorStyle:'arenaPrelims'}
   },
   // Zone 4: Champion's Dojo – endless arena unlocked after championship
   ZONE4_ROOMS: {
@@ -46,7 +46,104 @@ window.MMA.Zones = {
       dojoMode:'championsDojo'
     }
   },
-  getRoom: function(roomId){ return this.ZONE1_ROOMS[roomId] || this.ZONE2_ROOMS[roomId] || this.ZONE3_ROOMS[roomId] || this.ZONE4_ROOMS[roomId]; },
+  ROOM_DECORATIONS: {
+    room1: [
+      { col:2, row:9, type:'barrel' },
+      { col:6, row:2, type:'graffiti', w:1.6, h:0.8, alpha:0.82 },
+      { col:13, row:2, type:'streetLamp' },
+      { col:13, row:9, type:'trashCan' }
+    ],
+    room2: [
+      { col:2, row:3, type:'trashCan' },
+      { col:3, row:9, type:'barrel' },
+      { col:12, row:2, type:'graffiti', w:1.5, h:0.8, alpha:0.8 },
+      { col:13, row:8, type:'crates' }
+    ],
+    room3: [
+      { col:2, row:5, type:'streetLamp' },
+      { col:12, row:2, type:'graffiti', w:1.8, h:0.85, alpha:0.86 },
+      { col:13, row:9, type:'barrel' },
+      { col:5, row:9, type:'crates' }
+    ],
+    room4: [
+      { col:2, row:8, type:'crates' },
+      { col:13, row:8, type:'barrel' },
+      { col:11, row:2, type:'graffiti', w:1.4, h:0.8, alpha:0.76 }
+    ],
+    gym1: [
+      { col:3, row:2, type:'heavyBag' },
+      { col:12, row:2, type:'speedBag' },
+      { col:7, row:7, type:'boxingRing', w:2.8, h:1.8, depth:420, alpha:0.8 }
+    ],
+    gym2: [
+      { col:3, row:2, type:'weightRack' },
+      { col:12, row:2, type:'weightRack' },
+      { col:8, row:8, type:'mirror', h:1.3, alpha:0.92 }
+    ],
+    gym3: [
+      { col:3, row:2, type:'mirror', h:1.25, alpha:0.9 },
+      { col:12, row:3, type:'heavyBag' },
+      { col:12, row:8, type:'speedBag' }
+    ],
+    gym4: [
+      { col:3, row:2, type:'mirror', h:1.2, alpha:0.88 },
+      { col:12, row:2, type:'heavyBag' },
+      { col:7, row:8, type:'boxingRing', w:2.5, h:1.5, depth:410, alpha:0.74 }
+    ],
+    gym5: [
+      { col:7, row:2, type:'mirror', h:1.3, alpha:0.9 },
+      { col:4, row:8, type:'weightRack' },
+      { col:11, row:8, type:'weightRack' }
+    ],
+    gymTraining: [
+      { col:4, row:2, type:'speedBag' },
+      { col:10, row:2, type:'heavyBag' },
+      { col:7, row:8, type:'weightRack' }
+    ],
+    oct1: [
+      { col:7, row:8, type:'entranceTunnel', w:2.7, h:1.6, depth:440, alpha:0.88 },
+      { col:3, row:2, type:'crowdSilhouette', w:2.4, h:1.2, alpha:0.62 },
+      { col:12, row:2, type:'crowdSilhouette', w:2.4, h:1.2, alpha:0.62 }
+    ],
+    oct2: [
+      { col:2, row:2, type:'cornerPost' },
+      { col:13, row:2, type:'cornerPost' },
+      { col:7, row:8, type:'crowdSilhouette', w:2.7, h:1.2, alpha:0.66 }
+    ],
+    oct3: [
+      { col:7, row:6, type:'octagon', w:2.9, h:2.3, depth:460, alpha:0.78 },
+      { col:2, row:2, type:'cornerPost' },
+      { col:13, row:2, type:'cornerPost' },
+      { col:7, row:1, type:'crowdSilhouette', w:2.8, h:1.2, alpha:0.64 }
+    ],
+    oct4: [
+      { col:7, row:6, type:'octagon', w:3.0, h:2.35, depth:470, alpha:0.82 },
+      { col:2, row:2, type:'cornerPost' },
+      { col:13, row:2, type:'cornerPost' },
+      { col:7, row:1, type:'crowdSilhouette', w:3.0, h:1.2, alpha:0.68 }
+    ],
+    survival1: [
+      { col:7, row:2, type:'crowdSilhouette', w:2.8, h:1.2, alpha:0.65 },
+      { col:4, row:8, type:'entranceTunnel', w:2.2, h:1.4, depth:430, alpha:0.82 },
+      { col:11, row:8, type:'cornerPost' }
+    ],
+    dojo1: [
+      { col:7, row:6, type:'octagon', w:3.0, h:2.35, depth:470, alpha:0.84 },
+      { col:3, row:2, type:'crowdSilhouette', w:2.4, h:1.15, alpha:0.6 },
+      { col:12, row:2, type:'crowdSilhouette', w:2.4, h:1.15, alpha:0.6 }
+    ]
+  },
+  _cloneDecorationPositions: function(roomId) {
+    var positions = this.ROOM_DECORATIONS[roomId] || [];
+    return positions.map(function(pos) {
+      return Object.assign({}, pos);
+    });
+  },
+  getRoom: function(roomId){
+    var room = this.ZONE1_ROOMS[roomId] || this.ZONE2_ROOMS[roomId] || this.ZONE3_ROOMS[roomId] || this.ZONE4_ROOMS[roomId];
+    if (room && !room.decorationPositions) room.decorationPositions = this._cloneDecorationPositions(roomId);
+    return room;
+  },
   getConnectedRoom: function(roomId, direction){ var r = this.getRoom(roomId); return r && r.connections ? r.connections[direction] : null; },
   getRoomSpawnPositions: function(roomId){ var r = this.getRoom(roomId); return r ? r.spawnPositions : []; },
   getRoomEnemyPool: function(roomId){ var r = this.getRoom(roomId); return r ? r.enemyPool : ['streetThug']; },
@@ -64,6 +161,10 @@ window.MMA.Zones = {
     var room = typeof roomIdOrRoom === 'string' ? this.getRoom(roomIdOrRoom) : roomIdOrRoom;
     if (!room) return;
     window.MMA_AUDIO.playBGM(this.getMusicCueForRoom(room));
+    if (window.MMA_AUDIO.ambient && typeof window.MMA_AUDIO.ambient.play === 'function') {
+      var ambientType = room.zone === 1 ? 'traffic' : (room.zone === 2 ? 'gym' : 'crowd');
+      window.MMA_AUDIO.ambient.play(ambientType);
+    }
   },
   getDoorDirection: function(room, col, row){ if (!room || !room.doors) return null; for (var dir in room.doors) if (room.doors[dir].col === col && room.doors[dir].row === row) return dir; return null; },
   // Weight class helpers
@@ -276,6 +377,18 @@ window.MMA.Zones = {
       weather.projectileDrift = 0;
       weather.label = 'Night';
       weather.message = 'Night lights limit visibility – pick your shots carefully.';
+    } else if (t === 'fog') {
+      weather.slippery = false;
+      weather.visibilityMultiplier = 0.72;
+      weather.projectileDrift = 0;
+      weather.label = 'Fog';
+      weather.message = 'Fog hangs low over the room and makes openings harder to read.';
+    } else if (t === 'dust') {
+      weather.slippery = false;
+      weather.visibilityMultiplier = 0.88;
+      weather.projectileDrift = 0.08;
+      weather.label = 'Dust';
+      weather.message = 'Dust hangs in the air and softens long sight-lines.';
     } else if (t === 'wind') {
       weather.slippery = false;
       weather.visibilityMultiplier = 1.0;
@@ -317,6 +430,9 @@ window.MMA.Zones = {
     } else if (!active) {
       scene.registry.set('weatherLabel', '');
     }
+    if (window.MMA && MMA.VFX && typeof MMA.VFX.applyRoomWeather === 'function') {
+      MMA.VFX.applyRoomWeather(scene, room, weather);
+    }
   },
   buildRoom: function(scene, roomId) {
     var DT = CONFIG.DISPLAY_TILE, room = this.getRoom(roomId), zone = room && room.zone ? room.zone : 1;
@@ -341,6 +457,9 @@ window.MMA.Zones = {
       }
     }
     if (room) {
+      if (window.MMA && MMA.Sprites && typeof MMA.Sprites.spawnZoneDecorations === 'function') {
+        MMA.Sprites.spawnZoneDecorations(scene, zone, room);
+      }
       // Set basic zone message
       scene.registry.set('gameMessage', 'ZONE ' + zone + ' - ' + room.name);
       scene.time.delayedCall(2000, function(){ scene.registry.set('gameMessage', ''); });

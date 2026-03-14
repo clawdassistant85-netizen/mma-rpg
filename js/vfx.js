@@ -393,9 +393,275 @@ window.MMA.VFX = {
   }
 };
 
+window.MMA.VFX._rememberWeatherObject = function(scene, obj) {
+  if (!scene || !obj) return obj;
+  if (!scene._mmaWeatherFxObjects) scene._mmaWeatherFxObjects = [];
+  scene._mmaWeatherFxObjects.push(obj);
+  return obj;
+};
+
+window.MMA.VFX._rememberWeatherCleanup = function(scene, cleanupFn) {
+  if (!scene || typeof cleanupFn !== 'function') return;
+  if (!scene._mmaWeatherFxCleanup) scene._mmaWeatherFxCleanup = [];
+  scene._mmaWeatherFxCleanup.push(cleanupFn);
+};
+
+window.MMA.VFX._createWeatherGraphics = function(scene, depth, updater) {
+  if (!scene || !scene.add || !scene.events) return null;
+
+  var layer = this._rememberWeatherObject(scene, scene.add.graphics().setDepth(depth || 60));
+  var tick = function(time, delta) {
+    if (!layer || !layer.active) return;
+    updater(layer, delta || 16);
+  };
+
+  scene.events.on('update', tick);
+  this._rememberWeatherCleanup(scene, function() {
+    if (scene && scene.events) scene.events.off('update', tick);
+  });
+  updater(layer, 16);
+  return layer;
+};
+
+window.MMA.VFX.clearWeatherEffects = function(scene) {
+  if (!scene) return;
+
+  var cleanups = scene._mmaWeatherFxCleanup || [];
+  while (cleanups.length) {
+    var cleanup = cleanups.pop();
+    try {
+      cleanup();
+    } catch (err) {}
+  }
+
+  var objects = scene._mmaWeatherFxObjects || [];
+  while (objects.length) {
+    var obj = objects.pop();
+    if (obj && obj.destroy) obj.destroy();
+  }
+
+  scene.weatherParticles = null;
+  scene.fogLayer = null;
+  scene.lightingOverlay = null;
+  scene.windLayer = null;
+};
+
+window.MMA.VFX.weatherEffects = {
+  clear: function(scene) {
+    window.MMA.VFX.clearWeatherEffects(scene);
+  },
+
+  rain: function(scene) {
+    var VFX = window.MMA.VFX;
+    var drops = [];
+    for (var i = 0; i < 36; i++) {
+      drops.push({
+        x: VFX._randomRange(-40, 808),
+        y: VFX._randomRange(-580, 576),
+        len: VFX._randomRange(10, 20),
+        speed: VFX._randomRange(360, 520),
+        drift: VFX._randomRange(42, 75)
+      });
+    }
+
+    return VFX._createWeatherGraphics(scene, 100, function(layer, delta) {
+      var step = delta / 1000;
+      layer.clear();
+      layer.lineStyle(2, 0xb7d8ff, 0.4);
+      for (var idx = 0; idx < drops.length; idx++) {
+        var drop = drops[idx];
+        drop.x += drop.drift * step;
+        drop.y += drop.speed * step;
+        if (drop.y - drop.len > 620 || drop.x > 830) {
+          drop.x = VFX._randomRange(-70, 760);
+          drop.y = VFX._randomRange(-160, -20);
+        }
+        layer.lineBetween(drop.x, drop.y, drop.x - 5, drop.y - drop.len);
+      }
+    });
+  },
+
+  fog: function(scene, density) {
+    var VFX = window.MMA.VFX;
+    var fog = VFX._rememberWeatherObject(scene, scene.add.container(0, 0).setDepth(50));
+    var alpha = typeof density === 'number' ? density : 0.28;
+    var layers = [
+      { x: 150, y: 180, w: 320, h: 140, speed: 18 },
+      { x: 520, y: 250, w: 380, h: 160, speed: -24 },
+      { x: 330, y: 420, w: 430, h: 180, speed: 12 }
+    ];
+
+    for (var i = 0; i < layers.length; i++) {
+      var cfg = layers[i];
+      var puff = scene.add.ellipse(cfg.x, cfg.y, cfg.w, cfg.h, 0xdde6f2, alpha);
+      puff.setBlendMode(Phaser.BlendModes.SCREEN);
+      fog.add(puff);
+      scene.tweens.add({
+        targets: puff,
+        x: cfg.x + cfg.speed,
+        alpha: alpha * 0.65,
+        duration: 4200 + i * 600,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+    }
+    return fog;
+  },
+
+  dust: function(scene) {
+    var VFX = window.MMA.VFX;
+    var motes = [];
+    for (var i = 0; i < 22; i++) {
+      motes.push({
+        x: VFX._randomRange(0, 768),
+        y: VFX._randomRange(0, 576),
+        r: VFX._randomRange(1, 3),
+        dx: VFX._randomRange(-8, 10),
+        dy: VFX._randomRange(-10, 6),
+        alpha: VFX._randomRange(0.08, 0.22)
+      });
+    }
+
+    return VFX._createWeatherGraphics(scene, 45, function(layer, delta) {
+      var step = delta / 1000;
+      layer.clear();
+      for (var idx = 0; idx < motes.length; idx++) {
+        var mote = motes[idx];
+        mote.x += mote.dx * step;
+        mote.y += mote.dy * step;
+        if (mote.x < -10) mote.x = 778;
+        if (mote.x > 778) mote.x = -10;
+        if (mote.y < -10) mote.y = 586;
+        if (mote.y > 586) mote.y = -10;
+        layer.fillStyle(0xd9c39a, mote.alpha);
+        layer.fillCircle(mote.x, mote.y, mote.r);
+      }
+    });
+  },
+
+  wind: function(scene) {
+    var VFX = window.MMA.VFX;
+    var gusts = [];
+    for (var i = 0; i < 16; i++) {
+      gusts.push({
+        x: VFX._randomRange(-220, 760),
+        y: VFX._randomRange(60, 540),
+        len: VFX._randomRange(26, 58),
+        speed: VFX._randomRange(120, 220),
+        alpha: VFX._randomRange(0.08, 0.18)
+      });
+    }
+
+    return VFX._createWeatherGraphics(scene, 65, function(layer, delta) {
+      var step = delta / 1000;
+      layer.clear();
+      for (var idx = 0; idx < gusts.length; idx++) {
+        var gust = gusts[idx];
+        gust.x += gust.speed * step;
+        if (gust.x - gust.len > 820) {
+          gust.x = VFX._randomRange(-220, -40);
+          gust.y = VFX._randomRange(60, 540);
+        }
+        layer.lineStyle(2, 0xcfe8ff, gust.alpha);
+        layer.lineBetween(gust.x, gust.y, gust.x + gust.len, gust.y + 2);
+      }
+    });
+  },
+
+  night: function(scene) {
+    var VFX = window.MMA.VFX;
+    var overlay = VFX._rememberWeatherObject(scene, scene.add.rectangle(384, 288, 768, 576, 0x081226, 0.28).setDepth(40));
+    overlay.setScrollFactor(0);
+
+    var lampA = VFX._rememberWeatherObject(scene, scene.add.ellipse(118, 94, 160, 120, 0x4d6b9d, 0.12).setDepth(41));
+    lampA.setBlendMode(Phaser.BlendModes.SCREEN);
+    lampA.setScrollFactor(0);
+    var lampB = VFX._rememberWeatherObject(scene, scene.add.ellipse(650, 118, 190, 140, 0x3f5f90, 0.1).setDepth(41));
+    lampB.setBlendMode(Phaser.BlendModes.SCREEN);
+    lampB.setScrollFactor(0);
+
+    scene.tweens.add({
+      targets: overlay,
+      alpha: { from: 0.24, to: 0.34 },
+      duration: 1600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    scene.tweens.add({
+      targets: [lampA, lampB],
+      alpha: { from: 0.08, to: 0.15 },
+      duration: 1900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
+    scene.lightingOverlay = overlay;
+    return overlay;
+  }
+};
+
+window.MMA.VFX.applyRoomWeather = function(scene, roomIdOrRoom, weather) {
+  if (!scene) return null;
+
+  var room = typeof roomIdOrRoom === 'string' && window.MMA && MMA.Zones ? MMA.Zones.getRoom(roomIdOrRoom) : roomIdOrRoom;
+  var activeWeather = weather;
+  if (!activeWeather && window.MMA && MMA.Zones && typeof MMA.Zones.chooseWeatherForRoom === 'function') {
+    activeWeather = MMA.Zones.chooseWeatherForRoom(scene, room);
+  }
+  if (!activeWeather) activeWeather = { type: 'clear' };
+
+  this.weatherEffects.clear(scene);
+
+  if (activeWeather.type === 'rain') {
+    scene.weatherParticles = this.weatherEffects.rain(scene);
+  } else if (activeWeather.type === 'fog') {
+    scene.fogLayer = this.weatherEffects.fog(scene, room && room.zone >= 3 ? 0.34 : 0.24);
+  } else if (activeWeather.type === 'dust') {
+    scene.weatherParticles = this.weatherEffects.dust(scene);
+  } else if (activeWeather.type === 'wind') {
+    scene.windLayer = this.weatherEffects.wind(scene);
+  }
+
+  if (activeWeather.type === 'night' || activeWeather.type === 'fog' || (activeWeather.type === 'rain' && room && room.zone === 1)) {
+    scene.lightingOverlay = this.weatherEffects.night(scene);
+  }
+
+  return activeWeather.type;
+};
+
+window.MMA.VFX.comboDisplay = {
+  create: function(scene) {
+    if (!scene || !window.MMA || !MMA.UI || typeof MMA.UI.showComboCounter !== 'function') return null;
+    return MMA.UI.showComboCounter(scene);
+  },
+
+  update: function(scene, count) {
+    if (!scene || !window.MMA || !MMA.UI) return;
+    if (count > 0) {
+      if (!MMA.UI.comboCounter || !MMA.UI.comboCounter.container) this.create(scene);
+      if (typeof MMA.UI.updateComboCounter === 'function') MMA.UI.updateComboCounter(scene, count);
+    } else if (typeof MMA.UI.hideComboCounter === 'function') {
+      MMA.UI.hideComboCounter(scene);
+    }
+  }
+};
+
 (function() {
   var VFX = window.MMA && window.MMA.VFX;
   if (!VFX) return;
+
+  function getActiveGameScene() {
+    if (!window.phaserGame || !window.phaserGame.scene || typeof window.phaserGame.scene.getScene !== 'function') return null;
+    try {
+      var scene = window.phaserGame.scene.getScene('GameScene');
+      return scene && scene.scene && scene.scene.isActive() ? scene : scene;
+    } catch (err) {
+      return null;
+    }
+  }
 
   function installUiPatch() {
     if (!window.MMA || !MMA.UI || MMA.UI._mmaVfxDamageNumbers) return false;
@@ -443,10 +709,42 @@ window.MMA.VFX = {
     return true;
   }
 
+  function installComboPatch() {
+    if (!window.MMA || !MMA.UI || MMA.UI._mmaComboDisplayPatched) return false;
+
+    var originalIncrementCombo = MMA.UI.incrementCombo;
+    MMA.UI.incrementCombo = function() {
+      var result = originalIncrementCombo.apply(this, arguments);
+      var scene = getActiveGameScene();
+      if (scene) VFX.comboDisplay.update(scene, this.fightStats.currentCombo || 0);
+      return result;
+    };
+
+    var originalResetCombo = MMA.UI.resetCombo;
+    MMA.UI.resetCombo = function() {
+      var result = originalResetCombo.apply(this, arguments);
+      var scene = getActiveGameScene();
+      if (scene) VFX.comboDisplay.update(scene, 0);
+      return result;
+    };
+
+    var originalResetFightStats = MMA.UI.resetFightStats;
+    MMA.UI.resetFightStats = function() {
+      var result = originalResetFightStats.apply(this, arguments);
+      var scene = getActiveGameScene();
+      if (scene && typeof this.destroyComboCounter === 'function') this.destroyComboCounter();
+      return result;
+    };
+
+    MMA.UI._mmaComboDisplayPatched = true;
+    return true;
+  }
+
   function retryPatches(remaining) {
     installEnemyPatch();
     installGroundPatch();
     installUiPatch();
+    installComboPatch();
     if (remaining <= 0 || (window.MMA && window.MMA.UI && window.MMA.UI._mmaVfxDamageNumbers)) return;
     window.setTimeout(function() {
       retryPatches(remaining - 1);

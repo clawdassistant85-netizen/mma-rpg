@@ -401,6 +401,9 @@ window.MMA.Enemies = {
     mmaChamp:{name:'MMA Champ',hp:200,maxHp:200,speed:85,attackDamage:25,attackCooldownMax:1100,attackRange:70,chaseRange:260,color:0xffd700,xpReward:100,teachesMove:'spinningBackFist',zone:3,aiPattern:'chase'},
     kickboxer:{name:'Kickboxer',hp:70,maxHp:70,speed:100,attackDamage:16,attackCooldownMax:900,attackRange:90,chaseRange:280,color:0x00cccc,xpReward:35,teachesMove:'roundhouseKick',zone:2,aiPattern:'kickboxer',groundDefense:0.2,groundEscape:0.1},
     striker:{name:'Striker',hp:55,maxHp:55,speed:95,attackDamage:10,attackCooldownMax:600,attackRange:50,chaseRange:260,color:0xff3366,xpReward:32,teachesMove:'jab',zone:2,aiPattern:'combo',groundDefense:0.2,groundEscape:0.1},
+    boxer:{name:'Boxer',hp:68,maxHp:68,speed:108,attackDamage:12,attackCooldownMax:700,attackRange:58,chaseRange:260,color:0xcc4444,xpReward:38,teachesMove:'jab',zone:2,aiPattern:'boxer',groundDefense:0.25,groundEscape:0.2},
+    karateka:{name:'Karateka',hp:82,maxHp:82,speed:78,attackDamage:18,attackCooldownMax:1400,attackRange:82,chaseRange:230,color:0xf1f1f1,xpReward:42,teachesMove:'roundhouseKick',zone:2,aiPattern:'karateka',groundDefense:0.3,groundEscape:0.2},
+    streetFighter:{name:'Street Fighter',hp:92,maxHp:92,speed:92,attackDamage:17,attackCooldownMax:1150,attackRange:68,chaseRange:270,color:0xff9922,xpReward:55,teachesMove:'bodyShot',zone:3,aiPattern:'streetFighter',groundDefense:0.35,groundEscape:0.3},
     stunner:{name:'Stunner',hp:80,maxHp:80,speed:70,attackDamage:12,attackCooldownMax:1200,attackRange:60,chaseRange:250,color:0x8800ff,xpReward:45,teachesMove:null,zone:2,aiPattern:'stunner',groundDefense:0.3,groundEscape:0.2},
     // Coach Enemy: support-type that boosts nearby allies (+15% attack speed per Coach in radius)
     coach:{name:'Coach',hp:60,maxHp:60,speed:88,attackDamage:6,attackCooldownMax:1800,attackRange:40,chaseRange:260,color:0x33ffcc,xpReward:45,teachesMove:null,zone:2,aiPattern:'coach'},
@@ -446,7 +449,10 @@ window.MMA.Enemies = {
     eliteJudoka:{baseType:'judoka',name:'Elite Judoka',hpMultiplier:2,attackMultiplier:1.6,speedBonus:15,color:0xaa66ff,colorGlow:0x8800ff,xpMultiplier:2.5,dropChance:0.25,rareItem:'giBelt'},
     eliteGroundNPounder:{baseType:'groundNPounder',name:'Elite Ground Pounder',hpMultiplier:2,attackMultiplier:1.5,speedBonus:8,color:0xffaa66,colorGlow:0xff8800,xpMultiplier:2.5,dropChance:0.2,rareItem:'kneePads'},
     eliteBJJ:{baseType:'bjjBlackBelt',name:'Elite BJJ Master',hpMultiplier:2,attackMultiplier:1.7,speedBonus:18,color:0x444444,colorGlow:0x222222,xpMultiplier:3,dropChance:0.3,rareItem:'submissionGloves'},
-    eliteStriker:{baseType:'striker',name:'Elite Striker',hpMultiplier:2,attackMultiplier:1.6,speedBonus:20,color:0xff6699,colorGlow:0xff0066,xpMultiplier:2.5,dropChance:0.22,rareItem:'speedPotion'}
+    eliteStriker:{baseType:'striker',name:'Elite Striker',hpMultiplier:2,attackMultiplier:1.6,speedBonus:20,color:0xff6699,colorGlow:0xff0066,xpMultiplier:2.5,dropChance:0.22,rareItem:'speedPotion'},
+    eliteBoxer:{baseType:'boxer',name:'Elite Boxer',hpMultiplier:2,attackMultiplier:1.5,speedBonus:18,color:0xff6666,colorGlow:0xff0000,xpMultiplier:2.6,dropChance:0.24,rareItem:'speedPotion',specialAbility:'counterStance'},
+    eliteKarateka:{baseType:'karateka',name:'Sensei',hpMultiplier:2.4,attackMultiplier:1.75,speedBonus:14,color:0xffffff,colorGlow:0x00ffff,xpMultiplier:3,dropChance:0.28,rareItem:'giBelt',specialAbility:'focusStrike'},
+    eliteStreetFighter:{baseType:'streetFighter',name:'Chaos King',hpMultiplier:2.2,attackMultiplier:1.65,speedBonus:16,color:0xffaa44,colorGlow:0xff5500,xpMultiplier:2.8,dropChance:0.26,rareItem:'powerGloves',specialAbility:'chaosRush'}
   },
   // Chance to spawn elite instead of regular (15%)
   ELITE_SPAWN_CHANCE: 0.15,
@@ -499,6 +505,21 @@ window.MMA.Enemies = {
     }
     
     return item;
+  },
+
+  applyEliteAbility: function(enemy, ability) {
+    if (!enemy || !ability) return;
+    enemy.eliteAbility = ability;
+    if (ability === 'counterStance') {
+      enemy.counterWindow = 400;
+      enemy.counterCooldown = 0;
+    } else if (ability === 'focusStrike') {
+      enemy.focusCharge = 0;
+      enemy.focusReady = false;
+    } else if (ability === 'chaosRush') {
+      enemy.chaosRushTimer = 0;
+      enemy.chaosRushActive = false;
+    }
   },
 
   // Tag Team AI: paired enemies alternate who "pressures" the player.
@@ -579,6 +600,99 @@ window.MMA.Enemies = {
     }
   },
 
+  coordination: {
+    COOLDOWN_MS: 2600,
+    DURATION_MS: 1400,
+    RETREAT_THRESHOLD: 0.22,
+    checkCoordination: function(scene, delta) {
+      if (!scene || !scene.player || !scene.enemies) return;
+      if (scene._mmaCoordinationCooldown === undefined) scene._mmaCoordinationCooldown = 0;
+      if (scene._mmaCoordinationCooldown > 0) {
+        scene._mmaCoordinationCooldown -= delta;
+        if (scene._mmaCoordinationCooldown < 0) scene._mmaCoordinationCooldown = 0;
+      }
+      if (scene._mmaCoordinationCooldown > 0) return;
+
+      var fighters = scene.enemies.filter(function(e) {
+        return e && e.active && e.state !== 'dead' && !e.isBoss && !e.isFleeing;
+      });
+      if (fighters.length < 2) return;
+      if (Math.random() > 0.005 * (delta / 16)) return;
+
+      var leader = fighters[Math.floor(Math.random() * fighters.length)];
+      var flankers = fighters.filter(function(e) { return e !== leader; }).slice(0, 2);
+      if (!leader || !flankers.length) return;
+
+      var callout = ['FLANK HIM!', 'PRESS NOW!', 'CUT HIM OFF!'][Math.floor(Math.random() * 3)];
+      if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        MMA.UI.showDamageText(scene, leader.x, leader.y - 46, callout, '#ff8800');
+      }
+
+      leader.coordinationRole = 'press';
+      leader.coordinationTimer = this.DURATION_MS;
+      for (var i = 0; i < flankers.length; i++) {
+        flankers[i].coordinationRole = 'flank';
+        flankers[i].coordinationSide = i === 0 ? 1 : -1;
+        flankers[i].coordinationTimer = this.DURATION_MS + i * 160;
+      }
+
+      scene._mmaCoordinationCooldown = this.COOLDOWN_MS;
+    },
+
+    updateEnemy: function(enemy, player, scene, delta) {
+      if (!enemy || !player || !enemy.coordinationTimer) return false;
+
+      enemy.coordinationTimer -= delta;
+      if (enemy.coordinationTimer <= 0) {
+        enemy.coordinationTimer = 0;
+        enemy.coordinationRole = null;
+        enemy.coordinationSide = 0;
+        return false;
+      }
+
+      var dx = player.x - enemy.x;
+      var dy = player.y - enemy.y;
+      var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      var hpRatio = enemy.stats && enemy.stats.maxHp ? (enemy.stats.hp / enemy.stats.maxHp) : 1;
+      var retreat = hpRatio <= this.RETREAT_THRESHOLD;
+      var speed = enemy.type && enemy.type.speed ? enemy.type.speed : (enemy.baseSpeed || 80);
+
+      if (retreat) {
+        enemy.setVelocity(-(dx / dist) * speed * 1.2, -(dy / dist) * speed * 1.2);
+        return true;
+      }
+
+      if (enemy.coordinationRole === 'press') {
+        enemy.setVelocity((dx / dist) * speed * 1.08, (dy / dist) * speed * 1.08);
+        return true;
+      }
+
+      if (enemy.coordinationRole === 'flank') {
+        var angle = Math.atan2(dy, dx) + ((enemy.coordinationSide || 1) * 0.9);
+        var targetX = player.x - Math.cos(angle) * 74;
+        var targetY = player.y - Math.sin(angle) * 74;
+        var tx = targetX - enemy.x;
+        var ty = targetY - enemy.y;
+        var flankDist = Math.sqrt(tx * tx + ty * ty) || 1;
+        enemy.setVelocity((tx / flankDist) * speed * 1.04, (ty / flankDist) * speed * 1.04);
+        return true;
+      }
+
+      return false;
+    }
+  },
+
+  _playEnemyAnimation: function(scene, enemy, animationKey) {
+    if (!scene || !enemy || !window.MMA || !MMA.Sprites || typeof MMA.Sprites.playEnemyAnimation !== 'function') return null;
+    return MMA.Sprites.playEnemyAnimation(enemy, animationKey, scene);
+  },
+
+  _didPlayerRecentlyAttack: function(scene, windowMs) {
+    if (!scene || !scene.player) return false;
+    var now = scene.time && typeof scene.time.now === 'number' ? scene.time.now : Date.now();
+    return !!(scene.player._mmaLastAttackAt && now - scene.player._mmaLastAttackAt <= (windowMs || 240));
+  },
+
   AI: {},
   _getPlayerStyle: function(scene) {
     // Best-effort inference without touching other files.
@@ -611,15 +725,18 @@ window.MMA.Enemies = {
       if (typeKey === 'muayThaiFighter') eliteKey = 'eliteMuayThai';
       if (typeKey === 'groundNPounder') eliteKey = 'eliteGroundNPounder';
       if (typeKey === 'bjjBlackBelt') eliteKey = 'eliteBJJ';
+      if (typeKey === 'streetFighter') eliteKey = 'eliteStreetFighter';
       
       if (this.ELITE_TYPES[eliteKey]) {
         eliteType = this.ELITE_TYPES[eliteKey];
         baseTypeKey = eliteType.baseType;
       }
     }
-    
+
     var baseType = this.TYPES[baseTypeKey];
     var type = Object.assign({}, baseType);
+    type.id = typeKey;
+    type.typeKey = typeKey;
     
     // Apply elite multipliers
     if (eliteType) {
@@ -689,12 +806,14 @@ window.MMA.Enemies = {
     type.attackDamage = Math.max(1, Math.round(type.attackDamage * 0.36)); type.attackCooldownMax = Math.round(type.attackCooldownMax * 1.8); type.speed = Math.round(type.speed * 0.85);
     if (typeof type.groundDefense !== 'number') type.groundDefense = 0.25;
     if (typeof type.groundEscape !== 'number') type.groundEscape = 0.2;
-    var tex = (baseTypeKey === 'streetThug') ? 'enemy_thug' : 'enemy_brawler';
+    var tex = (window.MMA && MMA.Sprites && typeof MMA.Sprites.resolveEnemyTextureKey === 'function')
+      ? MMA.Sprites.resolveEnemyTextureKey(typeKey, baseTypeKey)
+      : ((baseTypeKey === 'streetThug') ? 'enemy_thug' : 'enemy_brawler');
     var e = scene.physics.add.sprite(x, y, tex);
     e.setDisplaySize(CONFIG.DISPLAY_TILE, CONFIG.DISPLAY_TILE * 1.5); if (baseTypeKey === 'barBrawler') e.setDisplaySize(CONFIG.DISPLAY_TILE * 1.08, CONFIG.DISPLAY_TILE * 1.62);
-    e.body.setSize(24, 36); e.body.setOffset(12, 18); e.stats = { hp: type.hp, maxHp: type.maxHp }; e.type = type; e.typeKey = typeKey; e.baseSpeed = type.speed; // store base speed
+    e.body.setSize(24, 36); e.body.setOffset(12, 18); e.stats = { hp: type.hp, maxHp: type.maxHp }; e.type = type; e.typeKey = typeKey; e.baseTypeKey = baseTypeKey; e.baseSpeed = type.speed; // store base speed
     e.state = 'idle'; e.attackCooldown = 0; e.staggerTimer = 0;
-    e.isBoss = (typeKey === 'mmaChamp'); e.phaseTwo = false;
+    e.isBoss = (typeKey === 'mmaChamp'); e.phaseTwo = false; e.isElite = !!eliteType;
 
     // Tutor Enemy: snapshot player's recent move keys so it can "mirror" your habits.
     if (typeKey === 'tutor') {
@@ -721,6 +840,9 @@ window.MMA.Enemies = {
         repeat: -1,
         ease: 'Sine.easeInOut'
       });
+    }
+    if (eliteType && eliteType.specialAbility) {
+      this.applyEliteAbility(e, eliteType.specialAbility);
     }
 
     // Regenerator visual cue (only if not overridden by elite/boss)
@@ -854,6 +976,7 @@ window.MMA.Enemies = {
     // Tag Team AI: establish pairs per-room and update who is "active".
     self._ensureTagTeams(scene);
     self._updateTagTeams(scene, delta);
+    self.coordination.checkCoordination(scene, delta);
 
     // --- Attack token coordination ---
     var now = Date.now();
@@ -988,9 +1111,40 @@ window.MMA.Enemies = {
         e.enrageSpeedBonus = 0;
         e.enrageAttackBonus = 0;
       }
+
+      if (e.counterCooldown > 0) e.counterCooldown -= delta;
+      if (e.eliteAbility === 'focusStrike') {
+        e.focusCharge = (e.focusCharge || 0) + delta;
+        if (e.focusCharge >= 2200 && !e.focusReady) {
+          e.focusReady = true;
+          if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+            MMA.UI.showDamageText(scene, e.x, e.y - 50, 'FOCUS!', '#66ffff');
+          }
+        }
+      } else if (e.eliteAbility === 'chaosRush') {
+        e.chaosRushTimer = (e.chaosRushTimer || 0) + delta;
+        if (e.chaosRushTimer >= 2600) {
+          e.chaosRushTimer = 0;
+          e.chaosRushActive = true;
+        }
+      }
+
+      var aiStateNow = e.aiState || '';
+      if (e._mmaLastAiState !== aiStateNow) {
+        if (aiStateNow === 'windup' || aiStateNow === 'feintWindup' || aiStateNow === 'focusWindup' || aiStateNow === 'counterWindup' || aiStateNow === 'chaosRush') {
+          self._playEnemyAnimation(scene, e, 'attackWindup');
+        }
+        e._mmaLastAiState = aiStateNow;
+      }
       
       // Apply enrage speed bonus to effective speed calculation later
-      
+      if (e.staggerTimer > 0 && !e._mmaHitAnimQueued) {
+        self._playEnemyAnimation(scene, e, 'hitReaction');
+        e._mmaHitAnimQueued = true;
+      } else if (e.staggerTimer <= 0) {
+        e._mmaHitAnimQueued = false;
+      }
+
       if (e.staggerTimer > 0) { e.staggerTimer -= delta; e.setVelocity(0,0); return; }
       // Flee logic for non-boss enemies
       if (!e.isBoss) {
@@ -1078,6 +1232,11 @@ window.MMA.Enemies = {
       var maxSpeed = e.baseSpeed * 2 * (1 + enrageSpeedBonus);
       e.type.speed = Math.min(e.baseSpeed + bonus, maxSpeed);
 
+      if (self.coordination.updateEnemy(e, scene.player, scene, delta)) {
+        if (e.attackCooldown > 0) e.attackCooldown -= delta;
+        return;
+      }
+
       var ai = self.AI[e.type.aiPattern || 'chase'];
       (ai || self.AI.chase)(e, scene.player, scene, delta);
     });
@@ -1085,6 +1244,10 @@ window.MMA.Enemies = {
   killEnemy: function(scene, enemy) {
     scene.enemiesDefeated = (scene.enemiesDefeated || 0) + 1;
     enemy.state = 'dead';
+    enemy.aiState = 'dead';
+    enemy.setVelocity(0, 0);
+    if (enemy.body) enemy.body.enable = false;
+    this._playEnemyAnimation(scene, enemy, 'deathFrames');
 
     // Loyalty Bond: trigger Vengeance on nearby allies when a non-boss enemy dies
     if (!enemy.isBoss) {
@@ -1122,6 +1285,12 @@ window.MMA.Enemies = {
     
     var contractTier = this.getContractTier(scene);
     var xp = enemy.type.xpReward; scene.player.stats.xp += xp;
+    scene._mmaRoomXpGained = (scene._mmaRoomXpGained || 0) + xp;
+    if (scene.registry) {
+      scene.registry.set('lastEnemyDefeated', enemy.type.name || enemy.typeKey || 'Enemy');
+      scene.registry.set('xpGained', scene._mmaRoomXpGained);
+      scene.registry.set('fightStats', Object.assign({}, MMA.UI.fightStats));
+    }
     MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, '+' + xp + ' XP', '#e8c830');
     
     // Elite enemy rare item drop
@@ -1184,7 +1353,7 @@ window.MMA.Enemies = {
         MMA.UI.recordBossDefeat(bossId, zone, duration);
       }
       scene.registry.set('gameMessage', 'VICTORY!'); scene.cameras.main.flash(500, 255, 215, 0); scene.gameOver = true;
-      scene.registry.set('playerStats', Object.assign({}, scene.player.stats)); scene.registry.set('enemiesDefeated', scene.enemiesDefeated); scene.registry.set('playTime', Math.floor((Date.now() - scene.runStartMs) / 1000));
+      scene.registry.set('playerStats', Object.assign({}, scene.player.stats)); scene.registry.set('enemiesDefeated', scene.enemiesDefeated); scene.registry.set('playTime', Math.floor((Date.now() - scene.runStartMs) / 1000)); scene.registry.set('fightStats', Object.assign({}, MMA.UI.fightStats)); scene.registry.set('xpGained', scene._mmaRoomXpGained || 0); scene.registry.set('bossDefeated', true);
       scene.time.delayedCall(3000, function(){ scene.scene.stop(); scene.scene.launch('VictoryScene'); });
       return;
     }
@@ -1243,7 +1412,10 @@ window.MMA.Enemies = {
     }
     if (enemy._hpBarBg) { enemy._hpBarBg.destroy(); enemy._hpBarFill.destroy(); }
     MMA.Items.spawnDropsForEnemy(scene, enemy);
-    enemy.destroy(); scene.enemies = scene.enemies.filter(function(e){ return e !== enemy; });
+    scene.enemies = scene.enemies.filter(function(e){ return e !== enemy; });
+    scene.time.delayedCall(320, function() {
+      if (enemy && enemy.active) enemy.destroy();
+    });
     if (window.saveGame) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);
     var alive = scene.enemies.filter(function(e){ return e.state !== 'dead' && e.active; });
     if (alive.length === 0) {
@@ -1251,6 +1423,10 @@ window.MMA.Enemies = {
       // Show fight stats
       scene.time.delayedCall(1500, function(){ MMA.UI.showFightStats(scene); });
       scene.time.delayedCall(3500, function(){ scene.registry.set('gameMessage', ''); });
+      if (scene.registry) {
+        scene.registry.set('fightStats', Object.assign({}, MMA.UI.fightStats));
+        scene.registry.set('xpGained', scene._mmaRoomXpGained || 0);
+      }
       if (scene.currentZone >= 3) { try { localStorage.clear(); } catch(e) {} scene.scene.pause('GameScene'); scene.scene.launch('VictoryScene'); }
     }
   }
@@ -1259,6 +1435,148 @@ window.MMA.Enemies.AI = {
   // Regen AI: behaves like chase AI; its gimmick is handled in updateEnemies via periodic healing.
   regen: function(enemy, player, scene, dt){
     return window.MMA.Enemies.AI.chase(enemy, player, scene, dt);
+  },
+
+  defender: function(enemy, player, scene, dt) {
+    var dx = player.x - enemy.x;
+    var dy = player.y - enemy.y;
+    var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+    var recentAttack = window.MMA.Enemies._didPlayerRecentlyAttack(scene, enemy.eliteAbility === 'counterStance' ? 320 : 220);
+    var strafeAngle = Math.atan2(dy, dx) + (enemy.circleDir || 1) * 1.15;
+
+    if (enemy.counterCooldown > 0) enemy.counterCooldown -= dt;
+    if (!enemy.circleDir) enemy.circleDir = Math.random() < 0.5 ? 1 : -1;
+
+    if (enemy.aiState === 'counterWindup') {
+      enemy.setVelocity(0, 0);
+      enemy.counterTimer -= dt;
+      if (enemy.counterTimer <= 0) {
+        enemy.aiState = 'recover';
+        enemy.counterTimer = 260;
+        enemy.attackCooldown = enemy.type.attackCooldownMax * 1.15 * attackMod;
+        MMA.Player.damage(scene, Math.round(enemy.type.attackDamage * (enemy.eliteAbility === 'counterStance' ? 1.45 : 1.25)));
+        MMA.UI.showDamageText(scene, player.x, player.y - 34, 'COUNTER!', '#ff5555');
+      }
+      return;
+    }
+
+    if (enemy.aiState === 'recover') {
+      enemy.setVelocity(-(dx / dist) * enemy.type.speed * 0.42, -(dy / dist) * enemy.type.speed * 0.42);
+      enemy.counterTimer -= dt;
+      if (enemy.counterTimer <= 0) enemy.aiState = null;
+      return;
+    }
+
+    if (enemy.blockTimer > 0) {
+      enemy.blockTimer -= dt;
+      enemy.isBlocking = true;
+      enemy.setVelocity(0, 0);
+      if (enemy.blockTimer <= 0) {
+        enemy.isBlocking = false;
+        enemy.aiState = 'counterWindup';
+        enemy.counterTimer = enemy.eliteAbility === 'counterStance' ? 110 : 150;
+      }
+      return;
+    }
+
+    if (recentAttack && dist <= enemy.type.attackRange * 1.45 && enemy.counterCooldown <= 0) {
+      enemy.blockTimer = enemy.eliteAbility === 'counterStance' ? 320 : 240;
+      enemy.counterCooldown = 900;
+      enemy.isBlocking = true;
+      if (window.sfx && typeof window.sfx.block === 'function') window.sfx.block();
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 36, 'BLOCK!', '#88ddff');
+      return;
+    }
+
+    if (dist < enemy.type.chaseRange) {
+      if (dist > enemy.type.attackRange * 1.1) {
+        enemy.setVelocity((dx / dist) * enemy.type.speed * 0.86 * speedMod, (dy / dist) * enemy.type.speed * 0.86 * speedMod);
+      } else if (dist < enemy.type.attackRange * 0.75) {
+        enemy.setVelocity(Math.cos(strafeAngle) * enemy.type.speed * 0.84 * speedMod, Math.sin(strafeAngle) * enemy.type.speed * 0.84 * speedMod);
+      } else {
+        enemy.setVelocity(0, 0);
+        if ((enemy.hasAttackToken || enemy.isBoss) && enemy.attackCooldown <= 0) {
+          enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod;
+          MMA.Player.damage(scene, Math.round(enemy.type.attackDamage * 0.95));
+          MMA.UI.showDamageText(scene, player.x, player.y - 28, 'JAB!', '#cc4444');
+        }
+      }
+    } else {
+      enemy.setVelocity(0, 0);
+    }
+
+    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
+  },
+
+  boxer: function(enemy, player, scene, dt) {
+    return window.MMA.Enemies.AI.defender(enemy, player, scene, dt);
+  },
+
+  karateka: function(enemy, player, scene, dt) {
+    var dx = player.x - enemy.x;
+    var dy = player.y - enemy.y;
+    var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+
+    if (enemy.aiState === 'focusWindup') {
+      enemy.setVelocity(0, 0);
+      enemy.focusWindupTimer -= dt;
+      if (enemy.focusWindupTimer <= 0) {
+        enemy.aiState = 'retreat';
+        enemy.retreatTimer = 520;
+        enemy.focusReady = false;
+        enemy.focusCharge = 0;
+        enemy.attackCooldown = enemy.type.attackCooldownMax * 1.1 * attackMod;
+        MMA.Player.damage(scene, Math.round(enemy.type.attackDamage * 1.8));
+        MMA.UI.showDamageText(scene, player.x, player.y - 32, 'FOCUS STRIKE!', '#66ffff');
+      }
+      return;
+    }
+
+    if (enemy.focusReady && dist <= enemy.type.attackRange * 1.3 && enemy.attackCooldown <= 0) {
+      enemy.aiState = 'focusWindup';
+      enemy.focusWindupTimer = 260;
+      enemy.setVelocity(0, 0);
+      return;
+    }
+
+    return window.MMA.Enemies.AI.kickboxer(enemy, player, scene, dt);
+  },
+
+  streetFighter: function(enemy, player, scene, dt) {
+    var dx = player.x - enemy.x;
+    var dy = player.y - enemy.y;
+    var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+
+    if (enemy.aiState === 'chaosRush') {
+      enemy.chaosRushTimerActive -= dt;
+      enemy.setVelocity((dx / dist) * enemy.type.speed * 1.7 * speedMod, (dy / dist) * enemy.type.speed * 1.7 * speedMod);
+      if (!enemy._chaosRushDamageDone && dist <= enemy.type.attackRange * 1.2) {
+        enemy._chaosRushDamageDone = true;
+        MMA.Player.damage(scene, Math.round(enemy.type.attackDamage * 1.6));
+        MMA.UI.showDamageText(scene, player.x, player.y - 34, 'CHAOS RUSH!', '#ff9933');
+      }
+      if (enemy.chaosRushTimerActive <= 0) {
+        enemy.aiState = 'recover';
+        enemy.counterTimer = 320;
+        enemy.chaosRushActive = false;
+        enemy._chaosRushDamageDone = false;
+      }
+      return;
+    }
+
+    if (enemy.chaosRushActive && dist <= enemy.type.chaseRange) {
+      enemy.aiState = 'chaosRush';
+      enemy.chaosRushTimerActive = 260;
+      enemy.attackCooldown = enemy.type.attackCooldownMax * 1.2 * attackMod;
+      return;
+    }
+
+    return window.MMA.Enemies.AI.combo(enemy, player, scene, dt);
   },
 
   stunner: function(enemy, player, scene, dt){
