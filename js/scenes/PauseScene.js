@@ -227,7 +227,6 @@ var PauseScene = new Phaser.Class({
       slotBg.fillRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
       slotBg.lineStyle(1, slotColors[i], 0.6);
       slotBg.strokeRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
-      this.add(slotBg);
       
       var slotNum = this.add.text(slotX + 10, loadoutY + 20, (i + 1) + ':', {
         fontSize: '10px', color: '#888888'
