@@ -10,6 +10,14 @@ document it here. The Reviewer agent will integrate these.
 
 ## Pending
 
+### Adaptive Tactics — Player Attack Tracking
+- **Module**: Enemies (js/enemies.js)
+- **Target file**: js/combat.js
+- **Description**: When player successfully lands an attack on an enemy, call `MMA.Enemies.onPlayerAttack(scene, targetEnemy, moveKey)` to track the attack type for adaptive defense. This enables enemies to gain +15% defense when player uses repeated move types (striker/grappler patterns).
+- **Priority**: P1
+- **Status**: ✅ Implemented in reviewer pass (normal + special attacks now record landed moves and apply adaptive defense)
+- **Added**: 2026-03-13
+
 ### Elite Enemy Item Pickups — Collision Logic
 - **Module**: Enemies (js/enemies.js)
 - **Target file**: js/items.js

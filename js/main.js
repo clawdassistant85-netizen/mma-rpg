@@ -1,7 +1,9 @@
 window.onload = function() {
-  // Load legacy records on startup
-  if (window.MMA && window.MMA.UI && window.MMA.UI.loadLegacyRecords) {
-    window.MMA.UI.loadLegacyRecords();
+  // Load legacy records, trophy room, and diary on startup
+  if (window.MMA && window.MMA.UI) {
+    if (window.MMA.UI.loadLegacyRecords) window.MMA.UI.loadLegacyRecords();
+    if (window.MMA.UI.loadTrophyRoom) window.MMA.UI.loadTrophyRoom();
+    if (window.MMA.UI.loadFighterDiary) window.MMA.UI.loadFighterDiary();
   }
 
   var phaserConfig = {

@@ -1,5 +1,169 @@
 window.MMA = window.MMA || {};
 window.MMA.Enemies = {
+  // Mercenary Contracts: boosts enemy stats when active (purchased by player)
+  MERCENARY_CONTRACTS: {
+    // No contract: default behavior
+    none: { hpMultiplier: 1, attackMultiplier: 1, xpMultiplier: 1 },
+    // Bronze: entry-level contract
+    bronze: { hpMultiplier: 1.25, attackMultiplier: 1.10, xpMultiplier: 1.10 },
+    // Silver: mid-tier contract
+    silver: { hpMultiplier: 1.50, attackMultiplier: 1.20, xpMultiplier: 1.20 },
+    // Gold: top-tier contract
+    gold: { hpMultiplier: 2.0, attackMultiplier: 1.35, xpMultiplier: 1.35 }
+  },
+
+  // Get active mercenary contract tier from scene
+  getContractTier: function(scene) {
+    var tier = null;
+    // Try scene.registry first
+    if (scene && scene.registry) {
+      tier = scene.registry.get('mercenaryContractTier');
+    }
+    // Fall back to scene property
+    if (!tier && scene && scene.mercenaryContractTier) {
+      tier = scene.mercenaryContractTier;
+    }
+    // Validate tier exists in config
+    if (tier && this.MERCENARY_CONTRACTS[tier]) {
+      return tier;
+    }
+    return null;
+  },
+
+  // Get contract multipliers for a given tier
+  getContractMultipliers: function(tier) {
+    if (!tier || !this.MERCENARY_CONTRACTS[tier]) {
+      return this.MERCENARY_CONTRACTS.none;
+    }
+    return this.MERCENARY_CONTRACTS[tier];
+  },
+
+  // Adaptive Tactics: enemy analyzes player's last 5 attacks and gains +15% defense against repeated move types
+  ADAPTIVE_TACTICS: {
+    TRACK_COUNT: 5,           // Number of recent attacks to track
+    DEFENSE_BONUS: 0.15,       // +15% defense against repeated move types
+    MOVE_TYPE_GROUPS: {        // Group similar moves together
+      'jab': 'striker', 'cross': 'striker', 'hook': 'striker', 'uppercut': 'striker', 'bodyShot': 'striker', 'elbowStrike': 'striker', 'spinningBackFist': 'striker',
+      'lowKick': 'kicker', 'headKick': 'kicker', 'roundhouseKick': 'kicker', 'kneeStrike': 'kicker',
+      'takedown': 'grappler', 'singleLegTakedown': 'grappler', 'single_leg_takedown': 'grappler', 'hipThrow': 'grappler', 'guardPass': 'grappler', 'mountCtrl': 'grappler',
+      'armbar': 'grappler', 'guillotine': 'grappler', 'triangleChoke': 'grappler', 'kimura': 'grappler', 'rnc': 'grappler'
+    }
+  },
+
+  // Initialize adaptive tracking for a scene
+  initAdaptiveTracking: function(scene) {
+    if (!scene._playerAttackHistory) {
+      scene._playerAttackHistory = [];
+    }
+  },
+
+  // Record player attack move type
+  recordPlayerAttack: function(scene, moveKey) {
+    this.initAdaptiveTracking(scene);
+    var moveType = this.ADAPTIVE_TACTICS.MOVE_TYPE_GROUPS[moveKey] || 'unknown';
+    
+    scene._playerAttackHistory.push(moveType);
+    if (scene._playerAttackHistory.length > this.ADAPTIVE_TACTICS.TRACK_COUNT) {
+      scene._playerAttackHistory.shift();
+    }
+  },
+
+  // Get defense bonus based on player's attack pattern
+  getAdaptiveDefense: function(enemy, scene) {
+    if (!scene._playerAttackHistory || scene._playerAttackHistory.length < 3) return 1;
+    
+    // Count move type frequency in recent attacks
+    var counts = {};
+    var self = this;
+    scene._playerAttackHistory.forEach(function(type) {
+      counts[type] = (counts[type] || 0) + 1;
+    });
+    
+    // Find most frequent move type
+    var maxType = null, maxCount = 0;
+    Object.keys(counts).forEach(function(type) {
+      if (counts[type] > maxCount) {
+        maxCount = counts[type];
+        maxType = type;
+      }
+    });
+    
+    // Need at least 3 of same type to trigger adaptation
+    if (maxCount >= 3 && maxType !== 'unknown') {
+      // Check if enemy's current attack matches the player's frequent style
+      var enemyStyle = enemy.type.aiPattern;
+      var isGrappleEnemy = (enemyStyle === 'grasper' || enemyStyle === 'thrower' || enemyStyle === 'subHunter');
+      var isStrikerEnemy = (enemyStyle === 'combo' || enemyStyle === 'kickboxer' || enemyStyle === 'kicker');
+      
+      // Adapt defense: striker enemies adapt to striker attacks, grapplers to grappler
+      if ((maxType === 'striker' && isStrikerEnemy) || (maxType === 'grappler' && isGrappleEnemy) || (maxType === 'kicker' && (enemyStyle === 'kickboxer' || enemyStyle === 'kicker'))) {
+        return 1 + self.ADAPTIVE_TACTICS.DEFENSE_BONUS;
+      }
+    }
+    
+    return 1;
+  },
+
+  // Called when player lands an attack - records move and returns adaptive defense multiplier
+  onPlayerAttack: function(scene, enemy, moveKey) {
+    this.initAdaptiveTracking(scene);
+    this.recordPlayerAttack(scene, moveKey);
+    var adaptiveDef = this.getAdaptiveDefense(enemy, scene);
+    // Apply vengeance defense penalty (player hits harder)
+    var vengeanceDef = this.getVengeanceDefenseMult(enemy);
+    return adaptiveDef * vengeanceDef;
+  },
+
+  // Show adaptive feedback text
+  showAdaptiveFeedback: function(scene, enemy) {
+    if (!scene._playerAttackHistory || scene._playerAttackHistory.length < 3) return;
+    
+    var counts = {};
+    scene._playerAttackHistory.forEach(function(type) {
+      counts[type] = (counts[type] || 0) + 1;
+    });
+    
+    var maxType = null, maxCount = 0;
+    Object.keys(counts).forEach(function(type) {
+      if (counts[type] > maxCount) {
+        maxCount = counts[type];
+        maxType = type;
+      }
+    });
+    
+    if (maxCount >= 3 && maxType !== 'unknown') {
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 55, 'ADAPTED!', '#00ffff');
+    }
+  },
+
+  // Desperation Enrage: non-boss enemies rage when below 25% HP
+  ENRAGE_CONFIG: {
+    HP_THRESHOLD: 0.25,        // Trigger at 25% HP
+    DURATION: 2000,           // 2 second enrage duration
+    COOLDOWN: 8000,           // 8 second cooldown between enrages
+    SPEED_BONUS: 0.25,        // +25% move speed
+    ATTACK_SPEED_BONUS: 0.30  // +30% attack speed (faster attacks)
+  },
+
+  // Gimmick Specialist: Regenerator enemy slowly heals over time.
+  // Visual cue: green tint, periodic "REGEN" floating text.
+  REGENERATOR_CONFIG: {
+    BASE_INTERVAL_MS: 1000,
+    CRITICAL_INTERVAL_MS: 700,
+    HEAL_PCT_PER_TICK: 0.03,      // 3% max HP per tick
+    CRITICAL_HP_PCT: 0.30,        // below 30% HP -> faster/stronger regen
+    CRITICAL_HEAL_MULT: 1.7
+  },
+
+  // Loyalty Bond / Vengeance Mode: when a non-boss ally dies, nearby enemies enter VENGEANCE
+  VENGEANCE_CONFIG: {
+    RADIUS: 170,               // pixels - range to trigger vengeance
+    DURATION: 5000,           // 5 seconds duration
+    DAMAGE_BONUS: 0.20,       // +20% damage dealt
+    DEFENSE_PENALTY: 0.15,    // -15% defense (player hits harder)
+    DEFENSE_MULT: 0.85        // Multiplier applied to defense (1 - 0.15 = 0.85)
+  },
+  
   // Injury System: tracking cumulative limb hits for stacking debuffs
   INJURY_SYSTEM: {
     ARM_HIT_DEBUFF: 0.10, // -10% attack speed per stack
@@ -78,6 +242,93 @@ window.MMA.Enemies = {
     if (!enemy.injuries) return 1;
     return enemy.isVulnerable ? (1 + this.INJURY_SYSTEM.DAMAGE_BONUS_VULN) : 1;
   },
+
+  // Loyalty Bond: Apply Vengeance to nearby allies when an enemy dies
+  applyVengeanceToNearby: function(dyingEnemy, scene) {
+    if (!dyingEnemy || !scene || !scene.enemies) return;
+    
+    var config = this.VENGEANCE_CONFIG;
+    var now = Date.now();
+    
+    // Don't trigger on boss deaths (they have their own mechanics)
+    if (dyingEnemy.isBoss) return;
+    
+    // Find nearby alive enemies within radius
+    (scene.enemies || []).forEach(function(other) {
+      if (!other || other === dyingEnemy) return;
+      if (!other.active || other.state === 'dead') return;
+      if (other.isBoss) return; // bosses don't get vengeance
+      
+      var dx = other.x - dyingEnemy.x;
+      var dy = other.y - dyingEnemy.y;
+      var dist = Math.sqrt(dx*dx + dy*dy);
+      
+      if (dist <= config.RADIUS) {
+        // Apply vengeance - refresh timer if already active
+        other.vengeanceTimer = config.DURATION;
+        other.vengeanceDamageMult = 1 + config.DAMAGE_BONUS;
+        other.vengeanceDefenseMult = config.DEFENSE_MULT;
+        
+        // Show VENGEANCE! floating text once per trigger
+        if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+          MMA.UI.showDamageText(scene, other.x, other.y - 50, 'VENGEANCE!', '#ff4400');
+        }
+        
+        // Add subtle red tint to show vengeance state
+        other.setTint(0xff6644);
+        
+        // Create pulse effect
+        if (scene.tweens) {
+          scene.tweens.add({
+            targets: other,
+            alpha: 0.6,
+            duration: 200,
+            yoyo: true,
+            repeat: 3,
+            ease: 'Sine.easeInOut'
+          });
+        }
+      }
+    });
+  },
+
+  // Get vengeance damage multiplier for enemy attacks
+  getVengeanceDamageMult: function(enemy) {
+    if (!enemy) return 1;
+    return enemy.vengeanceDamageMult || 1;
+  },
+
+  // Get vengeance defense multiplier (applied to adaptive defense)
+  getVengeanceDefenseMult: function(enemy) {
+    if (!enemy) return 1;
+    return enemy.vengeanceDefenseMult || 1;
+  },
+
+  // Update vengeance timers - call this in updateEnemies
+  updateVengeance: function(enemy, delta) {
+    if (!enemy || !enemy.vengeanceTimer) return;
+    
+    enemy.vengeanceTimer -= delta;
+    
+    if (enemy.vengeanceTimer <= 0) {
+      // Vengeance expired - reset multipliers
+      enemy.vengeanceTimer = 0;
+      enemy.vengeanceDamageMult = 1;
+      enemy.vengeanceDefenseMult = 1;
+      
+      // Clear tint if enemy is still alive
+      if (enemy.active && enemy.state !== 'dead') {
+        // Clear custom tint - restore original if elite/boss
+        if (enemy.type && enemy.type.isElite && enemy.type.eliteData && enemy.type.eliteData.colorGlow) {
+          enemy.setTint(enemy.type.eliteData.colorGlow);
+        } else if (enemy.isBoss) {
+          enemy.setTint(0xffd700);
+        } else {
+          enemy.clearTint();
+        }
+      }
+    }
+  },
   
   // Visual feedback for injury (called when enemy takes damage)
   showInjuryFeedback: function(scene, enemy, limbType) {
@@ -107,11 +358,38 @@ window.MMA.Enemies = {
     mmaChamp:{name:'MMA Champ',hp:200,maxHp:200,speed:85,attackDamage:25,attackCooldownMax:1100,attackRange:70,chaseRange:260,color:0xffd700,xpReward:100,teachesMove:'spinningBackFist',zone:3,aiPattern:'chase'},
     kickboxer:{name:'Kickboxer',hp:70,maxHp:70,speed:100,attackDamage:16,attackCooldownMax:900,attackRange:90,chaseRange:280,color:0x00cccc,xpReward:35,teachesMove:'roundhouseKick',zone:2,aiPattern:'kickboxer',groundDefense:0.2,groundEscape:0.1},
     striker:{name:'Striker',hp:55,maxHp:55,speed:95,attackDamage:10,attackCooldownMax:600,attackRange:50,chaseRange:260,color:0xff3366,xpReward:32,teachesMove:'jab',zone:2,aiPattern:'combo',groundDefense:0.2,groundEscape:0.1},
+    stunner:{name:'Stunner',hp:80,maxHp:80,speed:70,attackDamage:12,attackCooldownMax:1200,attackRange:60,chaseRange:250,color:0x8800ff,xpReward:45,teachesMove:null,zone:2,aiPattern:'stunner',groundDefense:0.3,groundEscape:0.2},
     // Coach Enemy: support-type that boosts nearby allies (+15% attack speed per Coach in radius)
     coach:{name:'Coach',hp:60,maxHp:60,speed:88,attackDamage:6,attackCooldownMax:1800,attackRange:40,chaseRange:260,color:0x33ffcc,xpReward:45,teachesMove:null,zone:2,aiPattern:'coach'},
     // Rival System: recurring "Shadow" boss that appears across zones with scaling stats
-    shadowRival:{name:'Shadow Rival',hp:150,maxHp:150,speed:92,attackDamage:22,attackCooldownMax:1150,attackRange:70,chaseRange:280,color:0x111111,xpReward:90,teachesMove:null,zone:2,aiPattern:'chase'}
+    shadowRival:{name:'Shadow Rival',hp:150,maxHp:150,speed:92,attackDamage:22,attackCooldownMax:1150,attackRange:70,chaseRange:280,color:0x111111,xpReward:90,teachesMove:null,zone:2,aiPattern:'chase'},
+    // Feint Master: zones 2-3, mid HP, good speed, performs fake windup then real strike
+    feintMaster:{name:'Feint Master',hp:75,maxHp:75,speed:95,attackDamage:16,attackCooldownMax:1400,attackRange:65,chaseRange:250,color:0xff00ff,xpReward:50,teachesMove:null,zone:2,aiPattern:'feintMaster',groundDefense:0.3,groundEscape:0.25},
+
+    // Bully AI: pressures harder when player is low HP; panics/flees when its own HP is critical
+    bully:{name:'Bully',hp:95,maxHp:95,speed:82,attackDamage:15,attackCooldownMax:1150,attackRange:60,chaseRange:260,color:0xff8800,xpReward:55,teachesMove:null,zone:2,aiPattern:'bully',groundDefense:0.35,groundEscape:0.25},
+
+    // Gimmick Specialist: Regenerator (slow heal over time; punishes passive play)
+    regenerator:{name:'Regenerator',hp:85,maxHp:85,speed:78,attackDamage:12,attackCooldownMax:1250,attackRange:60,chaseRange:240,color:0x22ff66,xpReward:60,teachesMove:null,zone:2,aiPattern:'regen',groundDefense:0.35,groundEscape:0.25}
   },
+  // Pack damage multiplier helper
+  getPackDamageMultiplier: function(enemy, scene) {
+    if (!enemy || !scene) return 1;
+    const PACK_RADIUS = 100;
+    // Count nearby allies (excluding self) that are active and not dead
+    var allies = (scene.enemies || []).filter(function(other) {
+      if (other === enemy) return false;
+      if (!other.active || other.state === 'dead') return false;
+      var dx = other.x - enemy.x, dy = other.y - enemy.y;
+      return Math.sqrt(dx*dx + dy*dy) <= PACK_RADIUS;
+    });
+    var count = allies.length;
+    if (count <= 0) return 1;
+    // Each ally gives +10% damage, capped at +30%
+    var bonus = Math.min(count * 0.10, 0.30);
+    return 1 + bonus;
+  },
+
   // Elite variants: 2x HP, stronger attacks, unique glow, rare drops
   ELITE_TYPES: {
     eliteStreetThug:{baseType:'streetThug',name:'Elite Street Thug',hpMultiplier:2,attackMultiplier:1.5,speedBonus:15,color:0xff4444,colorGlow:0xff0000,xpMultiplier:2.5,dropChance:0.2,rareItem:'speedPotion'},
@@ -175,6 +453,85 @@ window.MMA.Enemies = {
     
     return item;
   },
+
+  // Tag Team AI: paired enemies alternate who "pressures" the player.
+  // The resting partner backs off, repositions, and recovers faster.
+  TAG_TEAM: {
+    ENABLED: true,
+    MIN_ZONE: 2,
+    SWAP_MS: 2000,
+    REST_DISTANCE: 140,  // try to stay at least this far from player while resting
+    FLANK_ANGLE: 1.1     // radians offset for flanking while resting
+  },
+
+  _ensureTagTeams: function(scene) {
+    if (!this.TAG_TEAM.ENABLED) return;
+    var z = scene.currentZone || 1;
+    if (z < this.TAG_TEAM.MIN_ZONE) return;
+
+    var roomId = scene.currentRoomId || 'unknown';
+    if (scene._tagTeamRoomId === roomId && scene._tagTeamPairs) return;
+
+    scene._tagTeamRoomId = roomId;
+    scene._tagTeamPairs = [];
+
+    // Pair up non-boss, non-coach enemies.
+    var fighters = (scene.enemies || []).filter(function(e) {
+      return e && e.active && e.state !== 'dead' && !e.isBoss && e.typeKey !== 'coach' && e.typeKey !== 'shadowRival';
+    });
+
+    // Shuffle for variety
+    for (var i = fighters.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = fighters[i]; fighters[i] = fighters[j]; fighters[j] = tmp;
+    }
+
+    for (var p = 0; p < fighters.length - 1; p += 2) {
+      var a = fighters[p], b = fighters[p + 1];
+      if (!a || !b) continue;
+      var pairId = 'tt_' + roomId + '_' + p;
+      a.tagTeamPairId = pairId;
+      b.tagTeamPairId = pairId;
+      scene._tagTeamPairs.push({ id: pairId, a: a, b: b, active: a, nextSwapAt: Date.now() + this.TAG_TEAM.SWAP_MS });
+    }
+  },
+
+  _updateTagTeams: function(scene, delta) {
+    if (!scene._tagTeamPairs || !scene._tagTeamPairs.length) return;
+
+    var now = Date.now();
+    for (var i = 0; i < scene._tagTeamPairs.length; i++) {
+      var pair = scene._tagTeamPairs[i];
+      if (!pair || !pair.a || !pair.b) continue;
+      if (!pair.a.active || pair.a.state === 'dead' || !pair.b.active || pair.b.state === 'dead') continue;
+
+      if (now >= pair.nextSwapAt) {
+        pair.active = (pair.active === pair.a) ? pair.b : pair.a;
+        pair.nextSwapAt = now + this.TAG_TEAM.SWAP_MS;
+      }
+
+      // Mark resting/active for downstream AI logic.
+      pair.a.isResting = (pair.active !== pair.a);
+      pair.b.isResting = (pair.active !== pair.b);
+
+      // Resting partner recovers attack cooldown faster.
+      var rest = pair.a.isResting ? pair.a : pair.b;
+      if (rest && rest.attackCooldown > 0) rest.attackCooldown = Math.max(0, rest.attackCooldown - delta * 1.5);
+
+      // Encourage resting partner to flank and keep distance.
+      if (rest && scene.player) {
+        var dx = rest.x - scene.player.x;
+        var dy = rest.y - scene.player.y;
+        var dist = Math.sqrt(dx*dx + dy*dy) || 1;
+        if (dist < this.TAG_TEAM.REST_DISTANCE) {
+          var ang = Math.atan2(dy, dx) + (Math.random() < 0.5 ? this.TAG_TEAM.FLANK_ANGLE : -this.TAG_TEAM.FLANK_ANGLE);
+          var spd = (rest.type && rest.type.speed ? rest.type.speed : 80);
+          rest.setVelocity(Math.cos(ang) * spd, Math.sin(ang) * spd);
+        }
+      }
+    }
+  },
+
   AI: {},
   _getPlayerStyle: function(scene) {
     // Best-effort inference without touching other files.
@@ -270,6 +627,18 @@ window.MMA.Enemies = {
       }
     }
 
+    // Apply Mercenary Contract multipliers AFTER elite/rival/zone scaling
+    var contractTier = this.getContractTier(scene);
+    if (contractTier) {
+      var contractMult = this.getContractMultipliers(contractTier);
+      type.hp = Math.round(type.hp * contractMult.hpMultiplier);
+      type.maxHp = type.hp;
+      type.attackDamage = Math.round(type.attackDamage * contractMult.attackMultiplier);
+      type.xpReward = Math.round(type.xpReward * contractMult.xpMultiplier);
+      type.hasContract = true;
+      type.contractTier = contractTier;
+    }
+
     type.attackDamage = Math.max(1, Math.round(type.attackDamage * 0.36)); type.attackCooldownMax = Math.round(type.attackCooldownMax * 1.8); type.speed = Math.round(type.speed * 0.85);
     if (typeof type.groundDefense !== 'number') type.groundDefense = 0.25;
     if (typeof type.groundEscape !== 'number') type.groundEscape = 0.2;
@@ -293,6 +662,21 @@ window.MMA.Enemies = {
         ease: 'Sine.easeInOut'
       });
     }
+
+    // Regenerator visual cue (only if not overridden by elite/boss)
+    if (!eliteType && !e.isBoss && type && type.aiPattern === 'regen') {
+      e.setTint(0x22ff66);
+      if (scene.tweens) {
+        scene.tweens.add({
+          targets: e,
+          alpha: 0.75,
+          duration: 650,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+      }
+    }
     
     if (e.isBoss) { e.setTint(0xffd700); scene.registry.set('gameMessage', 'BOSS FIGHT!'); scene.time.delayedCall(2000, function(){ scene.registry.set('gameMessage', ''); }); }
     
@@ -313,6 +697,13 @@ window.MMA.Enemies = {
     }
     
     scene.enemyGroup.add(e); scene.enemies.push(e);
+    
+    // HP bar above enemy sprite
+    var hpBg = scene.add.rectangle(0, -e.displayHeight/2 - 8, 36, 5, 0x333333).setOrigin(0.5);
+    var hpFill = scene.add.rectangle(0, -e.displayHeight/2 - 8, 36, 5, 0xe83030).setOrigin(0.5);
+    e._hpBarBg = hpBg;
+    e._hpBarFill = hpFill;
+    
     if (window.narrate) window.narrate('combatStart', { enemy: { name: type.name || typeKey } }).then(function(msg){ if (msg) scene.registry.set('gameMessage', msg); scene.time.delayedCall(3000, function(){ scene.registry.set('gameMessage', ''); }); });
     return e;
   },
@@ -332,7 +723,47 @@ window.MMA.Enemies = {
       }
     }
 
+    // Feint Master: small chance to spawn in zone 2+ (do not replace bosses or shadowRival)
+    if (z >= 2 && positions && positions.length && pool && pool.length) {
+      var feintChance = 0.06 + (z - 2) * 0.02; // 6% in zone2 → up to 10%
+      if (Math.random() < feintChance) {
+        var replaceIdx = Math.floor(Math.random() * pool.length);
+        // Only replace if not boss and not already shadowRival
+        var currentType = pool[replaceIdx];
+        if (currentType !== 'mmaChamp' && currentType !== 'shadowRival') {
+          pool[replaceIdx] = 'feintMaster';
+        }
+      }
+    }
+
+    // Bully AI: uncommon spawn in zone 2+ (replaces a non-boss spawn)
+    if (z >= 2 && positions && positions.length && pool && pool.length) {
+      var bullyChance = 0.07 + (z - 2) * 0.02; // 7% in zone2 → up to 11%
+      if (Math.random() < bullyChance) {
+        var replaceIdx = Math.floor(Math.random() * pool.length);
+        var currentType = pool[replaceIdx];
+        if (currentType !== 'mmaChamp' && currentType !== 'shadowRival' && currentType !== 'coach') {
+          pool[replaceIdx] = 'bully';
+        }
+      }
+    }
+
+    // Gimmick Specialist: Regenerator spawn (zone 2+) (replaces a non-boss spawn)
+    if (z >= 2 && positions && positions.length && pool && pool.length) {
+      var regenChance = 0.06 + (z - 2) * 0.015; // 6% in zone2 → up to ~9%
+      if (Math.random() < regenChance) {
+        var replaceIdx = Math.floor(Math.random() * pool.length);
+        var currentType = pool[replaceIdx];
+        if (currentType !== 'mmaChamp' && currentType !== 'shadowRival' && currentType !== 'coach') {
+          pool[replaceIdx] = 'regenerator';
+        }
+      }
+    }
+
     for (var i=0; i<positions.length; i++) this.spawnEnemy(scene, pool[i % pool.length], positions[i].col * DT + DT/2, positions[i].row * DT + DT/2);
+
+    // Initialize Tag Team pairings for this room after spawns.
+    this._ensureTagTeams(scene);
   },
   spawnBoss: function(scene, x, y) { return this.spawnEnemy(scene, 'mmaChamp', x, y); },
   updateEnemies: function(scene, delta) {
@@ -343,25 +774,176 @@ window.MMA.Enemies = {
     const FLEE_CHANCE = 0.3; // 30% chance to flee when low HP
     const FLEE_DURATION = 1500; // ms
     const FLEE_COOLDOWN = 6000; // ms
+    const ATTACK_TOKEN_RADIUS = 140; // max distance for token eligibility
+    const ATTACK_TOKEN_TTL = 350; // ms token lifetime
 
     var self = this;
+
+    // Tag Team AI: establish pairs per-room and update who is "active".
+    self._ensureTagTeams(scene);
+    self._updateTagTeams(scene, delta);
+
+    // --- Attack token coordination ---
+    var now = Date.now();
+    // Validate existing token and clear if dead or expired
+    if (!scene._enemyAttackToken || !scene._enemyAttackToken.enemy || !scene._enemyAttackToken.enemy.active || now > scene._enemyAttackToken.expiresAt) {
+      // Find eligible enemies within radius, choose closest to player
+      var candidates = scene.enemies.filter(function(e) {
+        return e.active && e.state !== 'dead' && !e.isBoss && !(e.isFleeing) && !e.isResting && Math.hypot(e.x - scene.player.x, e.y - scene.player.y) <= ATTACK_TOKEN_RADIUS;
+      });
+      if (candidates.length) {
+        // pick closest
+        var primary = candidates.reduce(function(best, cur) {
+          var dBest = Math.hypot(best.x - scene.player.x, best.y - scene.player.y);
+          var dCur = Math.hypot(cur.x - scene.player.x, cur.y - scene.player.y);
+          return dCur < dBest ? cur : best;
+        }, candidates[0]);
+        scene._enemyAttackToken = { enemy: primary, expiresAt: now + ATTACK_TOKEN_TTL };
+      } else {
+        scene._enemyAttackToken = null;
+      }
+    }
+    // Mark each enemy with token flag
+    scene.enemies.forEach(function(e) { e.hasAttackToken = (scene._enemyAttackToken && e === scene._enemyAttackToken.enemy); });
+
     scene.enemies.forEach(function(e) {
       if (!e.active || e.state === 'dead') return;
       
+      // Update HP bar position and width
+      if (e._hpBarBg) {
+        e._hpBarBg.x = e.x;
+        e._hpBarBg.y = e.y - e.displayHeight/2 - 8;
+        e._hpBarFill.x = e.x;
+        e._hpBarFill.y = e.y - e.displayHeight/2 - 8;
+        var ratio = Math.max(0, e.stats.hp / e.stats.maxHp);
+        e._hpBarFill.width = 36 * ratio;
+      }
+      
       // Update injury states (decay over time)
       self.updateInjuries(e, delta);
+
+      // Update vengeance timers (5 second duration, then expires)
+      self.updateVengeance(e, delta);
+
+      // Regenerator gimmick: periodic self-heal (non-boss only)
+      if (e.type && e.type.aiPattern === 'regen' && !e.isBoss) {
+        var rCfg = self.REGENERATOR_CONFIG;
+        if (e._regenTickMs === undefined) e._regenTickMs = rCfg.BASE_INTERVAL_MS;
+        if (e._regenTimer === undefined) e._regenTimer = e._regenTickMs;
+
+        // Scale regen when at critical HP
+        var hpPct = (e.stats && e.stats.maxHp) ? (e.stats.hp / e.stats.maxHp) : 1;
+        var interval = (hpPct <= rCfg.CRITICAL_HP_PCT) ? rCfg.CRITICAL_INTERVAL_MS : rCfg.BASE_INTERVAL_MS;
+        e._regenTickMs = interval;
+
+        e._regenTimer -= delta;
+        if (e._regenTimer <= 0) {
+          e._regenTimer += e._regenTickMs;
+          if (e.stats && e.stats.hp < e.stats.maxHp) {
+            var healPct = rCfg.HEAL_PCT_PER_TICK * (hpPct <= rCfg.CRITICAL_HP_PCT ? rCfg.CRITICAL_HEAL_MULT : 1);
+            var heal = Math.max(1, Math.round(e.stats.maxHp * healPct));
+            e.stats.hp = Math.min(e.stats.maxHp, e.stats.hp + heal);
+            if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+              MMA.UI.showDamageText(scene, e.x, e.y - 55, 'REGEN +' + heal, '#22ff66');
+            }
+          }
+        }
+      }
+
+      // Coach Demoralize: after a Coach is KO'd, nearby allies become SHAKEN for a short time
+      // (slower movement + slower attacks). This is driven by killEnemy() setting shakenTimer.
+      if (e.shakenTimer === undefined) e.shakenTimer = 0;
+      if (e.shakenMoveMult === undefined) e.shakenMoveMult = 1;
+      if (e.shakenAttackMult === undefined) e.shakenAttackMult = 1;
+
+      if (e.shakenTimer > 0) {
+        e.shakenTimer -= delta;
+        e.shakenMoveMult = 0.85;
+        e.shakenAttackMult = 1.25; // increases cooldown multiplier (slower attacks)
+        if (!e._shakenShown && typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+          e._shakenShown = true;
+          MMA.UI.showDamageText(scene, e.x, e.y - 45, 'SHAKEN!', '#33ffcc');
+        }
+        if (e.shakenTimer <= 0) {
+          e.shakenTimer = 0;
+          e.shakenMoveMult = 1;
+          e.shakenAttackMult = 1;
+          e._shakenShown = false;
+        }
+      } else {
+        e.shakenMoveMult = 1;
+        e.shakenAttackMult = 1;
+      }
+      
+      // Desperation Enrage: non-boss enemies enter enrage when below 25% HP
+      if (!e.isBoss && !e.isElite) {
+        var hpPct = e.stats.hp / e.stats.maxHp;
+        var config = self.ENRAGE_CONFIG;
+        
+        // Initialize enrage state if not present
+        if (e.enrageCooldown === undefined) e.enrageCooldown = 0;
+        
+        // Reduce cooldown
+        if (e.enrageCooldown > 0) e.enrageCooldown -= delta;
+        
+        // Check if should trigger enrage (only once per trigger, not continuous)
+        if (hpPct <= config.HP_THRESHOLD && !e.isEnraged && e.enrageCooldown <= 0) {
+          e.isEnraged = true;
+          e.enrageTimer = config.DURATION;
+          e.enrageCooldown = config.COOLDOWN;
+          e.enrageSpeedBonus = config.SPEED_BONUS;
+          e.enrageAttackBonus = config.ATTACK_SPEED_BONUS;
+          
+          // Show ENRAGED! text
+          if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+            MMA.UI.showDamageText(scene, e.x, e.y - 50, 'ENRAGED!', '#ff0000');
+          }
+        }
+        
+        // Apply enrage bonuses while active
+        if (e.isEnraged) {
+          e.enrageTimer -= delta;
+          if (e.enrageTimer <= 0) {
+            // Enrage ended
+            e.isEnraged = false;
+            e.enrageSpeedBonus = 0;
+            e.enrageAttackBonus = 0;
+          }
+        }
+      } else {
+        // Reset enrage flags for boss/elite (they don't enrage)
+        e.isEnraged = false;
+        e.enrageSpeedBonus = 0;
+        e.enrageAttackBonus = 0;
+      }
+      
+      // Apply enrage speed bonus to effective speed calculation later
       
       if (e.staggerTimer > 0) { e.staggerTimer -= delta; e.setVelocity(0,0); return; }
       // Flee logic for non-boss enemies
       if (!e.isBoss) {
+        // Default flee tuning
+        var fleeHpThreshold = FLEE_HP_THRESHOLD;
+        var fleeChance = FLEE_CHANCE;
+        var fleeDuration = FLEE_DURATION;
+        var fleeCooldown = FLEE_COOLDOWN;
+
+        // Bully AI: always flees at critical HP (panic), no randomness.
+        if (e.type && e.type.aiPattern === 'bully') {
+          fleeHpThreshold = 0.20;
+          fleeChance = 1.0;
+          fleeDuration = 2200;
+          fleeCooldown = 8000;
+        }
+
         if (!e.fleeCooldown) e.fleeCooldown = 0;
         if (e.fleeCooldown > 0) {
           e.fleeCooldown -= delta;
-        } else if (!e.isFleeing && e.stats.hp <= e.stats.maxHp * FLEE_HP_THRESHOLD) {
-          if (Math.random() < FLEE_CHANCE) {
+        } else if (!e.isFleeing && e.stats.hp <= e.stats.maxHp * fleeHpThreshold) {
+          if (Math.random() < fleeChance) {
             e.isFleeing = true;
-            e.fleeTimer = FLEE_DURATION;
-            e.fleeCooldown = FLEE_COOLDOWN;
+            e.fleeTimer = fleeDuration;
+            e.fleeCooldown = fleeCooldown;
             // Show flee text
             if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
               MMA.UI.showDamageText(scene, e.x, e.y - 30, 'FLEE!', '#ff0000');
@@ -395,15 +977,34 @@ window.MMA.Enemies = {
         scene.registry.set('gameMessage', 'BOSS ENRAGE!');
         scene.time.delayedCall(2000, function(){ scene.registry.set('gameMessage', ''); });
       }
-      // Compute effective speed with pack bonus
+      // Compute effective speed with pack bonus and Coach support
       var allies = scene.enemies.filter(function(other){return other!==e && other.active && other.state!=='dead';});
       var closeAllies = allies.filter(function(other){
         var dx = other.x - e.x, dy = other.y - e.y;
         return Math.sqrt(dx*dx+dy*dy) <= PACK_RADIUS;
       });
       var bonus = closeAllies.length > 0 ? SPEED_BONUS : 0;
-      // Cap speed at double baseSpeed
-      e.type.speed = Math.min(e.baseSpeed + bonus, e.baseSpeed * 2);
+      // Coach support: increase attack speed of nearby allies (+15% per Coach within radius 120)
+      var coachBonus = 0;
+      var COACH_RADIUS = 120;
+      var coachCount = allies.filter(function(other){
+        if (other.typeKey !== 'coach') return false;
+        var dx = other.x - e.x, dy = other.y - e.y;
+        return Math.sqrt(dx*dx+dy*dy) <= COACH_RADIUS;
+      }).length;
+      if (coachCount > 0) {
+        coachBonus = coachCount * 0.15; // 15% per coach
+      }
+      e.attackSpeedMod = (e.attackSpeedMod || 1) * (1 + coachBonus);
+      // Apply enrage attack speed bonus if active (+30% faster attacks)
+      if (e.enrageAttackBonus) {
+        e.attackSpeedMod = e.attackSpeedMod * (1 - e.enrageAttackBonus); // Reduce cooldown multiplier
+      }
+      // Apply enrage speed bonus if active (+25% move speed)
+      var enrageSpeedBonus = (e.enrageSpeedBonus || 0);
+      // Cap speed at double baseSpeed (including enrage bonus)
+      var maxSpeed = e.baseSpeed * 2 * (1 + enrageSpeedBonus);
+      e.type.speed = Math.min(e.baseSpeed + bonus, maxSpeed);
 
       var ai = self.AI[e.type.aiPattern || 'chase'];
       (ai || self.AI.chase)(e, scene.player, scene, delta);
@@ -412,25 +1013,95 @@ window.MMA.Enemies = {
   killEnemy: function(scene, enemy) {
     scene.enemiesDefeated = (scene.enemiesDefeated || 0) + 1;
     enemy.state = 'dead';
+
+    // Loyalty Bond: trigger Vengeance on nearby allies when a non-boss enemy dies
+    if (!enemy.isBoss) {
+      this.applyVengeanceToNearby(enemy, scene);
+    }
+
+    // Coach Demoralize: when a Coach goes down, nearby allies get briefly SHAKEN.
+    if (enemy.typeKey === 'coach') {
+      var R = 170;
+      (scene.enemies || []).forEach(function(other){
+        if (!other || other === enemy) return;
+        if (!other.active || other.state === 'dead') return;
+        if (other.isBoss) return; // bosses ignore morale hits
+        var dx = other.x - enemy.x, dy = other.y - enemy.y;
+        if (Math.sqrt(dx*dx + dy*dy) <= R) {
+          other.shakenTimer = Math.max(other.shakenTimer || 0, 2600);
+          other._shakenShown = false; // allow popup once
+        }
+      });
+      if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        MMA.UI.showDamageText(scene, enemy.x, enemy.y - 60, 'COACH DOWN!', '#33ffcc');
+      }
+    }
+
     // Track enemy defeated in fight stats
     MMA.UI.recordEnemyDefeated();
+    var contractTier = this.getContractTier(scene);
     var xp = enemy.type.xpReward; scene.player.stats.xp += xp;
     MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, '+' + xp + ' XP', '#e8c830');
     
     // Elite enemy rare item drop
     if (enemy.type.isElite && enemy.type.eliteData) {
+      // Record elite defeat in Trophy Room
+      var eliteType = enemy.type.typeKey || 'elite';
+      var zone = scene.registry.get('currentZone') || 1;
+      if (MMA.UI.recordEliteDefeat) {
+        MMA.UI.recordEliteDefeat(eliteType, zone);
+      }
+      
+      // Check for Mercenary Contract loot guarantee
+      var rareItem = enemy.type.eliteData.rareItem;
       var dropChance = enemy.type.eliteData.dropChance || 0.2;
-      if (Math.random() < dropChance) {
-        var rareItem = enemy.type.eliteData.rareItem;
+      var forceDrop = (contractTier && rareItem);
+      
+      if (forceDrop || Math.random() < dropChance) {
         if (rareItem) {
           // Spawn the rare item as a pickup
-          window.MMA.Enemies.spawnItem(scene, enemy.x, enemy.y, rareItem);
-          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 50, 'RARE DROP!', '#ff00ff');
+          if (typeof this.spawnItem === 'function') {
+            this.spawnItem(scene, enemy.x, enemy.y, rareItem);
+          }
+          // Also record the rare item in Trophy Room
+          if (MMA.UI.recordRareItem) {
+            MMA.UI.recordRareItem(rareItem);
+          }
+          // Show CONTRACT LOOT! if guaranteed by contract, otherwise RARE DROP!
+          if (forceDrop && typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+            MMA.UI.showDamageText(scene, enemy.x, enemy.y - 50, 'CONTRACT LOOT!', '#ffd700');
+          } else {
+            MMA.UI.showDamageText(scene, enemy.x, enemy.y - 50, 'RARE DROP!', '#ff00ff');
+          }
+        }
+      }
+    }
+    
+    // Mercenary Contract boss drop: spawn a rare item when boss dies with active contract
+    if (enemy.isBoss && contractTier) {
+      var rareItemKeys = Object.keys(this.RARE_ITEMS || {});
+      if (rareItemKeys.length > 0) {
+        var randomKey = rareItemKeys[Math.floor(Math.random() * rareItemKeys.length)];
+        if (typeof this.spawnItem === 'function') {
+          this.spawnItem(scene, enemy.x, enemy.y, randomKey);
+        }
+        if (MMA.UI.recordRareItem) {
+          MMA.UI.recordRareItem(randomKey);
+        }
+        if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 60, 'CONTRACT LOOT!', '#ffd700');
         }
       }
     }
     
     if (enemy.isBoss) {
+      // Record boss defeat in Trophy Room
+      var bossId = enemy.typeKey || 'boss';
+      var zone = scene.registry.get('currentZone') || 1;
+      var duration = scene.runStartMs ? Date.now() - scene.runStartMs : 0;
+      if (MMA.UI.recordBossDefeat) {
+        MMA.UI.recordBossDefeat(bossId, zone, duration);
+      }
       scene.registry.set('gameMessage', 'VICTORY!'); scene.cameras.main.flash(500, 255, 215, 0); scene.gameOver = true;
       scene.registry.set('playerStats', Object.assign({}, scene.player.stats)); scene.registry.set('enemiesDefeated', scene.enemiesDefeated); scene.registry.set('playTime', Math.floor((Date.now() - scene.runStartMs) / 1000));
       scene.time.delayedCall(3000, function(){ scene.scene.stop(); scene.scene.launch('VictoryScene'); });
@@ -459,7 +1130,7 @@ window.MMA.Enemies = {
       scene.time.delayedCall(2500, function(){ scene.registry.set('gameMessage', ''); });
       if (window.saveGame) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);
     }
-    if (enemy.hpFill && enemy.hpFill.active) enemy.hpFill.destroy();
+    if (enemy._hpBarBg) { enemy._hpBarBg.destroy(); enemy._hpBarFill.destroy(); }
     MMA.Items.spawnDropsForEnemy(scene, enemy);
     enemy.destroy(); scene.enemies = scene.enemies.filter(function(e){ return e !== enemy; });
     if (window.saveGame) window.saveGame(scene.player.stats, scene.player.unlockedMoves, scene.currentZone, scene.currentRoomId);
@@ -474,29 +1145,78 @@ window.MMA.Enemies = {
   }
 };
 window.MMA.Enemies.AI = {
+  // Regen AI: behaves like chase AI; its gimmick is handled in updateEnemies via periodic healing.
+  regen: function(enemy, player, scene, dt){
+    return window.MMA.Enemies.AI.chase(enemy, player, scene, dt);
+  },
+
+  stunner: function(enemy, player, scene, dt){
+    // Simple stun AI: approach player, then perform a stun attack that pauses player controls for 1.5s
+    var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+    var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
+    if (enemy.aiState === 'stunned') {
+      // During stun cooldown, do nothing
+      enemy.setVelocity(0,0);
+      enemy.stunTimer -= dt;
+      if (enemy.stunTimer <= 0) enemy.aiState = null;
+      return;
+    }
+    if (dist < enemy.type.chaseRange) {
+      if (dist < enemy.type.attackRange) {
+        enemy.setVelocity(0,0);
+        if (enemy.attackCooldown <= 0) {
+          // Perform stun attack
+          enemy.aiState = 'stunned';
+          enemy.stunTimer = 1500; // 1.5s player stun
+          enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod;
+          // Apply damage and stun effect
+          var dmg = Math.round(enemy.type.attackDamage * vulnMult * (window.MMA.Enemies.getPackDamageMultiplier ? window.MMA.Enemies.getPackDamageMultiplier(enemy, scene) : 1) * (window.MMA.Enemies.getVengeanceDamageMult ? window.MMA.Enemies.getVengeanceDamageMult(enemy) : 1));
+          MMA.Player.damage(scene, dmg);
+          // Add a stun flag to player (simple implementation via registry)
+          scene.registry.set('playerStunned', true);
+          scene.time.delayedCall(1500, function(){ scene.registry.set('playerStunned', false); });
+          MMA.UI.showDamageText(scene, player.x, player.y - 30, 'STUN!', '#ff00ff');
+        }
+      } else {
+        enemy.setVelocity((dx/dist)*enemy.type.speed*speedMod, (dy/dist)*enemy.type.speed*speedMod);
+      }
+    } else {
+      enemy.setVelocity(0,0);
+    }
+    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
+  },
   chase: function(enemy, player, scene, dt){ 
     var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1; 
     // Apply injury speed modifiers
-    var speedMod = enemy.moveSpeedMod || 1;
-    var attackMod = enemy.attackSpeedMod || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
     var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
     
     if (dist < enemy.type.chaseRange) { 
       if (dist < enemy.type.attackRange) { 
         enemy.setVelocity(0,0); 
-        if (enemy.attackCooldown <= 0) { 
-          enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod; 
-          var dmg = Math.round(enemy.type.attackDamage * vulnMult);
-          MMA.Player.damage(scene, dmg); 
-        } 
-      } else enemy.setVelocity((dx/dist)*enemy.type.speed*speedMod, (dy/dist)*enemy.type.speed*speedMod); 
+        // Attack token check: only token holder can deal damage
+        if (enemy.hasAttackToken || enemy.isBoss) {
+          if (enemy.attackCooldown <= 0) { 
+            enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod; 
+            var dmg = Math.round(enemy.type.attackDamage * vulnMult * (window.MMA.Enemies.getPackDamageMultiplier ? window.MMA.Enemies.getPackDamageMultiplier(enemy, scene) : 1) * (window.MMA.Enemies.getVengeanceDamageMult ? window.MMA.Enemies.getVengeanceDamageMult(enemy) : 1));
+            MMA.Player.damage(scene, dmg); 
+          } 
+        } else {
+          // Non-token enemies strafe or step back
+          var angle = Math.atan2(dy, dx) + Math.PI / 2; // perpendicular
+          enemy.setVelocity(Math.cos(angle) * enemy.type.speed * speedMod, Math.sin(angle) * enemy.type.speed * speedMod);
+        }
+      } else enemy.setVelocity((dx/dist)*enemy.type.speed*speedMod, (dy/dist)*enemy.type.speed*speedMod);
     } else enemy.setVelocity(0,0); 
     if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt; 
   },
   kicker: function(enemy, player, scene, dt){ 
     var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1; 
-    var speedMod = enemy.moveSpeedMod || 1;
-    var attackMod = enemy.attackSpeedMod || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
     var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
     
     if (enemy.aiState === 'windup') { enemy.setVelocity(0,0); enemy.windupTimer -= dt; if (enemy.windupTimer <= 0) { enemy.aiState = 'kicking'; enemy.kickTimer = 200; MMA.Player.damage(scene, Math.round((enemy.type.attackDamage + 5) * vulnMult)); } return; } 
@@ -573,7 +1293,7 @@ window.MMA.Enemies.AI = {
         enemy.setVelocity((cx/cdist)*enemy.type.speed, (cy/cdist)*enemy.type.speed);
         if (enemy.attackCooldown <= 0 && Math.random() < 0.005) {
           enemy.aiState = 'submitting';
-          enemy.submitTimer = 1200; // 1.2s window
+          enemy.submitTimer = 2000; // 2s window
           enemy.attackCooldown = enemy.type.attackCooldownMax;
           MMA.UI.showDamageText(scene, player.x, player.y - 40, 'SUBMISSION!', '#ff00ff');
           scene.registry.set('gameMessage', 'Submission! Mash Space!');
@@ -594,19 +1314,20 @@ window.MMA.Enemies.AI = {
   // Combo Striker AI: fast jab-cross-hook chains with brief pauses between combos
   combo: function(enemy, player, scene, dt){ 
     var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1; 
-    var speedMod = enemy.moveSpeedMod || 1;
-    var attackMod = enemy.attackSpeedMod || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
     var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
+    var vengeanceMult = window.MMA.Enemies.getVengeanceDamageMult(enemy);
     
     if (enemy.aiState && enemy.aiState.startsWith('combo')) { 
       enemy.setVelocity(0,0); 
       enemy.comboTimer -= dt; 
       if (enemy.comboTimer <= 0) { 
         var comboNum = parseInt(enemy.aiState.replace('combo','')) || 0; 
-        var hits = [Math.round(enemy.type.attackDamage * vulnMult), Math.round(enemy.type.attackDamage * 1.3 * vulnMult), Math.round(enemy.type.attackDamage * 1.6 * vulnMult)]; 
+        var hits = [Math.round(enemy.type.attackDamage * vulnMult * vengeanceMult), Math.round(enemy.type.attackDamage * 1.3 * vulnMult * vengeanceMult), Math.round(enemy.type.attackDamage * 1.6 * vulnMult * vengeanceMult)]; 
         var names = ['JAB!', 'CROSS!', 'HOOK!']; 
         if (comboNum < 3) { 
-          MMA.Player.damage(scene, hits[comboNum] || Math.round(enemy.type.attackDamage * vulnMult)); 
+          MMA.Player.damage(scene, hits[comboNum] || Math.round(enemy.type.attackDamage * vulnMult * vengeanceMult)); 
           MMA.UI.showDamageText(scene, player.x, player.y - 30, names[comboNum] || 'HIT!', '#ff3366'); 
           enemy.aiState = 'combo' + (comboNum + 1); 
           enemy.comboTimer = 180 * attackMod; 
@@ -631,6 +1352,130 @@ window.MMA.Enemies.AI = {
       } 
     } else enemy.setVelocity(0,0); 
     if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt; 
+  },
+
+  // Bully AI: hunts aggressively when player HP is low, but panics and flees at critical HP.
+  bully: function(enemy, player, scene, dt) {
+    var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+    var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
+
+    var pHp = (player && player.stats) ? player.stats.hp : 1;
+    var pMax = (player && player.stats) ? (player.stats.maxHp || 1) : 1;
+    var pPct = pMax > 0 ? (pHp / pMax) : 1;
+
+    // If player is low, bully pushes harder (but still respects attack token coordination)
+    var aggro = (pPct <= 0.30);
+    var spd = enemy.type.speed * (aggro ? 1.25 : 1.0) * speedMod;
+    var vengeanceMult = window.MMA.Enemies.getVengeanceDamageMult(enemy);
+
+    if (dist < enemy.type.chaseRange) {
+      if (dist < enemy.type.attackRange) {
+        enemy.setVelocity(0, 0);
+        if ((enemy.hasAttackToken || enemy.isBoss) && enemy.attackCooldown <= 0) {
+          enemy.attackCooldown = enemy.type.attackCooldownMax * (aggro ? 0.75 : 1.0) * attackMod;
+          var dmg = Math.round(enemy.type.attackDamage * vulnMult * (aggro ? 1.2 : 1.0) * (window.MMA.Enemies.getPackDamageMultiplier ? window.MMA.Enemies.getPackDamageMultiplier(enemy, scene) : 1) * vengeanceMult);
+          MMA.Player.damage(scene, dmg);
+          if (aggro && Math.random() < 0.25) MMA.UI.showDamageText(scene, player.x, player.y - 30, 'BULLIED!', '#ff8800');
+        }
+      } else {
+        enemy.setVelocity((dx / dist) * spd, (dy / dist) * spd);
+      }
+    } else {
+      enemy.setVelocity(0, 0);
+    }
+
+    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
+  },
+
+  // Feint Master AI: circles at mid range, performs fake windup (no damage), then real strike 300ms later
+  feintMaster: function(enemy, player, scene, dt) {
+    var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
+    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
+    var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
+    
+    // feintWindup: fake windup - no damage, shows "FEINT!" text
+    if (enemy.aiState === 'feintWindup') {
+      enemy.setVelocity(0, 0);
+      enemy.feintTimer -= dt;
+      if (enemy.feintTimer <= 0) {
+        // Transition to real strike after 300ms total (220ms feint + ~80ms more)
+        enemy.aiState = 'realStrike';
+        enemy.strikeTimer = 80; // remaining time to true strike
+        // Show attack name for real strike
+        MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, 'STRIKE!', '#ff00ff');
+      }
+      return;
+    }
+    
+    // realStrike: actual damaging attack - only deal damage if hasAttackToken or isBoss
+    if (enemy.aiState === 'realStrike') {
+      enemy.setVelocity(0, 0);
+      enemy.strikeTimer -= dt;
+      if (enemy.strikeTimer <= 0) {
+        // Deal damage only with token or if boss
+        if (enemy.hasAttackToken || enemy.isBoss) {
+          var vengeanceMult = window.MMA.Enemies.getVengeanceDamageMult(enemy);
+          var dmg = Math.round(enemy.type.attackDamage * vulnMult * 1.3 * vengeanceMult); // slightly stronger on real hit
+          MMA.Player.damage(scene, dmg);
+          MMA.UI.showDamageText(scene, player.x, player.y - 30, '-' + dmg + ' HP', '#ff0000');
+        }
+        // Enter retreat phase
+        enemy.aiState = 'retreat';
+        enemy.retreatTimer = 600;
+      }
+      return;
+    }
+    
+    // Retreat after real strike
+    if (enemy.aiState === 'retreat') {
+      enemy.setVelocity(-(dx / dist) * enemy.type.speed * 1.2 * speedMod, -(dy / dist) * enemy.type.speed * 1.2 * speedMod);
+      enemy.retreatTimer -= dt;
+      if (enemy.retreatTimer <= 0) {
+        enemy.aiState = null;
+      }
+      return;
+    }
+    
+    // Circle at mid range when not attacking
+    var minRange = 70;
+    var maxRange = 150;
+    
+    if (dist < enemy.type.chaseRange) {
+      if (dist >= minRange && dist <= maxRange) {
+        // Circle the player
+        if (!enemy.circleDir) enemy.circleDir = Math.random() < 0.5 ? 1 : -1;
+        if (!enemy.circleAngle) enemy.circleAngle = Math.atan2(dy, dx);
+        enemy.circleAngle += enemy.circleDir * 2.0 * (dt / 1000);
+        var targetX = player.x + Math.cos(enemy.circleAngle) * minRange;
+        var targetY = player.y + Math.sin(enemy.circleAngle) * minRange;
+        var cx = targetX - enemy.x, cy = targetY - enemy.y;
+        var cdist = Math.sqrt(cx * cx + cy * cy) || 1;
+        enemy.setVelocity((cx / cdist) * enemy.type.speed * 0.85 * speedMod, (cy / cdist) * enemy.type.speed * 0.85 * speedMod);
+        
+        // Random chance to start feint attack when in range and cooldown ready
+        if (enemy.attackCooldown <= 0 && Math.random() < 0.006) {
+          enemy.aiState = 'feintWindup';
+          enemy.feintTimer = 220; // fake windup duration (no damage)
+          enemy.attackCooldown = enemy.type.attackCooldownMax * attackMod;
+          enemy.setVelocity(0, 0);
+          // Show feint indicator
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 40, 'FEINT!', '#ffff00');
+        }
+      } else if (dist < minRange) {
+        // Back up slightly
+        enemy.setVelocity(-(dx / dist) * enemy.type.speed * 0.6 * speedMod, -(dy / dist) * enemy.type.speed * 0.6 * speedMod);
+      } else {
+        // Approach player
+        enemy.setVelocity((dx / dist) * enemy.type.speed * 0.8 * speedMod, (dy / dist) * enemy.type.speed * 0.8 * speedMod);
+      }
+    } else {
+      enemy.setVelocity(0, 0);
+    }
+    
+    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
   }
 };
 window.ENEMY_TYPES = window.ENEMY_TYPES || window.MMA.Enemies.TYPES;

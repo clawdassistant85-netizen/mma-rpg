@@ -1,8 +1,6 @@
 // Narrator integration for MMA RPG
 // Must be loaded via <script> before GameScene usage
-const NARRATOR_URL = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
-  ? 'http://127.0.0.1:18789/v1/chat/completions'
-  : null;
+const NARRATOR_URL = null; // Local LLM disabled — use built-in fallbacks
 
 // Prompt templates for different events
 const PROMPT_TEMPLATES = {

@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>MMA RPG</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230b0b0b'/%3E%3Ctext x='50%25' y='56%25' text-anchor='middle' font-size='34' font-family='Arial,sans-serif' fill='%23ffd447'%3EM%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/style.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -180,6 +181,25 @@
       transition: all 180ms ease;
     }
     #ground-banner.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    
+    /* Health Pulse Warning - red vignette when HP < 25% */
+    #health-pulse-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 25;
+      box-shadow: inset 0 0 0 0 rgba(255, 0, 0, 0);
+      transition: box-shadow 300ms ease;
+    }
+    #health-pulse-overlay.active {
+      animation: healthPulse 800ms ease-in-out infinite;
+    }
+    @keyframes healthPulse {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+    
     #dom-restart-btn {
       position: absolute;
       left: 50%;
@@ -213,6 +233,7 @@
     <div id="game-container"></div>
     <!-- UI layer (mobile touch controls) -->
     <div id="ui-layer" aria-hidden="true">
+      <div id="health-pulse-overlay"></div>
       <div id="ground-overlay"><div class="ground-text">GROUND GAME</div><div id="ground-timer"><div id="ground-timer-fill"></div></div></div>
       <button id="mobile-pause-btn" type="button" aria-label="Pause menu">⚙️</button>
       <div id="ground-banner">TAKEDOWN!</div>
@@ -234,16 +255,16 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=11"></script>
-  <script src="js/sprites.js?v=11"></script>
-  <script src="js/combat.js?v=11"></script>
-  <script src="js/enemies.js?v=11"></script>
-  <script src="js/zones.js?v=11"></script>
-  <script src="js/player.js?v=11"></script>
-  <script src="js/items.js?v=11"></script>
-  <script src="js/vfx.js?v=11"></script>
-  <script src="js/ui.js?v=11"></script>
-  <script src="js/progression.js?v=11"></script>
+  <script src="js/config.js?v=12"></script>
+  <script src="js/sprites.js?v=12"></script>
+  <script src="js/combat.js?v=12"></script>
+  <script src="js/enemies.js?v=12"></script>
+  <script src="js/zones.js?v=12"></script>
+  <script src="js/player.js?v=12"></script>
+  <script src="js/items.js?v=12"></script>
+  <script src="js/vfx.js?v=12"></script>
+  <script src="js/ui.js?v=12"></script>
+  <script src="js/progression.js?v=12"></script>
   <script>
   // Unlock WebAudio on first user interaction (mobile tap/click)
   function unlockAudio(){
@@ -272,6 +293,57 @@
   }
   document.addEventListener('touchstart', unlockAudio, {once:true});
   document.addEventListener('click', unlockAudio, {once:true});
+  
+  // Keyboard shortcuts for desktop
+  document.addEventListener('keydown', function(e) {
+    // Only process if game is running
+    if (!window.phaserGame || !window.phaserGame.scene || !window.phaserGame.scene.keys) return;
+    
+    var gameScene = window.phaserGame.scene.keys.GameScene;
+    var isGameActive = gameScene && gameScene.scene && gameScene.scene.isActive && gameScene.scene.isActive();
+    
+    // C key = Fighter Card toggle
+    if (e.key === 'c' || e.key === 'C') {
+      if (isGameActive && gameScene.player && !gameScene.paused && !gameScene.gameOver) {
+        if (gameScene.activeFighterCard && gameScene.activeFighterCard.close) {
+          gameScene.activeFighterCard.close();
+        } else {
+          gameScene.activeFighterCard = window.MMA.UI.showFighterCard(gameScene);
+        }
+      }
+    }
+    // T key = Trophy Room toggle
+    if (e.key === 't' || e.key === 'T') {
+      if (isGameActive && gameScene.player && !gameScene.paused && !gameScene.gameOver) {
+        if (gameScene.activeTrophyRoom && gameScene.activeTrophyRoom.close) {
+          gameScene.activeTrophyRoom.close();
+        } else {
+          gameScene.activeTrophyRoom = window.MMA.UI.showTrophyRoom(gameScene);
+        }
+      }
+    }
+    // D key = Fighter's Diary toggle
+    if (e.key === 'd' || e.key === 'D') {
+      if (isGameActive && gameScene.player && !gameScene.paused && !gameScene.gameOver) {
+        if (gameScene.activeFighterDiary && gameScene.activeFighterDiary.close) {
+          gameScene.activeFighterDiary.close();
+        } else {
+          gameScene.activeFighterDiary = window.MMA.UI.showFighterDiary(gameScene);
+        }
+      }
+    }
+  });
+  
+  // Periodic stamina and health warning check (every 500ms when game is active)
+  setInterval(function() {
+    if (!window.phaserGame || !window.phaserGame.scene || !window.phaserGame.scene.keys) return;
+    var gameScene = window.phaserGame.scene.keys.GameScene;
+    var isGameActive = gameScene && gameScene.scene && gameScene.scene.isActive && gameScene.scene.isActive();
+    if (isGameActive && gameScene.player && gameScene.player.stats && !gameScene.paused && !gameScene.gameOver) {
+      window.MMA.UI.checkStaminaWarning(gameScene, gameScene.player.stats.stamina, gameScene.player.stats.maxStamina);
+      window.MMA.UI.updateHealthPulse(gameScene, gameScene.player.stats.hp, gameScene.player.stats.maxHp);
+    }
+  }, 500);
   // Start game on first tap (mobile) after audio unlock
   document.addEventListener('touchstart', function(){
     var btn = document.getElementById('dom-start-btn');
@@ -434,16 +506,16 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=11"></script>
-  <script src="js/saveSystem.js?v=11"></script>
-  <script src="js/narrator.js?v=11"></script>
-  <script src="js/scenes/TitleScene.js?v=11"></script>
-  <script src="js/scenes/BootScene.js?v=11"></script>
-  <script src="js/scenes/GameScene.js?v=11"></script>
-  <script src="js/scenes/HUDScene.js?v=11"></script>
-  <script src="js/scenes/PauseScene.js?v=11"></script>
-  <script src="js/scenes/UnlockScene.js?v=11"></script>
-  <script src="js/scenes/VictoryScene.js?v=11"></script>
-  <script src="js/main.js?v=11"></script>
+<script src="js/sounds.js?v=12"></script>
+  <script src="js/saveSystem.js?v=12"></script>
+  <script src="js/narrator.js?v=12"></script>
+  <script src="js/scenes/TitleScene.js?v=12"></script>
+  <script src="js/scenes/BootScene.js?v=12"></script>
+  <script src="js/scenes/GameScene.js?v=12"></script>
+  <script src="js/scenes/HUDScene.js?v=12"></script>
+  <script src="js/scenes/PauseScene.js?v=12"></script>
+  <script src="js/scenes/UnlockScene.js?v=12"></script>
+  <script src="js/scenes/VictoryScene.js?v=12"></script>
+  <script src="js/main.js?v=12"></script>
 </body>
 </html>

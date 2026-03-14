@@ -42,6 +42,8 @@ window.MMA.UI = {
       enemiesDefeated: 0,
       critsLanded: 0
     };
+    // Deactivate health pulse on fight reset
+    this.deactivateHealthPulse();
   },
   recordHitDealt: function(damage, isCrit, comboCount) {
     this.fightStats.damageDealt += damage;
@@ -277,12 +279,238 @@ window.MMA.UI = {
     }
     this.hypeMeter.value = 0;
   },
+  // Fighter's Diary - auto-logged milestones and memorable moments
+  fighterDiary: {
+    entries: [], // { id, text, timestamp, icon, type }
+    milestoneThresholds: [5, 10, 25, 50, 100], // Unlock lore at these milestone counts
+    unlockedLore: [], // Array of lore snippets unlocked
+    loreSnippets: [
+      { threshold: 5, title: "First Steps", text: "Your journey as a fighter begins. Every master was once a beginner." },
+      { threshold: 10, title: "Finding Your Style", text: "You start to gravitate toward a particular fighting style. The ring reveals your nature." },
+      { threshold: 25, title: "Rising Threat", text: "Rumors spread of a new fighter making waves. The Underground takes notice." },
+      { threshold: 50, title: "Contender Status", text: "You're no longer an unknown. Other fighters study your techniques." },
+      { threshold: 100, title: "Legend Status", text: "Your name echoes through the arena. They've stopped underestimating you." }
+    ]
+  },
+  // Record a diary entry
+  recordDiaryEntry: function(text, type, icon) {
+    var entry = {
+      id: Date.now(),
+      text: text,
+      type: type || 'milestone',
+      icon: icon || '📝',
+      timestamp: Date.now()
+    };
+    this.fighterDiary.entries.unshift(entry); // Add to front
+    // Keep only last 50 entries
+    if (this.fighterDiary.entries.length > 50) {
+      this.fighterDiary.entries = this.fighterDiary.entries.slice(0, 50);
+    }
+    this.saveFighterDiary();
+    return entry;
+  },
+  // Check and unlock lore based on total fights
+  checkLoreUnlocks: function() {
+    var totalFights = this.fighterCard.stats.totalFights;
+    var self = this;
+    this.fighterDiary.loreSnippets.forEach(function(lore) {
+      if (totalFights >= lore.threshold && self.fighterDiary.unlockedLore.indexOf(lore.threshold) === -1) {
+        self.fighterDiary.unlockedLore.push(lore.threshold);
+        // Also record as diary entry
+        self.recordDiaryEntry(lore.title + ': ' + lore.text, 'lore', '📜');
+      }
+    });
+  },
+  // Save/load diary
+  saveFighterDiary: function() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      var key = 'mma-rpg-diary';
+      var data = {
+        entries: this.fighterDiary.entries,
+        unlockedLore: this.fighterDiary.unlockedLore
+      };
+      window.localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {}
+  },
+  loadFighterDiary: function() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      var key = 'mma-rpg-diary';
+      var raw = window.localStorage.getItem(key);
+      if (!raw) return;
+      var data = JSON.parse(raw);
+      if (!data || typeof data !== 'object') return;
+      if (data.entries) this.fighterDiary.entries = data.entries;
+      if (data.unlockedLore) this.fighterDiary.unlockedLore = data.unlockedLore;
+    } catch (e) {}
+  },
+  // Show Fighter's Diary as a popup
+  showFighterDiary: function(scene) {
+    var self = this;
+    var W = scene.cameras.main.width;
+    var H = scene.cameras.main.height;
+    var cw = Math.min(360, W - 40);
+    var ch = Math.min(480, H - 40);
+    var cx = (W - cw) / 2;
+    var cy = (H - ch) / 2;
+    var con = scene.add.container(cx, cy);
+    con.setDepth(200);
+
+    // Background
+    var g = scene.add.graphics();
+    g.fillStyle(0x000000, 0.92);
+    g.fillRoundedRect(0, 0, cw, ch, 16);
+    g.lineStyle(3, 0x44ffaa, 1);
+    g.strokeRoundedRect(0, 0, cw, ch, 16);
+    con.add(g);
+
+    // Header
+    var hdr = scene.add.graphics();
+    hdr.fillStyle(0x1a3a2a, 1);
+    hdr.fillRoundedRect(4, 4, cw - 8, 50, 12);
+    con.add(hdr);
+
+    var title = scene.add.text(cw / 2, 29, '📖 FIGHTER\'S DIARY', { fontFamily: 'Arial Black, sans-serif', fontSize: '16px', color: '#44ffaa' }).setOrigin(0.5);
+    con.add(title);
+
+    // Scroll container for entries
+    var contentY = 65;
+    var contentH = ch - 120;
+    var contentBg = scene.add.graphics();
+    contentBg.fillStyle(0x0a1a14, 1);
+    contentBg.fillRoundedRect(10, contentY, cw - 20, contentH, 8);
+    con.add(contentBg);
+
+    var entriesContainer = scene.add.container(0, contentY);
+    con.add(entriesContainer);
+
+    // Render diary entries
+    var entries = this.fighterDiary.entries.slice(0, 8); // Show up to 8 entries
+    if (entries.length === 0) {
+      var emptyText = scene.add.text(cw / 2 - 20, contentY + contentH / 2, 'No entries yet.\nKeep fighting!', { fontSize: '14px', color: '#666666', align: 'center' }).setOrigin(0.5);
+      entriesContainer.add(emptyText);
+    } else {
+      entries.forEach(function(entry, idx) {
+        var y = 10 + idx * 48;
+        if (y > contentH - 50) return;
+        
+        // Entry background
+        var entryBg = scene.add.graphics();
+        entryBg.fillStyle(0x1a2a22, 0.8);
+        entryBg.fillRoundedRect(15, y, cw - 50, 42, 6);
+        entriesContainer.add(entryBg);
+        
+        // Entry icon
+        var icon = scene.add.text(25, y + 21, entry.icon, { fontSize: '18px' }).setOrigin(0, 0.5);
+        entriesContainer.add(icon);
+        
+        // Entry text
+        var entryText = scene.add.text(50, y + 12, entry.text.substring(0, 40) + (entry.text.length > 40 ? '...' : ''), { fontSize: '12px', color: '#aaffcc' }).setOrigin(0, 0);
+        entriesContainer.add(entryText);
+        
+        // Timestamp
+        var date = new Date(entry.timestamp);
+        var timeStr = date.toLocaleDateString();
+        var timeText = scene.add.text(50, y + 26, timeStr, { fontSize: '10px', color: '#668877' }).setOrigin(0, 0);
+        entriesContainer.add(timeText);
+      });
+    }
+
+    // Lore section
+    var loreY = ch - 45;
+    var loreTitle = scene.add.text(20, loreY, 'LORE UNLOCKED: ' + this.fighterDiary.unlockedLore.length + '/' + this.fighterDiary.loreSnippets.length, { fontSize: '11px', color: '#ffaa44', fontStyle: 'bold' }).setOrigin(0, 0.5);
+    con.add(loreTitle);
+
+    // Close button
+    var closeBtn = scene.add.text(cw / 2, ch - 18, 'CLOSE', {
+      fontSize: '13px',
+      color: '#ffffff',
+      backgroundColor: '#225544',
+      padding: { left: 16, right: 16, top: 6, bottom: 6 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    con.add(closeBtn);
+
+    con.close = function() {
+      scene.tweens.add({
+        targets: con,
+        alpha: 0,
+        scaleX: 0.9,
+        scaleY: 0.9,
+        duration: 150,
+        onComplete: function() { con.destroy(); }
+      });
+    };
+    closeBtn.on('pointerdown', function() { con.close(); });
+
+    con.setAlpha(0);
+    con.setScale(0.9);
+    scene.tweens.add({
+      targets: con,
+      alpha: 1,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 200,
+      ease: 'Back.easeOut'
+    });
+
+    return con;
+  },
+  // Helper to record specific milestones
+  recordMilestone: function(type, data) {
+    var entry = null;
+    switch(type) {
+      case 'grapple_ko':
+        entry = this.recordDiaryEntry('First KO with a grapple!', 'achievement', '🤼');
+        break;
+      case 'survived_boss':
+        var seconds = Math.round(data.duration / 1000);
+        entry = this.recordDiaryEntry('Survived ' + seconds + 's vs ' + (data.bossName || 'Boss'), 'survival', '⏱️');
+        break;
+      case 'combo_streak':
+        entry = this.recordDiaryEntry('5-hit combo streak x' + data.count + '!', 'combo', '💥');
+        break;
+      case 'first_win':
+        entry = this.recordDiaryEntry('Won first fight! The journey begins.', 'first', '🥊');
+        break;
+      case 'boss_defeated':
+        entry = this.recordDiaryEntry('Defeated ' + (data.bossName || 'a boss') + '!', 'boss', '💀');
+        break;
+      case 'zone_clear':
+        entry = this.recordDiaryEntry('Cleared Zone ' + data.zone + '!', 'zone', '🏆');
+        break;
+      case 'perfect_fight':
+        entry = this.recordDiaryEntry('Won without taking damage!', 'perfect', '💎');
+        break;
+      case 'underdog_win':
+        entry = this.recordDiaryEntry('Underdog victory! Won with low HP.', 'underdog', '🦁');
+        break;
+      case 'speed_demon':
+        var seconds = Math.round(data.duration / 1000);
+        entry = this.recordDiaryEntry('Speed Demon! Won in ' + seconds + 's.', 'speed', '⚡');
+        break;
+      case 'crit_combo':
+        entry = this.recordDiaryEntry('Landed ' + data.count + ' crits in one fight!', 'crit', '🎯');
+        break;
+      case 'style_master':
+        entry = this.recordDiaryEntry('Mastered ' + data.style + ' style!', 'style', '🔥');
+        break;
+    }
+    this.checkLoreUnlocks();
+    return entry;
+  },
   // Fighter Card - visual profile with stats, style, achievements
   fighterCard: {
     stats: { totalFights: 0, wins: 0, losses: 0, enemiesDefeated: 0, totalDamageDealt: 0, totalHitsLanded: 0, longestCombo: 0, critsLanded: 0, perfectBlocks: 0 },
     achievements: [],
     style: 'balanced',
     stylePoints: { strike: 0, grapple: 0 },
+    // Move usage tracking for Style DNA Breakdown
+    moveUsageStats: {
+      jab: 0, cross: 0, hook: 0, kick: 0, uppercut: 0, // strikes
+      takedown: 0, grapple: 0, submission: 0, clinch: 0, // grapples
+      special: 0, counter: 0, dodge: 0, block: 0 // other
+    },
     // Legacy Records - personal bests that persist
     legacyRecords: {
       longestCombo: 0,
@@ -301,6 +529,53 @@ window.MMA.UI = {
       underdogWins: 0,
       speedDemonWins: 0
     }
+  },
+  // Trophy Room - collection of bosses, elites, and rare items
+  trophyRoom: {
+    bosses: [], // { id, name, zone, dateDefeated, fightDuration }
+    eliteEnemies: [], // { type, zone, dateDefeated }
+    rareItems: [], // { id, name, type, dateAcquired, rarity }
+    // Known boss definitions for display
+    bossRegistry: {
+      'shadow': { name: 'Shadow', zone: 1, icon: '👤', desc: 'Your rival' },
+      'heavyweights': { name: 'The Heavyweights', zone: 1, icon: '💪', desc: 'Twin enforcers' },
+      'grapple_master': { name: 'Grapple Master', zone: 2, icon: '🤼', desc: 'Ground game expert' },
+      'striker_king': { name: 'Striker King', zone: 2, icon: '👊', desc: 'Fists of fury' },
+      'coach': { name: 'The Coach', zone: 2, icon: '🎓', desc: 'Enemy support specialist' },
+      'elite_kickboxer': { name: 'Elite Kickboxer', zone: 3, icon: '🦵', desc: 'Advanced striker' },
+      'elite_wrestler': { name: 'Elite Wrestler', zone: 3, icon: '🏋️', desc: 'Elite grappler' },
+      'champion': { name: 'The Champion', zone: 4, icon: '🏆', desc: 'Title holder' }
+    },
+    // Elite enemy type definitions
+    eliteTypes: {
+      'elite_kickboxer': { name: 'Elite Kickboxer', zone: 3, icon: '🦵' },
+      'elite_wrestler': { name: 'Elite Wrestler', zone: 3, icon: '🏋️' }
+    },
+    // Rare item definitions
+    itemRegistry: {
+      'champions_belt': { name: "Champion's Belt", type: 'equipment', rarity: 'gold', icon: '🥇' },
+      'fighters_gloves': { name: "Fighter's Gloves", type: 'equipment', rarity: 'silver', icon: '🥊' },
+      'speed_wraps': { name: 'Speed Wraps', type: 'equipment', rarity: 'bronze', icon: '🩹' },
+      'focus_charm': { name: 'Focus Charm', type: 'consumable', rarity: 'silver', icon: '✨' },
+      'technique_scroll': { name: 'Technique Scroll', type: 'consumable', rarity: 'gold', icon: '📜' },
+      'energy_drink': { name: 'Energy Drink', type: 'consumable', rarity: 'bronze', icon: '⚡' },
+      'health_potion': { name: 'Health Potion', type: 'consumable', rarity: 'bronze', icon: '🧪' }
+    }
+  },
+  // Stamina warning indicator
+  staminaWarning: {
+    active: false,
+    container: null,
+    scene: null,
+    shown: false
+  },
+  // Health Pulse Warning - red vignette when HP < 25%
+  healthPulse: {
+    active: false,
+    overlay: null,
+    currentHpPercent: 100,
+    scene: null,
+    intervalId: null
   },
   ACHIEVEMENTS: {
     firstFight: { id: 'firstFight', name: 'First Blood', desc: 'Win your first fight', icon: '🥊' },
@@ -321,6 +596,138 @@ window.MMA.UI = {
     if (type === 'strike' || type === 'jab' || type === 'cross' || type === 'hook' || type === 'kick') this.fighterCard.stylePoints.strike++;
     else if (type === 'grapple' || type === 'takedown' || type === 'sub') this.fighterCard.stylePoints.grapple++;
     this.updateStyle();
+  },
+  // Record move usage for Style DNA Breakdown
+  recordMoveUsage: function(moveKey) {
+    var mu = this.fighterCard.moveUsageStats;
+    if (mu.hasOwnProperty(moveKey)) {
+      mu[moveKey]++;
+    }
+    // Also update style points
+    var strikeMoves = { jab:1, cross:1, hook:1, kick:1, uppercut:1 };
+    var grappleMoves = { takedown:1, grapple:1, submission:1, clinch:1 };
+    if (strikeMoves[moveKey]) {
+      this.fighterCard.stylePoints.strike++;
+    } else if (grappleMoves[moveKey]) {
+      this.fighterCard.stylePoints.grapple++;
+    }
+    this.updateStyle();
+  },
+  // Get Style DNA breakdown percentages
+  getStyleBreakdown: function() {
+    var mu = this.fighterCard.moveUsageStats;
+    var total = 0;
+    for (var k in mu) total += mu[k];
+    if (total === 0) return { strike: 50, grapple: 50, other: 0 };
+    
+    var strikeMoves = ['jab', 'cross', 'hook', 'kick', 'uppercut'];
+    var grappleMoves = ['takedown', 'grapple', 'submission', 'clinch'];
+    
+    var strikeCount = 0, grappleCount = 0;
+    for (var i = 0; i < strikeMoves.length; i++) {
+      strikeCount += mu[strikeMoves[i]] || 0;
+    }
+    for (var j = 0; j < grappleMoves.length; j++) {
+      grappleCount += mu[grappleMoves[j]] || 0;
+    }
+    var otherCount = total - strikeCount - grappleCount;
+    
+    return {
+      strike: Math.round((strikeCount / total) * 100),
+      grapple: Math.round((grappleCount / total) * 100),
+      other: Math.round((otherCount / total) * 100),
+      total: total
+    };
+  },
+  // Get top moves for display
+  getTopMoves: function(limit) {
+    var mu = this.fighterCard.moveUsageStats;
+    var moves = [];
+    for (var k in mu) {
+      if (mu[k] > 0) moves.push({ key: k, count: mu[k] });
+    }
+    moves.sort(function(a, b) { return b.count - a.count; });
+    return moves.slice(0, limit || 5);
+  },
+  // Draw pie chart for Style DNA
+  drawStylePieChart: function(scene, container, x, y, radius) {
+    var breakdown = this.getStyleBreakdown();
+    if (breakdown.total === 0) return;
+    
+    var strikeColor = 0xff4444;  // Red for striker
+    var grappleColor = 0x4488ff;  // Blue for grappler
+    var otherColor = 0x888888;   // Gray for other
+    
+    var segments = [];
+    if (breakdown.strike > 0) segments.push({ pct: breakdown.strike / 100, color: strikeColor });
+    if (breakdown.grapple > 0) segments.push({ pct: breakdown.grapple / 100, color: grappleColor });
+    if (breakdown.other > 0) segments.push({ pct: breakdown.other / 100, color: otherColor });
+    
+    if (segments.length === 0) return;
+    
+    // Draw pie segments
+    var startAngle = -Math.PI / 2; // Start from top
+    for (var i = 0; i < segments.length; i++) {
+      var seg = segments[i];
+      var endAngle = startAngle + (seg.pct * 2 * Math.PI);
+      
+      var wedge = scene.add.graphics();
+      wedge.fillStyle(seg.color, 1);
+      wedge.slice(x, y, radius, startAngle, endAngle, false);
+      wedge.fillPath();
+      container.add(wedge);
+      
+      // Add slight gap between segments
+      startAngle = endAngle + 0.02;
+    }
+    
+    // Draw center circle (donut hole)
+    var donut = scene.add.graphics();
+    donut.fillStyle(0x000000, 1);
+    donut.fillCircle(x, y, radius * 0.5);
+    container.add(donut);
+    
+    // Draw center label
+    var labelStyle = this.fighterCard.style;
+    var centerColor = labelStyle === 'striker' ? strikeColor : (labelStyle === 'grappler' ? grappleColor : 0x44ff88);
+    var centerText = scene.add.text(x, y - 6, this.getStyleLabel(), {
+      fontSize: '10px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    container.add(centerText);
+    
+    var centerPct = scene.add.text(x, y + 8, breakdown.strike + '%', {
+      fontSize: '12px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    container.add(centerPct);
+    
+    // Draw legend below
+    var legendY = y + radius + 15;
+    var legendItems = [
+      { label: 'Strikes', pct: breakdown.strike, color: strikeColor },
+      { label: 'Grapples', pct: breakdown.grapple, color: grappleColor }
+    ];
+    
+    for (var j = 0; j < legendItems.length; j++) {
+      var item = legendItems[j];
+      var lx = x - radius + j * (radius * 1.8);
+      
+      // Color box
+      var box = scene.add.graphics();
+      box.fillStyle(item.color, 1);
+      box.fillRect(lx - 10, legendY - 4, 8, 8);
+      container.add(box);
+      
+      // Label
+      var lbl = scene.add.text(lx, legendY, item.label + ' ' + item.pct + '%', {
+        fontSize: '9px',
+        color: '#cccccc'
+      }).setOrigin(0, 0.5);
+      container.add(lbl);
+    }
   },
   updateStyle: function() {
     var sp = this.fighterCard.stylePoints;
@@ -442,15 +849,139 @@ window.MMA.UI = {
     if (changed) this.saveLegacyRecords();
     return changed;
   },
-  // Save legacy records to localStorage
+  // Stamina Warning Indicator - shows when stamina is critically low
+  showStaminaWarning: function(scene) {
+    if (this.staminaWarning.shown) return;
+    
+    var centerX = scene.cameras.main.width / 2;
+    var topY = 140;
+    
+    var container = scene.add.container(centerX, topY);
+    container.setDepth(60);
+    container.setAlpha(0);
+    
+    // Warning background
+    var bg = scene.add.graphics();
+    bg.fillStyle(0xff0000, 0.8);
+    bg.fillRoundedRect(-80, -15, 160, 30, 8);
+    container.add(bg);
+    
+    // Warning text
+    var text = scene.add.text(0, 0, 'LOW STAMINA!', {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '16px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    container.add(text);
+    
+    this.staminaWarning.container = container;
+    this.staminaWarning.scene = scene;
+    this.staminaWarning.shown = true;
+    
+    // Fade in with pulse
+    scene.tweens.add({
+      targets: container,
+      alpha: 1,
+      duration: 200,
+      onComplete: function() {
+        scene.tweens.add({
+          targets: container,
+          alpha: 0.6,
+          duration: 400,
+          yoyo: true,
+          repeat: 2
+        });
+      }
+    });
+    
+    // Auto-hide after 2 seconds
+    scene.time.delayedCall(2000, function() {
+      if (container) {
+        scene.tweens.add({
+          targets: container,
+          alpha: 0,
+          duration: 200,
+          onComplete: function() {
+            if (container) container.destroy();
+          }
+        });
+      }
+      this.staminaWarning.shown = false;
+    }, [], this);
+  },
+  checkStaminaWarning: function(scene, currentStamina, maxStamina) {
+    // Show warning when stamina drops below 20%
+    if (currentStamina / maxStamina < 0.2 && !this.staminaWarning.shown) {
+      this.showStaminaWarning(scene);
+    }
+  },
+  resetStaminaWarning: function() {
+    this.staminaWarning.shown = false;
+    this.staminaWarning.scene = null;
+  },
+  // Health Pulse Warning - activates when HP < 25%
+  getHealthPulseOverlay: function() {
+    if (!this.healthPulse.overlay) {
+      this.healthPulse.overlay = document.getElementById('health-pulse-overlay');
+    }
+    return this.healthPulse.overlay;
+  },
+  updateHealthPulse: function(scene, currentHp, maxHp) {
+    var hpPercent = maxHp > 0 ? (currentHp / maxHp) * 100 : 0;
+    this.healthPulse.currentHpPercent = hpPercent;
+    
+    var overlay = this.getHealthPulseOverlay();
+    if (!overlay) return;
+    
+    // Activate when HP < 25%
+    if (hpPercent < 25 && !this.healthPulse.active) {
+      this.healthPulse.active = true;
+      overlay.classList.add('active');
+    } else if (hpPercent >= 25 && this.healthPulse.active) {
+      this.deactivateHealthPulse();
+      return;
+    }
+    
+    if (!this.healthPulse.active) return;
+    
+    // Scale intensity based on how low HP is (more intense as HP approaches 0%)
+    // At 25% HP: subtle pulse (inset 20px, opacity 0.3)
+    // At 5% HP: intense pulse (inset 80px, opacity 0.8)
+    var severity = Math.max(0, Math.min(1, (25 - hpPercent) / 20)); // 0 at 25%, 1 at 5% or below
+    
+    var insetPx = 20 + (severity * 60); // 20-80px
+    var opacity = 0.3 + (severity * 0.5); // 0.3-0.8
+    
+    // Update the pulse animation intensity via box-shadow
+    var shadow = 'inset ' + insetPx + 'px ' + insetPx + 'px ' + insetPx + 'px ' + insetPx + 'px rgba(255, 0, 0, ' + opacity + ')';
+    overlay.style.boxShadow = shadow;
+    
+    // Adjust animation speed - faster pulse as HP gets lower
+    var duration = Math.max(400, 800 - (severity * 400)); // 800ms at 25%, 400ms at critical
+    overlay.style.animationDuration = duration + 'ms';
+  },
+  deactivateHealthPulse: function() {
+    this.healthPulse.active = false;
+    var overlay = this.getHealthPulseOverlay();
+    if (overlay) {
+      overlay.classList.remove('active');
+      overlay.style.boxShadow = 'inset 0 0 0 0 rgba(255, 0, 0, 0)';
+    }
+  },
+  // Save legacy records and move stats to localStorage
   saveLegacyRecords: function() {
     try {
       if (typeof window === 'undefined' || !window.localStorage) return;
       var key = 'mma-rpg-legacy';
-      window.localStorage.setItem(key, JSON.stringify(this.fighterCard.legacyRecords));
+      var data = {
+        legacy: this.fighterCard.legacyRecords,
+        moves: this.fighterCard.moveUsageStats
+      };
+      window.localStorage.setItem(key, JSON.stringify(data));
     } catch (e) {}
   },
-  // Load legacy records from localStorage
+  // Load legacy records and move stats from localStorage
   loadLegacyRecords: function() {
     try {
       if (typeof window === 'undefined' || !window.localStorage) return;
@@ -459,15 +990,260 @@ window.MMA.UI = {
       if (!raw) return;
       var data = JSON.parse(raw);
       if (!data || typeof data !== 'object') return;
-      // Merge with defaults
-      var rec = this.fighterCard.legacyRecords;
-      for (var k in data) {
-        if (rec.hasOwnProperty(k)) {
-          rec[k] = data[k];
+      // Merge legacy records
+      if (data.legacy) {
+        var rec = this.fighterCard.legacyRecords;
+        for (var k in data.legacy) {
+          if (rec.hasOwnProperty(k)) {
+            rec[k] = data.legacy[k];
+          }
+        }
+      }
+      // Merge move usage stats
+      if (data.moves) {
+        var mu = this.fighterCard.moveUsageStats;
+        for (var mk in data.moves) {
+          if (mu.hasOwnProperty(mk)) {
+            mu[mk] = data.moves[mk];
+          }
         }
       }
     } catch (e) {}
   },
+  // Trophy Room - save/load
+  saveTrophyRoom: function() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      var key = 'mma-rpg-trophies';
+      var data = {
+        bosses: this.trophyRoom.bosses,
+        eliteEnemies: this.trophyRoom.eliteEnemies,
+        rareItems: this.trophyRoom.rareItems
+      };
+      window.localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {}
+  },
+  loadTrophyRoom: function() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      var key = 'mma-rpg-trophies';
+      var raw = window.localStorage.getItem(key);
+      if (!raw) return;
+      var data = JSON.parse(raw);
+      if (!data || typeof data !== 'object') return;
+      if (data.bosses) this.trophyRoom.bosses = data.bosses;
+      if (data.eliteEnemies) this.trophyRoom.eliteEnemies = data.eliteEnemies;
+      if (data.rareItems) this.trophyRoom.rareItems = data.rareItems;
+    } catch (e) {}
+  },
+  // Record a boss defeat
+  recordBossDefeat: function(bossId, zone, durationMs) {
+    // Check if already recorded
+    for (var i = 0; i < this.trophyRoom.bosses.length; i++) {
+      if (this.trophyRoom.bosses[i].id === bossId) return; // Already recorded
+    }
+    this.trophyRoom.bosses.push({
+      id: bossId,
+      zone: zone,
+      dateDefeated: Date.now(),
+      fightDuration: durationMs || 0
+    });
+    this.saveTrophyRoom();
+  },
+  // Record an elite enemy defeat
+  recordEliteDefeat: function(eliteType, zone) {
+    this.trophyRoom.eliteEnemies.push({
+      type: eliteType,
+      zone: zone,
+      dateDefeated: Date.now()
+    });
+    this.saveTrophyRoom();
+  },
+  // Record a rare item acquisition
+  recordRareItem: function(itemId) {
+    // Check if already have this item
+    for (var i = 0; i < this.trophyRoom.rareItems.length; i++) {
+      if (this.trophyRoom.rareItems[i].id === itemId) return; // Already have
+    }
+    var itemDef = this.trophyRoom.itemRegistry[itemId];
+    if (!itemDef) return;
+    this.trophyRoom.rareItems.push({
+      id: itemId,
+      name: itemDef.name,
+      type: itemDef.type,
+      rarity: itemDef.rarity,
+      dateAcquired: Date.now()
+    });
+    this.saveTrophyRoom();
+  },
+  // Get trophy counts
+  getTrophyCounts: function() {
+    return {
+      bosses: this.trophyRoom.bosses.length,
+      elites: this.trophyRoom.eliteEnemies.length,
+      items: this.trophyRoom.rareItems.length,
+      total: this.trophyRoom.bosses.length + this.trophyRoom.eliteEnemies.length + this.trophyRoom.rareItems.length
+    };
+  },
+  // Show Trophy Room UI
+  showTrophyRoom: function(scene) {
+    var self = this;
+    var W = scene.cameras.main.width;
+    var H = scene.cameras.main.height;
+    var cw = Math.min(400, W - 40);
+    var ch = Math.min(480, H - 40);
+    var cx = (W - cw) / 2;
+    var cy = (H - ch) / 2;
+    var con = scene.add.container(cx, cy);
+    con.setDepth(200);
+
+    // Background
+    var g = scene.add.graphics();
+    g.fillStyle(0x000000, 0.92);
+    g.fillRoundedRect(0, 0, cw, ch, 16);
+    g.lineStyle(3, 0x9933ff, 1);
+    g.strokeRoundedRect(0, 0, cw, ch, 16);
+    con.add(g);
+
+    // Header
+    var hdr = scene.add.graphics();
+    hdr.fillStyle(0x2a1a3a, 1);
+    hdr.fillRoundedRect(4, 4, cw - 8, 50, 12);
+    con.add(hdr);
+
+    var title = scene.add.text(cw / 2, 29, '🏆 TROPHY ROOM', { fontFamily: 'Arial Black, sans-serif', fontSize: '18px', color: '#9933ff' }).setOrigin(0.5);
+    con.add(title);
+
+    // Tab buttons
+    var tabs = [
+      { id: 'bosses', label: 'Bosses', icon: '👹' },
+      { id: 'elites', label: 'Elites', icon: '⭐' },
+      { id: 'items', label: 'Items', icon: '💎' }
+    ];
+    var activeTab = 'bosses';
+    var tabButtons = [];
+    var tabY = 65;
+    var tabWidth = (cw - 40) / 3;
+
+    tabs.forEach(function(tab, i) {
+      var tx = 20 + i * tabWidth + tabWidth / 2;
+      var isActive = activeTab === tab.id;
+      var btn = scene.add.container(tx, tabY);
+      var bg = scene.add.graphics();
+      bg.fillStyle(isActive ? 0x6633aa : 0x222222, 1);
+      bg.fillRoundedRect(-tabWidth / 2 + 2, -12, tabWidth - 4, 24, 6);
+      if (isActive) {
+        bg.lineStyle(2, 0xcc66ff, 1);
+        bg.strokeRoundedRect(-tabWidth / 2 + 2, -12, tabWidth - 4, 24, 6);
+      }
+      btn.add(bg);
+      var lbl = scene.add.text(0, 0, tab.icon + ' ' + tab.label, { fontSize: '12px', color: isActive ? '#ffffff' : '#888888' }).setOrigin(0.5);
+      btn.add(lbl);
+      btn.setSize(tabWidth - 4, 24);
+      btn.setInteractive({ useHandCursor: true });
+      btn.on('pointerdown', function() {
+        activeTab = tab.id;
+        updateContent();
+      });
+      con.add(btn);
+      tabButtons.push(btn);
+    });
+
+    // Content area
+    var contentY = 100;
+    var contentH = ch - 130;
+    var contentBg = scene.add.graphics();
+    contentBg.fillStyle(0x111111, 1);
+    contentBg.fillRoundedRect(10, contentY, cw - 20, contentH, 8);
+    con.add(contentBg);
+
+    var contentContainer = scene.add.container(0, contentY);
+    con.add(contentContainer);
+
+    function getRarityColor(rarity) {
+      if (rarity === 'gold') return '#ffd700';
+      if (rarity === 'silver') return '#c0c0c0';
+      return '#cd7f32';
+    }
+
+    function updateContent() {
+      contentContainer.removeAll();
+      var items = [];
+      var titleText = '';
+
+      if (activeTab === 'bosses') {
+        titleText = 'DEFEATED BOSSES';
+        items = self.trophyRoom.bosses;
+        items.forEach(function(boss) {
+          var def = self.trophyRoom.bossRegistry[boss.id] || { name: boss.id, icon: '👹', desc: '' };
+          contentContainer.add(scene.add.text(20, items.indexOf(boss) * 45, def.icon + ' ' + def.name + ' (Zone ' + boss.zone + ')', { fontSize: '13px', color: '#ff6666' }));
+          var sec = Math.round((boss.fightDuration || 0) / 1000);
+          contentContainer.add(scene.add.text(20, items.indexOf(boss) * 45 + 16, def.desc + ' - ' + sec + 's', { fontSize: '11px', color: '#888888' }));
+        });
+        if (items.length === 0) {
+          contentContainer.add(scene.add.text(cw / 2 - 20, contentH / 2, 'No bosses defeated yet', { fontSize: '14px', color: '#666666' }).setOrigin(0.5));
+        }
+      } else if (activeTab === 'elites') {
+        titleText = 'ELITE ENEMIES';
+        items = self.trophyRoom.eliteEnemies;
+        items.forEach(function(elite) {
+          var def = self.trophyRoom.eliteTypes[elite.type] || { name: elite.type, icon: '⭐' };
+          contentContainer.add(scene.add.text(20, items.indexOf(elite) * 40, def.icon + ' ' + def.name + ' (Zone ' + elite.zone + ')', { fontSize: '13px', color: '#66ccff' }));
+        });
+        if (items.length === 0) {
+          contentContainer.add(scene.add.text(cw / 2 - 20, contentH / 2, 'No elite enemies defeated yet', { fontSize: '14px', color: '#666666' }).setOrigin(0.5));
+        }
+      } else if (activeTab === 'items') {
+        titleText = 'RARE ITEMS';
+        items = self.trophyRoom.rareItems;
+        items.forEach(function(item) {
+          var color = getRarityColor(item.rarity);
+          contentContainer.add(scene.add.text(20, items.indexOf(item) * 40, (self.trophyRoom.itemRegistry[item.id] ? self.trophyRoom.itemRegistry[item.id].icon : '📦') + ' ' + item.name, { fontSize: '13px', color: color }));
+          contentContainer.add(scene.add.text(20, items.indexOf(item) * 40 + 16, item.type.toUpperCase() + ' - ' + item.rarity.toUpperCase(), { fontSize: '10px', color: '#666666' }));
+        });
+        if (items.length === 0) {
+          contentContainer.add(scene.add.text(cw / 2 - 20, contentH / 2, 'No rare items collected yet', { fontSize: '14px', color: '#666666' }).setOrigin(0.5));
+        }
+      }
+    }
+
+    updateContent();
+
+    // Close button
+    var closeBtn = scene.add.text(cw / 2, ch - 30, 'CLOSE', {
+      fontSize: '13px',
+      color: '#ffffff',
+      backgroundColor: '#553388',
+      padding: { left: 16, right: 16, top: 6, bottom: 6 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    con.add(closeBtn);
+
+    con.close = function() {
+      scene.tweens.add({
+        targets: con,
+        alpha: 0,
+        scaleX: 0.9,
+        scaleY: 0.9,
+        duration: 150,
+        onComplete: function() { con.destroy(); }
+      });
+    };
+    closeBtn.on('pointerdown', function() { con.close(); });
+
+    con.setAlpha(0);
+    con.setScale(0.9);
+    scene.tweens.add({
+      targets: con,
+      alpha: 1,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 200,
+      ease: 'Back.easeOut'
+    });
+
+    return con;
+  },
+  // Add Trophy Room button to Fighter Card
   unlockAchievement: function(achId) {
     if (this.hasAchievement(achId)) return;
     this.fighterCard.achievements.push(achId);
@@ -475,6 +1251,7 @@ window.MMA.UI = {
   hasAchievement: function(achId) { return this.fighterCard.achievements.indexOf(achId) !== -1; },
   updateCareerStats: function(fightData) {
     var st = this.fighterCard.stats;
+    var prevWins = st.wins;
     st.totalFights++;
     if (fightData.won) st.wins++; else st.losses++;
     st.enemiesDefeated += fightData.enemiesDefeated || 0;
@@ -485,6 +1262,31 @@ window.MMA.UI = {
     st.perfectBlocks += fightData.perfectBlocks || 0;
     this.checkAchievements(fightData);
     this.checkLegacyRecords(fightData);
+    
+    // Record milestones in Fighter's Diary
+    if (fightData.won && prevWins === 0) {
+      this.recordMilestone('first_win');
+    }
+    if (fightData.won && fightData.damageTaken === 0) {
+      this.recordMilestone('perfect_fight');
+    }
+    if (fightData.won && (fightData.finalHpPercent||0) < 20) {
+      this.recordMilestone('underdog_win');
+    }
+    if (fightData.won && (fightData.duration||0) < 30000) {
+      this.recordMilestone('speed_demon', { duration: fightData.duration });
+    }
+    if (fightData.bossDefeated) {
+      this.recordMilestone('boss_defeated', { bossName: fightData.bossName });
+    }
+    if (fightData.zoneCompleted) {
+      this.recordMilestone('zone_clear', { zone: fightData.currentZone });
+    }
+    if ((fightData.critsLanded||0) >= 5 && (fightData.critsLanded||0) > 0) {
+      this.recordMilestone('crit_combo', { count: fightData.critsLanded });
+    }
+    // Check lore unlocks based on total fights
+    this.checkLoreUnlocks();
   },
   showFighterCard: function(scene) {
     var self = this, W = scene.cameras.main.width, H = scene.cameras.main.height;
@@ -519,6 +1321,8 @@ window.MMA.UI = {
     var ly = ay + 100;
     // Calculate dynamic height based on how many rows we need
     var lh = 85; 
+    var hasMoves = self.getStyleBreakdown().total > 0;
+    if (hasMoves) lh += 50; // Add space for pie chart
     if (ch < ly + lh + 30) { ch = ly + lh + 30; con.removeAll(); con.add(g); con.add(hdr); con.add(icn); con.add(ttl); con.add(stt); }
     con.add(scene.add.text(c1x, ly, 'LEGACY RECORDS', { fontSize: '11px', color: '#ff8800', fontStyle: 'bold' }).setDepth(10));
     var lrLines = [];
@@ -539,8 +1343,38 @@ window.MMA.UI = {
     lrLines.forEach(function(line, i) {
       con.add(scene.add.text(c1x + 5, ly + 15 + i * 14, line, { fontSize: '12px', color: '#ffaa44' }).setDepth(10));
     });
-    con.add(scene.add.text(cw/2, ch-15, 'Tap card or press I/ESC to close', { fontSize: '12px', color: '#666666' }).setOrigin(0.5).setDepth(10));
-    con.close = function() { scene.tweens.add({ targets: con, alpha: 0, scaleX: 0.9, scaleY: 0.9, duration: 150, onComplete: function(){ con.destroy(); } }); };
+    
+    // Style DNA Breakdown - pie chart
+    var dnaY = ly + 85;
+    var hasMoves = self.getStyleBreakdown().total > 0;
+    if (hasMoves) {
+      con.add(scene.add.text(c1x, dnaY, 'STYLE DNA', { fontSize: '11px', color: '#aa44ff', fontStyle: 'bold' }).setDepth(10));
+      self.drawStylePieChart(scene, con, cw - 60, dnaY + 28, 28);
+      
+      // Show top move
+      var topMoves = self.getTopMoves(3);
+      if (topMoves.length > 0) {
+        var topLabel = topMoves[0].key.charAt(0).toUpperCase() + topMoves[0].key.slice(1);
+        con.add(scene.add.text(c1x, dnaY + 12, 'Top: ' + topLabel + ' x' + topMoves[0].count, { fontSize: '10px', color: '#cc88ff' }).setDepth(10));
+      }
+    }
+    
+    // Diary button
+    var diaryBtn = scene.add.text(cw - 90, ch - 18, '📖 Diary', {
+      fontSize: '12px',
+      color: '#44ffaa',
+      backgroundColor: '#1a3a2a',
+      padding: { left: 8, right: 8, top: 4, bottom: 4 }
+    }).setInteractive({ useHandCursor: true });
+    diaryBtn.on('pointerdown', function() {
+      scene.time.delayedCall(100, function() {
+        scene.activeFighterDiary = self.showFighterDiary(scene);
+      });
+    });
+    con.add(diaryBtn);
+    
+    con.add(scene.add.text(cw/2, ch-15, 'Tap card or press C to close', { fontSize: '12px', color: '#666666' }).setOrigin(0.5).setDepth(10));
+    con.close = function() { scene.tweens.add({ targets: con, alpha: 0, scaleX: 0.9, scaleY: 0.9, duration: 150, onComplete: function(){ if (scene.activeFighterCard === con) scene.activeFighterCard = null; con.destroy(); } }); };
     con.setSize(cw, ch);
     con.setInteractive(new Phaser.Geom.Rectangle(0, 0, cw, ch), Phaser.Geom.Rectangle.Contains);
     con.on('pointerdown', function() { con.close(); });
@@ -610,10 +1444,16 @@ window.MMA.UI = {
     this.cooldownActive = true;
     this._updateCooldownUI(action);
   },
-  updateCooldowns: function(deltaMs) {
-    if (!this.cooldownActive) return;
+  updateCooldowns: function(deltaMs, scene) {
+    if (!this.cooldownActive && !scene) return;
     var anyActive = false;
     var self = this;
+    
+    // Check stamina warning if scene provided with player
+    if (scene && scene.player && scene.player.stats) {
+      this.checkStaminaWarning(scene, scene.player.stats.stamina, scene.player.stats.maxStamina);
+    }
+    
     Object.keys(this.cooldowns).forEach(function(action) {
       var cd = self.cooldowns[action];
       if (cd.remaining > 0) {

@@ -7,14 +7,34 @@ window.MMA.Player = {
     scene.player.body.setSize(26, 38);
     scene.player.body.setOffset(11, 18);
     scene.player.body.setCollideWorldBounds(true);
-    scene.player.stats = { hp:125, maxHp:125, stamina:100, maxStamina:100, xp:0, level:1 };
+    scene.player.stats = { 
+      hp:200, maxHp:200, stamina:100, maxStamina:100, xp:0, level:1,
+      // RPG Attributes (base values)
+      strength: 10,
+      speed: 10,
+      defense: 10,
+      agility: 10,
+      endurance: 10
+    };
+    // Derived bonuses from attributes and outfit
+    scene.player.speedBonus = 0;
+    scene.player.defenseBonus = 0;
+    scene.player.attackBonus = 0;
+    scene.player.dodgeChance = 0;
+    scene.player.staminaRegenBonus = 0;
     scene.player.cooldowns = {};
     scene.player.unlockedMoves = ['jab', 'cross', 'takedown'];
     if (scene._savedGameData) {
       var st = scene._savedGameData.playerStats, mv = scene._savedGameData.playerUnlockedMoves;
       if (st && typeof st === 'object') { scene.player.stats.hp = st.hp; scene.player.stats.maxHp = st.maxHp; scene.player.stats.stamina = st.stamina; scene.player.stats.maxStamina = st.maxStamina; scene.player.stats.xp = st.xp; scene.player.stats.level = st.level; }
       if (Array.isArray(mv) && mv.length > 0) scene.player.unlockedMoves = mv.slice();
+      // Load outfit data
+      if (scene._savedGameData.outfitData) {
+        MMA.Outfits.loadOutfitData(scene._savedGameData.outfitData);
+      }
     }
+    // Apply outfit modifiers
+    this.applyOutfitModifiers(scene);
     scene.player.state = 'idle';
     scene.player.hitFlash = 0;
     scene.player.justLeveled = false;
@@ -46,7 +66,10 @@ window.MMA.Player = {
   },
   regenStaminaTick: function(scene) {
     var s = scene.player.stats;
-    s.stamina = Math.min(s.maxStamina, s.stamina + CONFIG.STAMINA_REGEN * 0.1);
+    // Base regen + endurance bonus (1 point = 0.5 extra stamina per tick)
+    var enduranceBonus = ((s.endurance || 10) - 10) * 0.5;
+    var regenAmount = (CONFIG.STAMINA_REGEN * 0.1) + enduranceBonus;
+    s.stamina = Math.min(s.maxStamina, s.stamina + regenAmount);
   },
   damage: function(scene, damage) {
     if (scene.gameOver) return;

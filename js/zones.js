@@ -21,13 +21,71 @@ window.MMA.Zones = {
     // maxHype: maximum hype achievable (0-1)
     // crowdLabel: short description displayed to player
     // weightClass: "light", "middle", "heavy" or "standard" (default)
-    oct1:{id:'oct1',zone:3,weatherOptions:['clear','night'],weightClass:'middle',crowdSize:200,baseHype:0.3,maxHype:0.8,crowdLabel:'Rowdy Entrance Crowd',doors:{right:{col:15,row:5},up:{col:7,row:0}},connections:{right:'oct2',up:'oct3'},spawnPositions:[{col:3,row:4},{col:12,row:4}],enemyPool:['bjjBlackBelt'],name:'Arena Entrance'},
-    oct2:{id:'oct2',zone:3,weatherOptions:['clear','night','wind'],weightClass:'middle',crowdSize:300,baseHype:0.5,maxHype:0.9,crowdLabel:'Boisterous Prelim Crowd',doors:{left:{col:0,row:5}},connections:{left:'oct1'},spawnPositions:[{col:3,row:3},{col:3,row:8}],enemyPool:['bjjBlackBelt','bjjBlackBelt'],name:'Prelim Cage'},
-    oct3:{id:'oct3',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',crowdSize:500,baseHype:0.7,maxHype:1.0,crowdLabel:'Electric Main Cage Crowd',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct1',up:'oct4'},spawnPositions:[{col:5,row:5},{col:9,row:5}],enemyPool:['bjjBlackBelt'],name:'Main Cage'},
-    oct4:{id:'oct4',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',crowdSize:800,baseHype:0.9,maxHype:1.0,crowdLabel:'Championship Crowd',doors:{down:{col:7,row:11}},connections:{down:'oct3'},spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:'Championship Ring'}
+    oct1:{id:'oct1',zone:3,weatherOptions:['clear','night'],weightClass:'middle',cornerPressure:true,crowdSize:200,baseHype:0.3,maxHype:0.8,crowdLabel:'Rowdy Entrance Crowd',
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
+      doors:{right:{col:15,row:5},up:{col:7,row:0}},connections:{right:'oct2',up:'oct3'},
+      spawnPositions:[{col:3,row:4},{col:12,row:4}],enemyPool:['bjjBlackBelt'],name:'Arena Entrance'},
+    oct2:{id:'oct2',zone:3,weatherOptions:['clear','night','wind'],weightClass:'middle',cornerPressure:true,crowdSize:300,baseHype:0.5,maxHype:0.9,crowdLabel:'Boisterous Prelim Crowd',
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
+      doors:{left:{col:0,row:5}},connections:{left:'oct1'},
+      spawnPositions:[{col:3,row:3},{col:3,row:8}],enemyPool:['bjjBlackBelt','bjjBlackBelt'],name:'Prelim Cage'},
+    oct3:{id:'oct3',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:500,baseHype:0.7,maxHype:1.0,crowdLabel:'Electric Main Cage Crowd',
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
+      doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct1',up:'oct4'},
+      spawnPositions:[{col:5,row:5},{col:9,row:5}],enemyPool:['bjjBlackBelt'],name:'Main Cage'},
+    oct4:{id:'oct4',zone:3,weatherOptions:['clear','night'],weightClass:'heavy',cornerPressure:true,crowdSize:800,baseHype:0.9,maxHype:1.0,crowdLabel:'Championship Crowd',
+      ringPowerups:true,ringPowerupTypes:['hp','stamina','focus'],
+      doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct3',up:'survival1'},
+      spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:'Championship Ring'},
+    // Survival Time Attack: 90s endurance room with escalating waves and score focus
+    survival1:{
+      id:'survival1',
+      zone:3,
+      weatherOptions:['clear','night'],
+      weightClass:'heavy',
+      cornerPressure:true,
+      crowdSize:900,
+      baseHype:0.6,
+      maxHype:1.0,
+      crowdLabel:'Time-Attack Crowd',
+      ringPowerups:true,
+      ringPowerupTypes:['hp','stamina','focus'],
+      doors:{down:{col:7,row:11}},
+      connections:{down:'oct4'},
+      spawnPositions:[{col:4,row:5},{col:11,row:5}],
+      enemyPool:['bjjBlackBelt','mmaChamp'],
+      name:'Survival Time Attack Cage',
+      survivalMode:true,
+      survivalDurationSeconds:90,
+      survivalScoreMultiplier:1.5
+    }
 
   },
-  getRoom: function(roomId){ return this.ZONE1_ROOMS[roomId] || this.ZONE2_ROOMS[roomId] || this.ZONE3_ROOMS[roomId]; },
+  // Zone 4: Champion's Dojo – endless arena unlocked after championship
+  ZONE4_ROOMS: {
+    dojo1:{
+      id:'dojo1',
+      zone:4,
+      weatherOptions:['clear','night'],
+      weightClass:'heavy',
+      cornerPressure:true,
+      // Champion's Dojo uses arena-style crowd metadata
+      crowdSize:600,
+      baseHype:0.6,
+      maxHype:1.0,
+      crowdLabel:'Legendary Dojo Crowd',
+      // Ring side power-ups are active in the Dojo as well
+      ringPowerups:true,
+      ringPowerupTypes:['hp','stamina','focus'],
+      doors:{down:{col:7,row:11}},
+      connections:{down:'oct4'},
+      spawnPositions:[{col:7,row:5}],
+      enemyPool:['mmaChamp'],
+      name:"Champion's Dojo",
+      dojoMode:'championsDojo'
+    }
+  },
+  getRoom: function(roomId){ return this.ZONE1_ROOMS[roomId] || this.ZONE2_ROOMS[roomId] || this.ZONE3_ROOMS[roomId] || this.ZONE4_ROOMS[roomId]; },
   getConnectedRoom: function(roomId, direction){ var r = this.getRoom(roomId); return r && r.connections ? r.connections[direction] : null; },
   getRoomSpawnPositions: function(roomId){ var r = this.getRoom(roomId); return r ? r.spawnPositions : []; },
   getRoomEnemyPool: function(roomId){ var r = this.getRoom(roomId); return r ? r.enemyPool : ['streetThug']; },
@@ -68,6 +126,29 @@ window.MMA.Zones = {
       };
     }
     return null;
+  },
+  // Corner Pressure configuration helper
+  // Used by combat systems to determine when the player is "backed into the ropes".
+  // We keep this data here so all arena geometry stays zone-driven.
+  getCornerPressureConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.cornerPressure) return null;
+    // Default to a 2x2 tile pocket in each corner of the ring.
+    // These are expressed in tile coordinates so movement systems can
+    // cheaply compare the player's grid position.
+    var regions = [
+      { colMin:1, colMax:2, rowMin:1, rowMax:2 },
+      { colMin:13, colMax:14, rowMin:1, rowMax:2 },
+      { colMin:1, colMax:2, rowMin:9, rowMax:10 },
+      { colMin:13, colMax:14, rowMin:9, rowMax:10 }
+    ];
+    // Multipliers are intentionally modest – other buffs/debuffs stack on top.
+    return {
+      active: true,
+      damageTakenMultiplier: 1.10,   // player takes +10% damage when cornered
+      damageDealtMultiplier: 1.15,   // but deals +15% damage when they swing back
+      regions: regions
+    };
   },
   // Compute damage bonus (0 to 0.10) based on current hype (0-1)
   computeCrowdDamageBonus: function(hype) {
@@ -167,8 +248,8 @@ window.MMA.Zones = {
   },
   buildRoom: function(scene, roomId) {
     var DT = CONFIG.DISPLAY_TILE, room = this.getRoom(roomId), zone = room && room.zone ? room.zone : 1;
-    var floorKey = zone === 2 ? 'gymFloor' : (zone === 3 ? 'cageFloor' : 'floor');
-    var wallKey = zone === 2 ? 'gymWalls' : (zone === 3 ? 'cageWall' : 'wall');
+    var floorKey = zone === 2 ? 'gymFloor' : ((zone === 3 || zone === 4) ? 'cageFloor' : 'floor');
+    var wallKey = zone === 2 ? 'gymWalls' : ((zone === 3 || zone === 4) ? 'cageWall' : 'wall');
     scene.walls.clear(true, true); scene.doors.clear(true, true);
     scene.children.list.filter(function(child){ return child.texture && (child.texture.key === 'floor' || child.texture.key === 'gymFloor' || child.texture.key === 'cageFloor' || child.texture.key === 'crateProp' || child.texture.key === 'debrisProp' || child.texture.key === 'lampProp'); }).forEach(function(tile){ tile.destroy(); });
     for (var col=0; col<16; col++) for (var row=0; row<12; row++) {
@@ -250,6 +331,78 @@ window.MMA.Zones = {
         });
       } else {
         scene.registry.set('weightClassLabel', 'Standard');
+      }
+      // Champion's Dojo metadata: endless arena + leaderboard hooks
+      if (room.dojoMode === 'championsDojo') {
+        scene.registry.set('dojoActive', true);
+        scene.registry.set('dojoMode', 'championsDojo');
+        scene.registry.set('dojoLabel', room.name || "Champion's Dojo");
+        scene.registry.set('dojoEndless', true);
+        scene.registry.set('dojoZone', zone);
+        // Flavor text so players know they reached a special arena
+        scene.time.delayedCall(2400, function(){
+          scene.registry.set('gameMessage', "Champion's Dojo: endless challengers await – chase your best streak.");
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('dojoActive', false);
+        scene.registry.set('dojoMode', '');
+        scene.registry.set('dojoLabel', '');
+        scene.registry.set('dojoEndless', false);
+      }
+      // Survival Time Attack metadata: 90s endurance rooms with score focus
+      if (room.survivalMode) {
+        scene.registry.set('survivalModeActive', true);
+        scene.registry.set('survivalDurationSeconds', room.survivalDurationSeconds || 90);
+        scene.registry.set('survivalScoreMultiplier', room.survivalScoreMultiplier || 1.0);
+        scene.registry.set('survivalRoomName', room.name || 'Survival Room');
+        scene.time.delayedCall(2450, function(){
+          var dur = scene.registry.get('survivalDurationSeconds') || 90;
+          scene.registry.set('gameMessage', 'Survival Time Attack: hold out for '+dur+' seconds – damage dealt = score.');
+          scene.time.delayedCall(2800, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('survivalModeActive', false);
+        scene.registry.set('survivalDurationSeconds', 0);
+        scene.registry.set('survivalScoreMultiplier', 1.0);
+        scene.registry.set('survivalRoomName', '');
+      }
+      // Ring Side Power-Ups metadata: arena-only buff item hooks
+      if (room.ringPowerups) {
+        scene.registry.set('ringPowerupsActive', true);
+        scene.registry.set('ringPowerupTypes', (room.ringPowerupTypes || ['hp','stamina','focus']).slice());
+        // Four ring corners in tile coordinates for arena rings (1,1), (14,1), (1,10), (14,10)
+        scene.registry.set('ringPowerupCorners', [
+          { col:1, row:1 },
+          { col:14, row:1 },
+          { col:1, row:10 },
+          { col:14, row:10 }
+        ]);
+        scene.time.delayedCall(2300, function(){
+          scene.registry.set('gameMessage', 'Ring side power-ups active – watch the corners for buffs.');
+          scene.time.delayedCall(2200, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('ringPowerupsActive', false);
+        scene.registry.set('ringPowerupTypes', []);
+        scene.registry.set('ringPowerupCorners', []);
+      }
+      // Corner Pressure metadata: arena zones where the ropes change the risk/reward
+      var cornerCfg = this.getCornerPressureConfig(room.id);
+      if (cornerCfg && cornerCfg.active) {
+        scene.registry.set('cornerPressureActive', true);
+        scene.registry.set('cornerPressureDamageTakenMultiplier', cornerCfg.damageTakenMultiplier);
+        scene.registry.set('cornerPressureDamageDealtMultiplier', cornerCfg.damageDealtMultiplier);
+        scene.registry.set('cornerPressureRegions', cornerCfg.regions);
+        scene.time.delayedCall(2350, function(){
+          scene.registry.set('gameMessage', 'Corner Pressure: trapped against the ropes = +10% damage taken, +15% damage dealt when you fight back.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('cornerPressureActive', false);
+        scene.registry.set('cornerPressureDamageTakenMultiplier', 1.0);
+        scene.registry.set('cornerPressureDamageDealtMultiplier', 1.0);
+        scene.registry.set('cornerPressureRegions', []);
       }
       // Apply zone-specific weather state so other systems can react
       this.applyWeatherToScene(scene, room);

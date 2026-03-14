@@ -2,12 +2,17 @@ window.MMA = window.MMA || {};
 window.MMA.Sprites = {
   IDLE_TEXTURES: {},
   DAMAGE_TEXTURES: {},
+  LIMB_DAMAGE_TEXTURES: {},
   PORTRAIT_TEXTURES: {},
   AURA_TEXTURES: {},
+  AURA_LAYER_TEXTURES: {},
   SHADOW_DOUBLE_CONFIG: {
     healthThreshold: 0.35,
+    damageMultiplier: 0.3,
+    procCooldown: 240,
     tint: 0x8a5cff,
     trailTint: 0xc7b8ff,
+    hitTint: 0xe5d8ff,
     alpha: 0.42,
     attackAlpha: 0.62,
     offsetX: 14,
@@ -19,6 +24,13 @@ window.MMA.Sprites = {
     striker: 0xff4d4d,
     grappler: 0x4d88ff,
     balanced: 0xb26bff
+  },
+  REACTION_FACE_TEXTURES: {},
+  VISUAL_ROLE_ALIASES: {
+    trainer: 'npc_trainer',
+    coach: 'npc_coach',
+    sparringPartner: 'npc_trainer',
+    gymNpc: 'npc_trainer'
   },
   makeAll: function(scene) {
     var self = scene;
@@ -149,14 +161,30 @@ window.MMA.Sprites = {
           headTilt: -1
         }
       ];
+      var limbVariants = [
+        { state: 'leftArm', suffix: '_limb_left_arm', opts: { leftArmDrop: 3, gloveBob: 1, bodyLean: -1, headTilt: -1 } },
+        { state: 'rightArm', suffix: '_limb_right_arm', opts: { rightArmDrop: 3, gloveBob: 1, bodyLean: 1, headTilt: 1 } },
+        { state: 'leftLeg', suffix: '_limb_left_leg', opts: { leftLegLift: 4, torsoBob: 1, bodyLean: 1, armShift: (baseOpts.armShift || 0) + 1 } },
+        { state: 'rightLeg', suffix: '_limb_right_leg', opts: { rightLegLift: 4, torsoBob: 1, bodyLean: -1, armShift: (baseOpts.armShift || 0) - 1 } },
+        { state: 'bothArms', suffix: '_limb_both_arms', opts: { leftArmDrop: 3, rightArmDrop: 3, gloveBob: 1, torsoBob: 1, headTilt: -1 } },
+        { state: 'bothLegs', suffix: '_limb_both_legs', opts: { leftLegLift: 3, rightLegLift: 3, torsoBob: 2, bodyLean: -1 } }
+      ];
       for (var i = 0; i < damageBases.length; i++) {
-        textureIdleSet(damageBases[i].key, colors, Object.assign({}, baseOpts, { damageLevel: damageBases[i].damageLevel }));
+        textureIdleSet(damageBases[i].key, colors, Object.assign({}, baseOpts, damageBases[i], { damageLevel: damageBases[i].damageLevel }));
+      }
+      var limbMap = {};
+      for (var j = 0; j < limbVariants.length; j++) {
+        var variant = limbVariants[j];
+        var variantKey = baseKey + variant.suffix;
+        textureIdleSet(variantKey, colors, Object.assign({}, baseOpts, variant.opts, { damageLevel: Math.max(1, (baseOpts && baseOpts.damageLevel) || 0) }));
+        limbMap[variant.state] = variantKey;
       }
       window.MMA.Sprites.DAMAGE_TEXTURES[baseKey] = {
         healthy: damageBases[0].key,
         bruised: damageBases[1].key,
         bloodied: damageBases[2].key
       };
+      window.MMA.Sprites.LIMB_DAMAGE_TEXTURES[baseKey] = limbMap;
     }
     function texturePortrait(key, colors, opts) {
       var g = self.make.graphics({ x:0, y:0, add:false });
@@ -200,16 +228,71 @@ window.MMA.Sprites = {
       texturePortrait(set.signature, colors, { pose: 'signature', accent: accent });
       window.MMA.Sprites.PORTRAIT_TEXTURES[baseKey] = set;
     }
-    function textureAura(key, color, alphaScale) {
+    function textureAura(key, color, alphaScale, variant) {
       var g = self.make.graphics({ x:0, y:0, add:false });
       var outerAlpha = typeof alphaScale === 'number' ? alphaScale : 0.18;
       var midAlpha = Math.min(0.55, outerAlpha + 0.14);
+      var mode = variant || 'core';
       g.clear();
-      g.fillStyle(color, outerAlpha); g.fillEllipse(24, 36, 38, 56);
-      g.fillStyle(color, midAlpha); g.fillEllipse(24, 36, 28, 44);
-      g.lineStyle(2, color, 0.8); g.strokeEllipse(24, 36, 24, 38);
-      g.lineStyle(1, 0xffffff, 0.35); g.strokeEllipse(24, 36, 32, 48);
+      if (mode === 'ring') {
+        g.lineStyle(3, color, Math.min(0.9, outerAlpha + 0.42)); g.strokeEllipse(24, 38, 34, 50);
+        g.lineStyle(2, 0xffffff, 0.24); g.strokeEllipse(24, 38, 24, 36);
+        g.fillStyle(color, outerAlpha * 0.55); g.fillEllipse(24, 42, 18, 18);
+      } else if (mode === 'flare') {
+        g.fillStyle(color, outerAlpha * 0.85); g.fillTriangle(24, 5, 14, 36, 22, 28);
+        g.fillTriangle(24, 5, 34, 36, 26, 28);
+        g.fillTriangle(10, 34, 19, 66, 21, 40);
+        g.fillTriangle(38, 34, 29, 66, 27, 40);
+        g.fillStyle(color, outerAlpha * 0.65); g.fillEllipse(24, 38, 26, 40);
+        g.lineStyle(2, 0xffffff, 0.18); g.strokeEllipse(24, 36, 18, 28);
+      } else {
+        g.fillStyle(color, outerAlpha); g.fillEllipse(24, 36, 38, 56);
+        g.fillStyle(color, midAlpha); g.fillEllipse(24, 36, 28, 44);
+        g.lineStyle(2, color, 0.8); g.strokeEllipse(24, 36, 24, 38);
+        g.lineStyle(1, 0xffffff, 0.35); g.strokeEllipse(24, 36, 32, 48);
+      }
       g.generateTexture(key, 48, 72); g.destroy();
+    }
+    function textureReactionFace(key, colors, mood) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var browColor = colors.hair || 0x1a1a1a;
+      var mouthColor = colors.skinDark || 0x8a5f43;
+      var accent = colors.headband || colors.glove || 0xffffff;
+      g.fillStyle(0x141820, 0.96); g.fillRoundedRect(0, 0, 24, 24, 6);
+      g.fillStyle(0x263245, 0.92); g.fillRoundedRect(2, 2, 20, 20, 5);
+      g.fillStyle(accent, 0.18); g.fillEllipse(12, 12, 16, 14);
+      g.fillStyle(colors.skin, 1); g.fillCircle(12, 12, 7);
+      g.fillStyle(colors.hair, 1); g.fillEllipse(12, 8, 14, 8);
+      g.fillStyle(0xffffff, 1); g.fillCircle(9, 11, 2); g.fillCircle(15, 11, 2);
+      if (mood === 'pained') {
+        g.lineStyle(2, browColor, 1); g.lineBetween(7, 9, 10, 10); g.lineBetween(17, 9, 14, 10);
+        g.fillStyle(0x9b1c1c, 0.95); g.fillCircle(9, 12, 1); g.fillCircle(15, 12, 1);
+        g.lineStyle(2, mouthColor, 1); g.beginPath(); g.moveTo(8, 17); g.lineTo(10, 19); g.lineTo(12, 17); g.lineTo(14, 19); g.lineTo(16, 17); g.strokePath();
+        g.fillStyle(0x6a2d7c, 0.9); g.fillCircle(6, 13, 1); g.fillCircle(18, 13, 1);
+      } else if (mood === 'exhausted') {
+        g.lineStyle(2, browColor, 0.9); g.lineBetween(7, 10, 10, 10); g.lineBetween(14, 10, 17, 10);
+        g.fillStyle(browColor, 0.85); g.fillRect(8, 11, 2, 1); g.fillRect(14, 11, 2, 1);
+        g.fillStyle(mouthColor, 1); g.fillEllipse(12, 17, 5, 3);
+        g.fillStyle(0xff6b8a, 0.95); g.fillRoundedRect(10, 17, 4, 5, 2);
+        g.fillStyle(0x9fd4ff, 0.8); g.fillCircle(18, 16, 1);
+      } else {
+        g.lineStyle(2, browColor, 1); g.lineBetween(7, 9, 10, 8); g.lineBetween(17, 9, 14, 8);
+        g.fillStyle(browColor, 1); g.fillCircle(9, 11, 1); g.fillCircle(15, 11, 1);
+        g.lineStyle(2, mouthColor, 1); g.beginPath(); g.moveTo(8, 17); g.lineTo(10, 16); g.lineTo(12, 16); g.lineTo(14, 16); g.lineTo(16, 17); g.strokePath();
+        g.lineStyle(2, accent, 0.8); g.strokeRoundedRect(3, 3, 18, 18, 5);
+      }
+      g.generateTexture(key, 24, 24); g.destroy();
+    }
+    function textureReactionFaceSet(baseKey, colors) {
+      var set = {
+        determined: baseKey + '_face_determined',
+        pained: baseKey + '_face_pained',
+        exhausted: baseKey + '_face_exhausted'
+      };
+      textureReactionFace(set.determined, colors, 'determined');
+      textureReactionFace(set.pained, colors, 'pained');
+      textureReactionFace(set.exhausted, colors, 'exhausted');
+      window.MMA.Sprites.REACTION_FACE_TEXTURES[baseKey] = set;
     }
     function texturePickup(key) {
       var g = self.make.graphics({ x:0, y:0, add:false });
@@ -229,28 +312,63 @@ window.MMA.Sprites = {
     var brawlerColors = { hair:0x3d2516, skin:0xd6a178, skinDark:0xb7835c, torso:0xc66a2a, torsoLight:0xde8a44, belt:0x6b3a14, glove:0x8b4a1d, weapon:0x4a3020, legs:0x4f3a2a, shoes:0x1a120d, bootDetail:0x2a1a15, shoeAccent:0x3a2a20, outline:0x2a1a10 };
     var eliteColors = { hair:0x090909, skin:0xc99667, skinDark:0x9e6e49, torso:0x5c1fa8, torsoLight:0x7f46d1, belt:0x2d1259, glove:0xd6c8ff, weapon:0x7a7a90, legs:0x221d34, shoes:0x050505, bootDetail:0x171125, shoeAccent:0xbca6ff, outline:0xf3dc7a };
     var bossColors = { hair:0xe7d37a, skin:0xd19a6c, skinDark:0xa86e43, torso:0x111111, torsoLight:0x3a3a3a, belt:0x9b1c1c, glove:0xffd54f, weapon:0xe7d37a, legs:0x2b2b2b, shoes:0x090909, bootDetail:0x3d2a12, shoeAccent:0xffd54f, outline:0xfff1a8 };
+    var shadowBossColors = { hair:0xd9d7ff, skin:0xa882b8, skinDark:0x7f5e92, torso:0x25143f, torsoLight:0x4b2d78, belt:0x8a5cff, glove:0xd7c8ff, weapon:0xcab8ff, legs:0x1a1230, shoes:0x05030a, bootDetail:0x110a1e, shoeAccent:0x8a5cff, outline:0xe4dcff, headband:0x6d4ad8 };
+    var trainerColors = { hair:0x5a3922, skin:0xe0b384, skinDark:0xbd8c64, torso:0x167a5c, torsoLight:0x2aa37f, belt:0x0f3f32, headband:0xf5f0d7, glove:0xe3fff7, legs:0x1b4f42, shoes:0x0b1614, bootDetail:0x15312c, shoeAccent:0x52d8b0, outline:0x0a241f };
+    var coachColors = { hair:0xd9d9d9, skin:0xc99567, skinDark:0x9d6c47, torso:0x4d2a91, torsoLight:0x7551c2, belt:0x2b1657, headband:0xffd86b, glove:0xffefba, legs:0x2d2250, shoes:0x0c0815, bootDetail:0x1a1230, shoeAccent:0xcab6ff, outline:0xf0d88d };
     textureDamageSet('player', playerColors, { armShift:1, bodyW:6, hasHeadband:true });
     textureDamageSet('enemy_thug', thugColors, { armShift:0, bodyW:5, hasWeapon:true });
     textureDamageSet('enemy_brawler', brawlerColors, { armShift:1, bodyW:8, bigFists:true, hasWeapon:true });
     textureDamageSet('enemy_thug_elite', eliteColors, { armShift:0, bodyW:5, hasWeapon:true, hasHeadband:true });
     textureDamageSet('enemy_brawler_boss', bossColors, { armShift:1, bodyW:8, bigFists:true, hasWeapon:true, hasHeadband:true });
+    textureDamageSet('enemy_shadow_boss', shadowBossColors, { armShift:1, bodyW:7, bigFists:true, hasWeapon:true, hasHeadband:true });
+    textureDamageSet('npc_trainer', trainerColors, { armShift:0, bodyW:6, hasHeadband:true });
+    textureDamageSet('npc_coach', coachColors, { armShift:-1, bodyW:7, hasHeadband:true, bigFists:true });
     texturePortraitSet('player', playerColors, { accent: window.MMA.Sprites.STYLE_AURA_COLORS.striker });
     texturePortraitSet('enemy_thug', thugColors, { accent: 0xff7a7a });
     texturePortraitSet('enemy_brawler', brawlerColors, { accent: 0xffb14d });
     texturePortraitSet('enemy_thug_elite', eliteColors, { accent: 0xbca6ff });
     texturePortraitSet('enemy_brawler_boss', bossColors, { accent: 0xffd54f });
+    texturePortraitSet('enemy_shadow_boss', shadowBossColors, { accent: 0x8a5cff });
+    texturePortraitSet('npc_trainer', trainerColors, { accent: 0x52d8b0 });
+    texturePortraitSet('npc_coach', coachColors, { accent: 0xffd86b });
+    textureReactionFaceSet('player', playerColors);
+    textureReactionFaceSet('enemy_thug', thugColors);
+    textureReactionFaceSet('enemy_brawler', brawlerColors);
+    textureReactionFaceSet('enemy_thug_elite', eliteColors);
+    textureReactionFaceSet('enemy_brawler_boss', bossColors);
+    textureReactionFaceSet('enemy_shadow_boss', shadowBossColors);
+    textureReactionFaceSet('npc_trainer', trainerColors);
+    textureReactionFaceSet('npc_coach', coachColors);
     window.MMA.Sprites.VISUAL_VARIANTS = {
       mmaChamp: 'enemy_brawler_boss',
       boss: 'enemy_brawler_boss',
-      elite: 'enemy_thug_elite'
+      rival: 'enemy_shadow_boss',
+      shadow: 'enemy_shadow_boss',
+      shadowBoss: 'enemy_shadow_boss',
+      elite: 'enemy_thug_elite',
+      trainer: 'npc_trainer',
+      coach: 'npc_coach',
+      sparringPartner: 'npc_trainer',
+      gymNpc: 'npc_trainer'
     };
-    textureAura('aura_striker', window.MMA.Sprites.STYLE_AURA_COLORS.striker, 0.16);
-    textureAura('aura_grappler', window.MMA.Sprites.STYLE_AURA_COLORS.grappler, 0.16);
-    textureAura('aura_balanced', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.14);
+    textureAura('aura_striker', window.MMA.Sprites.STYLE_AURA_COLORS.striker, 0.16, 'core');
+    textureAura('aura_striker_ring', window.MMA.Sprites.STYLE_AURA_COLORS.striker, 0.22, 'ring');
+    textureAura('aura_striker_flare', window.MMA.Sprites.STYLE_AURA_COLORS.striker, 0.2, 'flare');
+    textureAura('aura_grappler', window.MMA.Sprites.STYLE_AURA_COLORS.grappler, 0.16, 'core');
+    textureAura('aura_grappler_ring', window.MMA.Sprites.STYLE_AURA_COLORS.grappler, 0.22, 'ring');
+    textureAura('aura_grappler_flare', window.MMA.Sprites.STYLE_AURA_COLORS.grappler, 0.2, 'flare');
+    textureAura('aura_balanced', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.14, 'core');
+    textureAura('aura_balanced_ring', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.2, 'ring');
+    textureAura('aura_balanced_flare', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.18, 'flare');
     window.MMA.Sprites.AURA_TEXTURES = {
       striker: 'aura_striker',
       grappler: 'aura_grappler',
       balanced: 'aura_balanced'
+    };
+    window.MMA.Sprites.AURA_LAYER_TEXTURES = {
+      striker: { core: 'aura_striker', ring: 'aura_striker_ring', flare: 'aura_striker_flare' },
+      grappler: { core: 'aura_grappler', ring: 'aura_grappler_ring', flare: 'aura_grappler_flare' },
+      balanced: { core: 'aura_balanced', ring: 'aura_balanced_ring', flare: 'aura_balanced_flare' }
     };
     texturePickup('item_pickup');
     texturePickup('pickup_health');

@@ -23,6 +23,24 @@ window.MMA.Combat = {
   TAUNT_DEBUFF_DURATION_MS: 3000,
   TAUNT_FOCUS_GAIN: 20,
   FOCUS_MAX: 100,
+  INTUITION_BUILD_MS: 45000,
+  INTUITION_DAMAGE_MULTIPLIER: 1.5,
+  RAGE_MODE_TRIGGER_HP_PCT: 0.25,
+  RAGE_MODE_DAMAGE_TAKEN_MULTIPLIER: 1.2,
+  RAGE_MODE_ATTACK_SPEED_MULTIPLIER: 1.3,
+  FINISH_HIM_TRIGGER_HP_PCT: 0.1,
+  FINISH_HIM_DAMAGE_MULTIPLIER: 2,
+  FINISH_HIM_SCORE_BONUS: 250,
+  MENTAL_PRESSURE_PER_HIT: 14,
+  MENTAL_PRESSURE_TAUNT_BONUS: 24,
+  MENTAL_PRESSURE_FINISH_BONUS: 35,
+  MENTAL_PRESSURE_THRESHOLD: 100,
+  MENTAL_PANIC_DURATION_MS: 2000,
+  MENTAL_PANIC_DEFENSE_MULTIPLIER: 1.25,
+  MENTAL_PANIC_MISS_CHANCE: 0.3,
+  DEADLY_WINDOW_QUICK_MS: 200,
+  DEADLY_WINDOW_SLOW_MS: 500,
+  DEADLY_WINDOW_MULTIPLIER: 1.5,
   TAKEDOWN_BASE_CHANCE: {
     grappler: 0.8,
     balanced: 0.5,
@@ -84,6 +102,92 @@ window.MMA.Combat = {
   ensureMomentumState: function(scene) {
     scene.player.momentumState = scene.player.momentumState || { stacks: 0, surgeReady: false };
     return scene.player.momentumState;
+  },
+  ensureMentalPressureState: function(scene) {
+    scene.player.mentalPressureState = scene.player.mentalPressureState || { meter: 0 };
+    return scene.player.mentalPressureState;
+  },
+  gainMentalPressure: function(scene, enemy, amount, sourceLabel) {
+    var state = this.ensureMentalPressureState(scene);
+    if (enemy && enemy.active && enemy.state !== 'dead') {
+      this.onIntuitionEngage(scene, enemy);
+    }
+    var prev = state.meter;
+    state.meter = Math.min(this.MENTAL_PRESSURE_THRESHOLD, state.meter + Math.max(0, amount || 0));
+    var gained = state.meter - prev;
+    if (gained > 0 && sourceLabel) {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 108, 'MENTAL +' + gained + ' (' + sourceLabel + ')', '#f9a8ff');
+    }
+    if (state.meter >= this.MENTAL_PRESSURE_THRESHOLD) {
+      this.triggerMentalPanic(scene, enemy);
+    }
+    return state;
+  },
+  triggerMentalPanic: function(scene, enemy) {
+    var state = this.ensureMentalPressureState(scene);
+    if (!enemy || !enemy.active || enemy.state === 'dead') return false;
+    state.meter = 0;
+    enemy.combatState = enemy.combatState || {};
+    enemy.combatState.mentalPanicUntil = scene.time.now + this.MENTAL_PANIC_DURATION_MS;
+    enemy.combatState.mentalPanicMissChance = this.MENTAL_PANIC_MISS_CHANCE;
+    enemy.staggerTimer = Math.max(enemy.staggerTimer || 0, this.MENTAL_PANIC_DURATION_MS);
+    enemy.state = 'staggered';
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 122, 'MENTAL BREAK!', '#ff66cc');
+    return true;
+  },
+  applyMentalPanicIfActive: function(scene, enemy, damage) {
+    if (!enemy || !enemy.combatState || scene.time.now >= (enemy.combatState.mentalPanicUntil || 0)) {
+      return { damage: damage, panicActive: false };
+    }
+    return {
+      damage: Math.round(damage * this.MENTAL_PANIC_DEFENSE_MULTIPLIER),
+      panicActive: true
+    };
+  },
+  getDeadlyWindowDurationForEnemy: function(enemy) {
+    if (!enemy || !enemy.aiState) return 0;
+    if (enemy.aiState === 'recovery') return this.DEADLY_WINDOW_SLOW_MS;
+    if (enemy.aiState === 'retreat') return this.DEADLY_WINDOW_QUICK_MS;
+    return 0;
+  },
+  isEnemyInDeadlyWindow: function(scene, enemy) {
+    if (!enemy || !enemy.active || enemy.state === 'dead' || !enemy.aiState) return false;
+    var duration = this.getDeadlyWindowDurationForEnemy(enemy);
+    if (!duration) return false;
+
+    enemy.combatState = enemy.combatState || {};
+    var marker = enemy.combatState.deadlyWindowMarker;
+    if (!marker || marker.aiState !== enemy.aiState) {
+      marker = {
+        aiState: enemy.aiState,
+        openedAt: scene.time.now,
+        announcedAt: 0
+      };
+      enemy.combatState.deadlyWindowMarker = marker;
+    }
+
+    return scene.time.now - marker.openedAt <= duration;
+  },
+  applyDeadlyWindowIfActive: function(scene, enemy, damage) {
+    if (!this.isEnemyInDeadlyWindow(scene, enemy)) {
+      return { damage: damage, deadlyWindow: false };
+    }
+
+    enemy.combatState = enemy.combatState || {};
+    var marker = enemy.combatState.deadlyWindowMarker || { announcedAt: 0 };
+    if (!marker.announcedAt || scene.time.now - marker.announcedAt > 350) {
+      marker.announcedAt = scene.time.now;
+      enemy.combatState.deadlyWindowMarker = marker;
+      if (enemy.setTint) enemy.setTint(0xff5555);
+      scene.time.delayedCall(90, function() {
+        if (enemy && enemy.active && enemy.clearTint) enemy.clearTint();
+      });
+    }
+
+    return {
+      damage: Math.round(damage * this.DEADLY_WINDOW_MULTIPLIER),
+      deadlyWindow: true
+    };
   },
   ensureStunState: function(scene) {
     scene.player.stunChainState = scene.player.stunChainState || { hits: 0, lastHitAt: 0 };
@@ -250,6 +354,7 @@ window.MMA.Combat = {
     var dmg = gm.damage + (scene.player.attackBonus || 0);
     enemy.stats.hp -= dmg;
     MMA.UI.recordHitDealt(dmg, false, 1);
+    MMA.UI.recordMoveUsage(moveKey); // Track move for Style DNA
     MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, '-' + dmg, '#ffd54f');
     MMA.VFX.flashEnemyHit(scene, enemy, 90);
     if (enemy.stats.hp <= 0) {
@@ -295,6 +400,46 @@ window.MMA.Combat = {
     }
     return focus;
   },
+  ensureIntuitionState: function(scene) {
+    scene.player.intuitionState = scene.player.intuitionState || { targetKey: null, engagedAt: 0, meter: 0, ready: false };
+    return scene.player.intuitionState;
+  },
+  getEnemyIntuitionKey: function(enemy) {
+    if (!enemy) return null;
+    enemy.combatState = enemy.combatState || {};
+    if (!enemy.combatState.intuitionKey) {
+      window.MMA._intuitionEnemySeq = (window.MMA._intuitionEnemySeq || 0) + 1;
+      enemy.combatState.intuitionKey = 'enemy-' + window.MMA._intuitionEnemySeq;
+    }
+    return enemy.combatState.intuitionKey;
+  },
+  onIntuitionEngage: function(scene, enemy) {
+    var state = this.ensureIntuitionState(scene);
+    var now = scene.time.now;
+    var key = this.getEnemyIntuitionKey(enemy);
+    if (!key) return state;
+    if (state.targetKey !== key) {
+      state.targetKey = key;
+      state.engagedAt = now;
+      state.meter = 0;
+      state.ready = false;
+      return state;
+    }
+    var elapsed = Math.max(0, now - state.engagedAt);
+    state.meter = Math.min(100, Math.round((elapsed / this.INTUITION_BUILD_MS) * 100));
+    if (!state.ready && elapsed >= this.INTUITION_BUILD_MS) {
+      state.ready = true;
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 92, 'FLOW STATE READY!', '#9dff9d');
+    }
+    return state;
+  },
+  consumeIntuition: function(scene) {
+    var state = this.ensureIntuitionState(scene);
+    state.ready = false;
+    state.meter = 0;
+    state.engagedAt = scene.time.now;
+    return state;
+  },
   applyTauntDebuffIfActive: function(scene, enemy, damage) {
     if (!enemy) return damage;
     enemy.combatState = enemy.combatState || {};
@@ -302,6 +447,65 @@ window.MMA.Combat = {
       return Math.round(damage * this.TAUNT_DEBUFF_MULTIPLIER);
     }
     return damage;
+  },
+  ensureRageState: function(enemy) {
+    if (!enemy) return null;
+    enemy.combatState = enemy.combatState || {};
+    enemy.combatState.rageState = enemy.combatState.rageState || { active: false };
+    return enemy.combatState.rageState;
+  },
+  maybeTriggerRageMode: function(scene, enemy) {
+    if (!enemy || !enemy.active || enemy.state === 'dead' || !enemy.stats) return false;
+    var rage = this.ensureRageState(enemy);
+    if (rage.active) return false;
+    var maxHp = enemy.stats.maxHp || enemy.stats.hp || 1;
+    var threshold = Math.max(1, Math.round(maxHp * this.RAGE_MODE_TRIGGER_HP_PCT));
+    if (enemy.stats.hp > threshold) return false;
+
+    rage.active = true;
+    enemy.combatState.attackSpeedMultiplier = this.RAGE_MODE_ATTACK_SPEED_MULTIPLIER;
+    enemy.combatState.rageStartedAt = scene.time.now;
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 126, 'RAGE MODE!', '#ff4d6d');
+    return true;
+  },
+  applyRageDefenseModifierIfActive: function(enemy, damage) {
+    if (!enemy) return damage;
+    var rage = this.ensureRageState(enemy);
+    if (!rage || !rage.active) return damage;
+    return Math.round(damage * this.RAGE_MODE_DAMAGE_TAKEN_MULTIPLIER);
+  },
+  ensureFinishHimState: function(enemy) {
+    if (!enemy) return null;
+    enemy.combatState = enemy.combatState || {};
+    enemy.combatState.finishHimState = enemy.combatState.finishHimState || { armed: false, consumed: false };
+    return enemy.combatState.finishHimState;
+  },
+  maybeArmFinishHim: function(scene, enemy) {
+    if (!enemy || !enemy.active || enemy.state === 'dead' || !enemy.stats) return false;
+    var state = this.ensureFinishHimState(enemy);
+    if (!state || state.armed || state.consumed) return false;
+    var maxHp = enemy.stats.maxHp || enemy.stats.hp || 1;
+    var threshold = Math.max(1, Math.round(maxHp * this.FINISH_HIM_TRIGGER_HP_PCT));
+    if (enemy.stats.hp > threshold) return false;
+    state.armed = true;
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 140, 'FINISH HIM!', '#ff2e63');
+    return true;
+  },
+  applyFinishHimIfArmed: function(scene, enemy, damage) {
+    if (!enemy) return { damage: damage, finishHim: false };
+    var state = this.ensureFinishHimState(enemy);
+    if (!state || !state.armed || state.consumed) return { damage: damage, finishHim: false };
+    state.armed = false;
+    state.consumed = true;
+    var boostedDamage = Math.max(Math.round(damage * this.FINISH_HIM_DAMAGE_MULTIPLIER), enemy.stats && typeof enemy.stats.hp === 'number' ? enemy.stats.hp : damage);
+    scene.time.timeScale = 0.28;
+    scene.time.delayedCall(220, function() { scene.time.timeScale = 1; });
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 158, 'FINISH!', '#ffe066');
+    this.gainMentalPressure(scene, enemy, this.MENTAL_PRESSURE_FINISH_BONUS, 'FINISH');
+    MMA.VFX.showImpactSpark(scene, enemy.x, enemy.y, true);
+    var score = scene.registry.get('score') || 0;
+    scene.registry.set('score', score + this.FINISH_HIM_SCORE_BONUS);
+    return { damage: boostedDamage, finishHim: true };
   },
   executeTaunt: function(scene) {
     if (scene.groundState && scene.groundState.active) return;
@@ -335,6 +539,7 @@ window.MMA.Combat = {
     best.combatState = best.combatState || {};
     best.combatState.tauntDebuffUntil = scene.time.now + this.TAUNT_DEBUFF_DURATION_MS;
     this.gainFocus(scene, this.TAUNT_FOCUS_GAIN);
+    this.gainMentalPressure(scene, best, this.MENTAL_PRESSURE_TAUNT_BONUS, 'TAUNT');
     MMA.UI.showDamageText(scene, best.x, best.y - 54, 'TAUNTED! DEF -15%', '#ff99cc');
   },
   executeAttack: function(scene, moveKey) {
@@ -342,9 +547,12 @@ window.MMA.Combat = {
     if (scene.player.unlockedMoves.indexOf(moveKey) === -1) return MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'LOCKED', '#888888');
     var move = this.MOVE_ROSTER[moveKey]; if (!move) return;
     var s = scene.player.stats, cd = scene.player.cooldowns;
+    var intuitionState = this.ensureIntuitionState(scene);
+    var intuitionPrimed = !!intuitionState.ready;
     if (!cd[moveKey]) cd[moveKey] = 0;
-    if (cd[moveKey] > 0 || s.stamina < move.staminaCost || scene.gameOver) return;
-    s.stamina -= move.staminaCost; cd[moveKey] = move.cooldown;
+    if (cd[moveKey] > 0 || (!intuitionPrimed && s.stamina < move.staminaCost) || scene.gameOver) return;
+    if (!intuitionPrimed) s.stamina -= move.staminaCost;
+    cd[moveKey] = move.cooldown;
     if (window.sfx) { if (moveKey === 'jab' || moveKey === 'cross') window.sfx.punch(); else if (moveKey === 'lowKick' || moveKey === 'headKick') window.sfx.kick(); }
     var DT = CONFIG.DISPLAY_TILE, px = scene.player.x + scene.lastDir.x * DT * 0.5, py = scene.player.y + scene.lastDir.y * DT * 0.5;
     var hitbox = scene.add.image(px, py, 'hitbox').setDisplaySize(DT, DT).setAlpha(0.5);
@@ -366,27 +574,45 @@ window.MMA.Combat = {
           }
           continue;
         }
+        this.onIntuitionEngage(scene, enemy);
         var attackBonus = scene.player.attackBonus || 0;
         var baseDamage = Math.round((move.damage + attackBonus) * 1.2);
-        var momentum = this.getMomentumModifiers(scene, baseDamage);
+        var intuitionDamage = intuitionPrimed ? Math.round(baseDamage * this.INTUITION_DAMAGE_MULTIPLIER) : baseDamage;
+        var momentum = this.getMomentumModifiers(scene, intuitionDamage);
         var momentumDamage = momentum.surgeReady ? Math.round(momentum.damage * this.MOMENTUM_SURGE_DAMAGE_MULTIPLIER) : momentum.damage;
-        var rolled = this.rollDamage(momentumDamage, momentum.critChance, momentum.forceCrit);
+        var rolled = this.rollDamage(momentumDamage, momentum.critChance, momentum.forceCrit || intuitionPrimed);
         var comboResult = this.applyComboBonus(scene, moveKey, rolled.damage, true);
         var pressureResult = this.applyPressureBreakIfReady(scene, comboResult.damage, enemy);
         var staminaBreakDamage = this.applyStaminaBreakIfActive(scene, enemy, pressureResult.damage);
-        var dmg = this.applyTauntDebuffIfActive(scene, enemy, staminaBreakDamage.damage);
+        var tauntDamage = this.applyTauntDebuffIfActive(scene, enemy, staminaBreakDamage.damage);
+        var rageAdjustedDamage = this.applyRageDefenseModifierIfActive(enemy, tauntDamage);
+        var panicAdjusted = this.applyMentalPanicIfActive(scene, enemy, rageAdjustedDamage);
+        var deadlyWindowAdjusted = this.applyDeadlyWindowIfActive(scene, enemy, panicAdjusted.damage);
+        var finishHimAdjusted = this.applyFinishHimIfArmed(scene, enemy, deadlyWindowAdjusted.damage);
+        var adaptiveDefenseMult = MMA.Enemies.onPlayerAttack(scene, enemy, moveKey);
+        var dmg = Math.round(finishHimAdjusted.damage / adaptiveDefenseMult);
         var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
         // Track fight stats
         var comboCount = scene.player.comboState ? scene.player.comboState.index : 1;
         MMA.UI.recordHitDealt(dmg, rolled.crit, comboCount);
+        MMA.UI.recordMoveUsage(moveKey); // Track move for Style DNA
         MMA.UI.incrementCombo();
         if (window.sfx) window.sfx.hit();
         MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, '-' + dmg, rolled.crit ? '#ff6b6b' : undefined);
         if (rolled.crit) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 38, 'CRIT!', '#ff3333');
-        if (comboResult.comboFinished) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 56, comboResult.comboLabel, '#66ff99');
+        if (intuitionPrimed) {
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 56, 'FLOW COUNTER!', '#9dff9d');
+          scene.time.timeScale = 0.35;
+          scene.time.delayedCall(150, function() { scene.time.timeScale = 1; });
+          this.consumeIntuition(scene);
+        }
+        if (comboResult.comboFinished) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 74, comboResult.comboLabel, '#66ff99');
+        if (adaptiveDefenseMult > 1) MMA.Enemies.showAdaptiveFeedback(scene, enemy);
         if (pressureResult.pressureBreak) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 74, 'PRESSURE BREAK!', '#ffb347');
+        if (panicAdjusted.panicActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 84, 'PANIC OPENING!', '#ff66cc');
+        if (deadlyWindowAdjusted.deadlyWindow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 102, 'DEADLY WINDOW x1.5', '#ff5c5c');
         if (staminaBreakDamage.staminaBreakActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 92, 'STAMINA BREAK x1.5', '#ffd166');
         var staminaState = this.onEnemyStaminaHit(scene, enemy, move);
         if (staminaState.brokeNow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 110, 'STAMINA BROKEN!', '#ff9f1c');
@@ -398,10 +624,13 @@ window.MMA.Combat = {
           if (momentumState.stacks > 0) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 128, 'MOMENTUM x' + momentumState.stacks, '#7ce8ff');
         }
         this.onPressureHit(scene);
+        this.gainMentalPressure(scene, enemy, this.MENTAL_PRESSURE_PER_HIT, 'CLEAN HIT');
         this.onStunChainHit(scene, enemy);
         MMA.VFX.flashEnemyHit(scene, enemy, 100); MMA.VFX.showImpactSpark(scene, enemy.x, enemy.y, moveKey === 'cross');
         enemy.staggerTimer = Math.max(enemy.staggerTimer || 0, 400); enemy.state = 'staggered';
         if (window.narrate) window.narrate('bigHit', { move: moveKey, damage: dmg }).then(function(msg){ if (msg) scene.registry.set('gameMessage', msg); scene.time.delayedCall(2500, function(){ scene.registry.set('gameMessage', ''); }); });
+        this.maybeTriggerRageMode(scene, enemy);
+        if (enemy.stats.hp > 0) this.maybeArmFinishHim(scene, enemy);
         if (enemy.stats.hp <= 0) MMA.Enemies.killEnemy(scene, enemy);
       }
     }
@@ -423,11 +652,14 @@ window.MMA.Combat = {
     else for (var i=0;i<unlocked.length;i++){ var key = unlocked[i], m = this.MOVE_ROSTER[key]; if (m && m.damage > bestDamage) { bestDamage = m.damage; bestMoveKey = key; } }
     if (!bestMoveKey) return;
     var move = this.MOVE_ROSTER[bestMoveKey], cds = scene.player.cooldowns;
+    var intuitionState = this.ensureIntuitionState(scene);
+    var intuitionPrimed = !!intuitionState.ready;
     if (!cds[bestMoveKey]) cds[bestMoveKey] = 0;
     if (cds[bestMoveKey] > 0) return;
     var required = Math.ceil(move.staminaCost * 1.5);
-    if (scene.player.stats.stamina < required) return MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'NOT ENOUGH STAMINA', '#ff4444');
-    scene.player.stats.stamina -= required; cds[bestMoveKey] = move.cooldown;
+    if (!intuitionPrimed && scene.player.stats.stamina < required) return MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'NOT ENOUGH STAMINA', '#ff4444');
+    if (!intuitionPrimed) scene.player.stats.stamina -= required;
+    cds[bestMoveKey] = move.cooldown;
     var DT = CONFIG.DISPLAY_TILE, px = scene.player.x + scene.lastDir.x * DT * 0.7, py = scene.player.y + scene.lastDir.y * DT * 0.7;
     var hitbox = scene.add.image(px, py, 'hitbox').setDisplaySize(DT * 1.7, DT * 1.7).setAlpha(0.6);
     var enemies = scene.enemyGroup.getChildren(), hit = false;
@@ -436,14 +668,21 @@ window.MMA.Combat = {
       var dist = Phaser.Math.Distance.Between(scene.player.x, scene.player.y, enemy.x, enemy.y);
       if (dist <= DT * 2.5) {
         hit = true;
+        this.onIntuitionEngage(scene, enemy);
         var attackBonus = scene.player.attackBonus || 0;
         var baseDamage = Math.round((move.damage + attackBonus) * 1.2);
-        var momentum = this.getMomentumModifiers(scene, baseDamage);
+        var intuitionDamage = intuitionPrimed ? Math.round(baseDamage * this.INTUITION_DAMAGE_MULTIPLIER) : baseDamage;
+        var momentum = this.getMomentumModifiers(scene, intuitionDamage);
         var momentumDamage = momentum.surgeReady ? Math.round(momentum.damage * this.MOMENTUM_SURGE_DAMAGE_MULTIPLIER) : momentum.damage;
-        var rolled = this.rollDamage(momentumDamage, momentum.critChance, momentum.forceCrit);
+        var rolled = this.rollDamage(momentumDamage, momentum.critChance, momentum.forceCrit || intuitionPrimed);
         var pressureResult = this.applyPressureBreakIfReady(scene, rolled.damage, enemy);
         var staminaBreakDamage = this.applyStaminaBreakIfActive(scene, enemy, pressureResult.damage);
-        var dmg = staminaBreakDamage.damage;
+        var rageAdjustedDamage = this.applyRageDefenseModifierIfActive(enemy, staminaBreakDamage.damage);
+        var panicAdjusted = this.applyMentalPanicIfActive(scene, enemy, rageAdjustedDamage);
+        var deadlyWindowAdjusted = this.applyDeadlyWindowIfActive(scene, enemy, panicAdjusted.damage);
+        var finishHimAdjusted = this.applyFinishHimIfArmed(scene, enemy, deadlyWindowAdjusted.damage);
+        var adaptiveDefenseMult = MMA.Enemies.onPlayerAttack(scene, enemy, bestMoveKey);
+        var dmg = Math.round(finishHimAdjusted.damage / adaptiveDefenseMult);
         var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
         if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
         enemy.stats.hp -= dmg;
@@ -453,7 +692,16 @@ window.MMA.Combat = {
         if (window.sfx) window.sfx.hit();
         MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, '-' + dmg, rolled.crit ? '#ff6b6b' : '#ffd54f');
         if (rolled.crit) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 48, 'CRIT!', '#ff3333');
-        if (pressureResult.pressureBreak) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 66, 'PRESSURE BREAK!', '#ffb347');
+        if (intuitionPrimed) {
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 66, 'FLOW COUNTER!', '#9dff9d');
+          scene.time.timeScale = 0.35;
+          scene.time.delayedCall(150, function() { scene.time.timeScale = 1; });
+          this.consumeIntuition(scene);
+        }
+        if (adaptiveDefenseMult > 1) MMA.Enemies.showAdaptiveFeedback(scene, enemy);
+        if (pressureResult.pressureBreak) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 84, 'PRESSURE BREAK!', '#ffb347');
+        if (panicAdjusted.panicActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 94, 'PANIC OPENING!', '#ff66cc');
+        if (deadlyWindowAdjusted.deadlyWindow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 104, 'DEADLY WINDOW x1.5', '#ff5c5c');
         if (staminaBreakDamage.staminaBreakActive) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 84, 'STAMINA BREAK x1.5', '#ffd166');
         var staminaState = this.onEnemyStaminaHit(scene, enemy, move);
         if (staminaState.brokeNow) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 102, 'STAMINA BROKEN!', '#ff9f1c');
@@ -465,10 +713,13 @@ window.MMA.Combat = {
           if (momentumState.stacks > 0) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 120, 'MOMENTUM x' + momentumState.stacks, '#7ce8ff');
         }
         this.onPressureHit(scene);
+        this.gainMentalPressure(scene, enemy, this.MENTAL_PRESSURE_PER_HIT, 'CLEAN HIT');
         this.onStunChainHit(scene, enemy);
         MMA.VFX.flashEnemyHit(scene, enemy, 100); MMA.VFX.showImpactSpark(scene, enemy.x, enemy.y, true);
         enemy.staggerTimer = Math.max(enemy.staggerTimer || 0, 600); enemy.state = 'staggered';
         if (window.narrate) window.narrate('bigHit', { move: bestMoveKey, damage: dmg }).then(function(msg){ if (msg) scene.registry.set('gameMessage', msg); scene.time.delayedCall(2500, function(){ scene.registry.set('gameMessage', ''); }); });
+        this.maybeTriggerRageMode(scene, enemy);
+        if (enemy.stats.hp > 0) this.maybeArmFinishHim(scene, enemy);
         if (enemy.stats.hp <= 0) MMA.Enemies.killEnemy(scene, enemy);
       }
     }
