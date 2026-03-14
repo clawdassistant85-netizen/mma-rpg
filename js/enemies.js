@@ -1,6 +1,6 @@
 window.MMA = window.MMA || {};
 window.MMA.Enemies = {
-  // Helper: compute total damage multiplier for an enemy (packs, vengeance, injuries, enrage)
+  // Helper: compute total damage multiplier for an enemy (packs, vengeance, injuries, enrage, elite)
   getTotalDamageMultiplier: function(enemy, scene) {
     // Base pack multiplier
     var pack = (this.getPackDamageMultiplier) ? this.getPackDamageMultiplier(enemy, scene) : 1;
@@ -10,7 +10,8 @@ window.MMA.Enemies = {
     var injury = (this.getInjuryDamageMultiplier) ? this.getInjuryDamageMultiplier(enemy) : 1;
     // Enrage attack bonus (converted to multiplier)
     var enrage = (enemy && enemy.isEnraged && enemy.enrageAttackBonus) ? (1 - enemy.enrageAttackBonus) : 1;
-    return pack * vengeance * injury * enrage;
+    var elite = (this.getEliteMultiplier) ? this.getEliteMultiplier(enemy) : 1;
+    return pack * vengeance * injury * enrage * elite;
   },
   // Mercenary Contracts: boosts enemy stats when active (purchased by player)
   MERCENARY_CONTRACTS: {
@@ -127,6 +128,14 @@ window.MMA.Enemies = {
   },
 
   // Fighter Type Counter: enemies have a hidden style affinity.
+  // Elite variant multiplier
+  getEliteMultiplier: function(enemy) {
+    if (enemy && enemy.isElite) {
+      return 2; // double damage multiplier for elite enemies
+    }
+    return 1;
+  },
+
   // - striker-style enemies take +20% damage from grappler moves
   // - grappler-style enemies take +20% damage from striker pressure
   // - kickboxer-style enemies take +15% damage from striker (hands) pressure (crowding them)

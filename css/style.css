@@ -1,12 +1,13 @@
 /* Overlay and menu styling for MMA RPG */
 /* Action buttons */
 #action-cluster {
-  position: absolute;
+  position: fixed;
   right: 18px;
-  bottom: 18px;
-  width: 120px; /* enough for layout */
-  height: 120px;
+  bottom: 24px;
+  width: 176px;
+  height: 154px;
   pointer-events: auto;
+  z-index: 100;
 }
 .action-btn {
   position: absolute;

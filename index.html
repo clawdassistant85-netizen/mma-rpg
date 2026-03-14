@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>MMA RPG</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%230b0b0b'/%3E%3Ctext x='50%25' y='56%25' text-anchor='middle' font-size='34' font-family='Arial,sans-serif' fill='%23ffd447'%3EM%3C/text%3E%3C/svg%3E">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=27">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
@@ -133,7 +133,7 @@
 
     #mobile-pause-btn {
       position: fixed;
-      top: 12px;
+      bottom: 200px;
       right: 12px;
       width: 42px;
       height: 42px;
@@ -236,9 +236,10 @@
     
     /* Weight Class Indicator - DOM-based HUD element */
     #weight-class-indicator {
-      position: absolute;
-      top: 50px;
-      left: 8px;
+      position: fixed;
+      bottom: 180px;
+      left: 50%;
+      transform: translateX(-50%);
       padding: 4px 8px;
       background: rgba(0, 0, 0, 0.65);
       border-radius: 6px;
@@ -294,7 +295,6 @@
       #action-cluster { display: none; }
     }
   </style>
-  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div id="game-shell">
@@ -331,17 +331,17 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=25"></script>
-  <script src="js/sprites.js?v=25"></script>
-  <script src="js/combat.js?v=25"></script>
-  <script src="js/enemies.js?v=25"></script>
-  <script src="js/zones.js?v=25"></script>
-  <script src="js/player.js?v=25"></script>
-  <script src="js/items.js?v=25"></script>
-  <script src="js/outfits.js?v=25"></script>
-  <script src="js/vfx.js?v=25"></script>
-  <script src="js/ui.js?v=25"></script>
-  <script src="js/progression.js?v=25"></script>
+  <script src="js/config.js?v=27"></script>
+  <script src="js/sprites.js?v=27"></script>
+  <script src="js/combat.js?v=27"></script>
+  <script src="js/enemies.js?v=27"></script>
+  <script src="js/zones.js?v=27"></script>
+  <script src="js/player.js?v=27"></script>
+  <script src="js/items.js?v=27"></script>
+  <script src="js/outfits.js?v=27"></script>
+  <script src="js/vfx.js?v=27"></script>
+  <script src="js/ui.js?v=27"></script>
+  <script src="js/progression.js?v=27"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -589,17 +589,17 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=25"></script>
-  <script src="js/saveSystem.js?v=25"></script>
-  <script src="js/narrator.js?v=25"></script>
-  <script src="js/scenes/TitleScene.js?v=25"></script>
-  <script src="js/scenes/BootScene.js?v=25"></script>
-  <script src="js/scenes/GameScene.js?v=25"></script>
-  <script src="js/scenes/HUDScene.js?v=25"></script>
-  <script src="js/scenes/PauseScene.js?v=25"></script>
-  <script src="js/scenes/OutfitScene.js?v=25"></script>
-  <script src="js/scenes/UnlockScene.js?v=25"></script>
-  <script src="js/scenes/VictoryScene.js?v=25"></script>
-  <script src="js/main.js?v=25"></script>
+<script src="js/sounds.js?v=27"></script>
+  <script src="js/saveSystem.js?v=27"></script>
+  <script src="js/narrator.js?v=27"></script>
+  <script src="js/scenes/TitleScene.js?v=27"></script>
+  <script src="js/scenes/BootScene.js?v=27"></script>
+  <script src="js/scenes/GameScene.js?v=27"></script>
+  <script src="js/scenes/HUDScene.js?v=27"></script>
+  <script src="js/scenes/PauseScene.js?v=27"></script>
+  <script src="js/scenes/OutfitScene.js?v=27"></script>
+  <script src="js/scenes/UnlockScene.js?v=27"></script>
+  <script src="js/scenes/VictoryScene.js?v=27"></script>
+  <script src="js/main.js?v=27"></script>
 </body>
 </html>
