@@ -90,11 +90,11 @@ var BootScene = new Phaser.Class({
   _bootStep_vfxHooks: function() {
     // this.installSignatureSilhouetteHook();
     // this.installMuscleTensionHook();
-    // this.installExertionCueHook();
+    this.installExertionCueHook();
     // this.installLastChancePulseHook();
     // this.installFightIqAuraReadHook();
     // this.installEnemyFearTrembleHook();
-    this._updateLoadBar('VFX Hooks');
+    this._updateLoadBar('Exertion Cues');
   },
   _bootStep_launchGame: function() {
     if (this._loadBg) this._loadBg.destroy();

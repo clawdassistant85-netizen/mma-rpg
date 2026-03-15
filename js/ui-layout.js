@@ -17,11 +17,14 @@ Object.assign(window.MMA.UI, {
     dpad.style.width = dpadSize + "px"; dpad.style.height = dpadSize + "px"; dpad.style.left = landscape ? "2vw" : "2.5vw"; dpad.style.bottom = landscape ? "1vh" : "2vh";
     dpad.querySelectorAll(".dpad-btn").forEach(function(btn){ btn.style.width = dpadBtnSize + "px"; btn.style.height = dpadBtnSize + "px"; btn.style.fontSize = dpadBtnFont + "px"; btn.style.lineHeight = dpadBtnSize + "px"; });
     var up = dpad.querySelector(".dpad-up"), down = dpad.querySelector(".dpad-down"), left = dpad.querySelector(".dpad-left"), right = dpad.querySelector(".dpad-right");
-    var c = dpadSize / 2, off = (dpadSize - dpadBtnSize) / 2;
-    if (up) { up.style.left = c - dpadBtnSize / 2 + "px"; up.style.top = off + "px"; }
-    if (down) { down.style.left = c - dpadBtnSize / 2 + "px"; down.style.bottom = off + "px"; }
-    if (left) { left.style.left = off + "px"; left.style.top = c - dpadBtnSize / 2 + "px"; }
-    if (right) { right.style.right = off + "px"; right.style.top = c - dpadBtnSize / 2 + "px"; }
+    // c = center offset to horizontally/vertically center a button within the container
+    // edge = small margin from edge of container (NOT center — was the bug causing all arrows to overlap)
+    var c = dpadSize / 2, cHalf = Math.round(c - dpadBtnSize / 2);
+    var edge = Math.max(3, Math.round(dpadSize * 0.05));
+    if (up)    { up.style.left    = cHalf + "px"; up.style.top    = edge + "px";    up.style.bottom  = "";  up.style.right   = ""; }
+    if (down)  { down.style.left  = cHalf + "px"; down.style.bottom = edge + "px";  down.style.top   = "";  down.style.right = ""; }
+    if (left)  { left.style.left  = edge + "px";  left.style.top  = cHalf + "px";  left.style.bottom = "";  left.style.right = ""; }
+    if (right) { right.style.right = edge + "px"; right.style.top = cHalf + "px";  right.style.bottom = ""; right.style.left = ""; }
     var isTouchPortrait = !landscape && window.matchMedia && !window.matchMedia('(pointer: fine)').matches;
     var canvas = document.querySelector('#game-container canvas');
 

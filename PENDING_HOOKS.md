@@ -637,6 +637,46 @@ document it here. The Reviewer agent will integrate these.
 - **Added**: 2026-03-14
 - [2026-03-14 19:36:15 EDT] Combat module created js/combat.js with Clash Combo Breaker feature, but index.html does not include js/combat.js. Reviewer note (2026-03-15 03:39 UTC): live build is functional without loading this file; split combat files already carry active stamina-break hooks (`onEnemyStaminaHit` / `applyStaminaBreakIfActive` in `js/combat-moves.js`). Treat standalone `js/combat.js` as leftover/optional code, not a blocking integration task.
 
+### Cinematic Hit Director Feature
+- **Module**: VFX (js/vfx.js)
+- **Target file**: js/scenes/GameScene.js, js/combat.js
+- **Description**: Auto-director system that dynamically frames action during dramatic moments. Requires vfx.js for camera framing logic, GameScene.js to apply camera zoom/pan transitions, combat.js to emit combo/drama intensity events.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-15
+
+### Reactive Impact Audio Feature
+- **Module**: Audio (js/audio.js)
+- **Target file**: js/combat.js, js/scenes/GameScene.js
+- **Description**: Dynamic impact sounds based on combo count and attack power. Requires audio.js for sound variation logic, combat.js to pass attack metadata (type, power, combo count) to audio system, GameScene.js for audio zone management.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-15
+
+### Timing Window Mastery Feature
+- **Module**: Combat (js/combat.js)
+- **Target file**: js/player.js, js/ui.js
+- **Description**: Perfect timing windows for different attack types with mastery meter. Requires combat.js for window detection and meter tracking, player.js to apply gear/timing modifiers, ui.js for mastery meter display.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-15
+
+### Arena Legacy Markers Feature
+- **Module**: Zones (js/zones.js) + Sprites (js/sprites.js)
+- **Target file**: js/player.js, js/main.js, js/scenes/GameScene.js
+- **Description**: Permanent arena decorations commemorating player achievements. Requires zones.js for marker placement data, sprites.js to render legacy decorations, player.js to track milestone achievements, main.js for cross-save persistence.
+- **Priority**: P3
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-15
+
+### Fighter's Biography Generator Feature
+- **Module**: Player (js/player.js) + UI (js/ui.js)
+- **Target file**: js/combat.js, js/main.js, js/scenes/GameScene.js
+- **Description**: Auto-generated narrative biography based on playstyle and achievements. Requires player.js for biography state and generation logic, combat.js to track significant events (boss defeats, big combos), main.js for cross-save persistence, ui.js for biography display.
+- **Priority**: P2
+- **Status**: 🔲 Not implemented
+- **Added**: 2026-03-15
+
 ## [Combat] Stamina Break hook-up needed
 - **Status**: ✅ Already integrated in live split combat modules
 - Reviewer verification (2026-03-15 03:39 UTC): `js/combat-moves.js` already implements enemy stamina state, triggers break on depletion via `onEnemyStaminaHit(...)`, and applies the damage multiplier via `applyStaminaBreakIfActive(...)` during damage resolution. No `index.html` hook-up to standalone `js/combat.js` is required for the current working build.
