@@ -275,26 +275,30 @@ Object.assign(window.MMA.UI, {
     if (groundActive && scene && scene.groundState && scene.groundState.active) {
       // Ground game - show position-based moves
       var position = scene.groundState.position || 'fullGuard';
-      var positionLabels = {
-        fullGuard: { jab: 'G&P', heavy: 'Elbow', grapple: 'Submit', special: 'Improve' },
-        halfGuard: { jab: 'G&P', heavy: 'Elbow', grapple: 'Submit', special: 'Improve' },
-        sideControl: { jab: 'G&P', heavy: 'Elbow', grapple: 'Submit', special: 'Mount' },
-        mount: { jab: 'G&P', heavy: 'Pound', grapple: 'Submit', special: 'Back' },
-        backControl: { jab: 'Choke', heavy: 'Choke', grapple: 'Submit', special: 'Escape' }
-      };
-      
-      // Get valid submissions for current position
+      // Get valid submissions for current position — never fall back to "Submit"
       var posSubs = this.getSubmissionsForPosition(position, scene);
-      
-      // Show the first available submission name on the grapple button
-      var subName = 'Submit';
+      // If none for this position, use any unlocked submission
+      if (!posSubs || posSubs.length === 0) {
+        var anyUnlocked = (scene && scene.player && scene.player.unlockedSubmissions) || ['rnc'];
+        posSubs = anyUnlocked;
+      }
+      var subName = 'RNC'; // hard default — never "Submit"
       if (posSubs && posSubs.length > 0 && roster[posSubs[0]]) {
         subName = roster[posSubs[0]].name;
+      } else if (posSubs && posSubs.length > 0) {
+        subName = posSubs[0].toUpperCase();
       }
+
+      var positionLabels = {
+        fullGuard: { jab: 'G&P', heavy: 'Elbow', grapple: subName, special: 'Improve' },
+        halfGuard: { jab: 'G&P', heavy: 'Elbow', grapple: subName, special: 'Improve' },
+        sideControl: { jab: 'G&P', heavy: 'Elbow', grapple: subName, special: 'Mount' },
+        mount: { jab: 'G&P', heavy: 'Pound', grapple: subName, special: 'Back' },
+        backControl: { jab: 'Choke', heavy: 'Choke', grapple: subName, special: 'Escape' }
+      };
       
       var labels = positionLabels[position] || positionLabels.fullGuard;
-      labels.grapple = subName;  // Show actual submission name
-      
+
       Object.keys(labels).forEach(function(action) {
         var btn = window.MMA.UI.getActionButton(action);
         if (btn) btn.textContent = labels[action];
