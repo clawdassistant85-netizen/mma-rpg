@@ -7,7 +7,7 @@ Object.assign(window.MMA.UI, {
     soundVolume: 0.8,
     musicVolume: 0.6,
     showHud: true,
-    showInputDisplay: true,
+    showInputDisplay: false,
     vibration: true
   },
   showSettingsMenu: function(scene) {

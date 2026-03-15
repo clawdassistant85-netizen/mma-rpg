@@ -149,10 +149,17 @@ window.MMA.Zones = {
         { id:'hypeGain', label:'+15% hype gain (3 rooms)' },
         { id:'stamina', label:'+20% stamina regen (3 rooms)' }
       ],
+      // Ring Out KO: championship ropes are "live" – knock opponents over the ropes for an instant KO.
+      ringOutEnabled:true,
+      ringOutLabel:'Ring Out KO',
       // Crowd Judge Scoring: three-judge crowd scorecards for decision wins
       crowdJudgeScoring:true,
       crowdJudgeCount:3,
       crowdJudgeWeights:{ damage:0.5, control:0.3, aggression:0.2 },
+      // Signature Footprint Graveyard: championship mat tracks permanent victory footprints
+      footprintGraveyard:true,
+      footprintGraveyardLabel:'Championship Footprint Graveyard',
+      footprintGraveyardArenaId:'zone3_championship',
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct3',up:'survival1'},
       spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:'Championship Ring',narratorStyle:'arenaTitle',
       // Signature Room Theme: gold spotlight with slow-falling confetti
@@ -265,11 +272,18 @@ window.MMA.Zones = {
       // Ring side power-ups are active in the Dojo as well
       ringPowerups:true,
       ringPowerupTypes:['hp','stamina','focus'],crowdFunding:true,crowdHypemen:true,
+      // Ring Out KO is also live in the Dojo for high-stakes endless runs.
+      ringOutEnabled:true,
+      ringOutLabel:'Ring Out KO',
       crowdHypemanBuffs:[
         { id:'damage', label:'+10% damage (3 rooms)' },
         { id:'hypeGain', label:'+15% hype gain (3 rooms)' },
         { id:'stamina', label:'+20% stamina regen (3 rooms)' }
       ],
+      // Signature Footprint Graveyard: dojo mat remembers fallen challengers
+      footprintGraveyard:true,
+      footprintGraveyardLabel:"Dojo Footprint Graveyard",
+      footprintGraveyardArenaId:'zone4_dojo',
       doors:{down:{col:7,row:11}},
       connections:{down:'oct4'},
       spawnPositions:[{col:7,row:5}],
@@ -523,6 +537,77 @@ window.MMA.Zones = {
       };
     }
     return null;
+  },
+  // Signature Footprint Graveyard helpers
+  // Championship-style arenas can opt into a lightweight "footprint
+  // graveyard" system. Zones only exposes metadata and simple counters –
+  // sprite/VFX systems own the actual footprint rendering, and player
+  // systems own applying persistent titles.
+  getFootprintGraveyardConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.footprintGraveyard) return null;
+    return {
+      active:true,
+      arenaId: room.footprintGraveyardArenaId || room.id,
+      label: room.footprintGraveyardLabel || (room.name + ' Footprint Graveyard'),
+      // Threshold where the arena grants its "Arena Legend" status.
+      legendFootprintThreshold: 25
+    };
+  },
+  // Register a defeated enemy for the current footprint arena. Combat
+  // systems should call this once per KO in eligible rooms so the mat
+  // can slowly "remember" fallen opponents.
+  registerFootprintGraveyardEvent: function(scene, payload) {
+    if (!scene || !scene.registry || !scene.currentRoomId) return;
+    var cfg = this.getFootprintGraveyardConfig(scene.currentRoomId);
+    if (!cfg || !cfg.active) return;
+    var arenaId = cfg.arenaId;
+    var keyCount = 'footprintGraveyardCount_' + arenaId;
+    var keyLegend = 'footprintGraveyardLegendUnlocked_' + arenaId;
+    var prevCount = scene.registry.get(keyCount) || 0;
+    var nextCount = prevCount + 1;
+    scene.registry.set(keyCount, nextCount);
+    // Surface lightweight metadata about the most recent imprint so
+    // sprite/VFX layers can vary footprint shapes by enemy archetype.
+    var enemyType = payload && payload.enemyType ? payload.enemyType : null;
+    if (enemyType) {
+      scene.registry.set('footprintGraveyardLastEnemyType_' + arenaId, enemyType);
+    }
+    // Once the mat has seen enough fights, flag "Arena Legend" status
+    // for this arena and expose a small damage buff hook.
+    var legendUnlocked = !!scene.registry.get(keyLegend);
+    if (!legendUnlocked && nextCount >= cfg.legendFootprintThreshold) {
+      scene.registry.set(keyLegend, true);
+      scene.registry.set('footprintGraveyardLegendDamageMultiplier_' + arenaId, 1.05);
+      var label = cfg.label || 'Footprint Graveyard';
+      scene.time.delayedCall(2500, function(){
+        scene.registry.set('gameMessage', label + ': Arena Legend status unlocked – +5% damage in this arena.');
+        scene.time.delayedCall(2800, function(){ scene.registry.set('gameMessage', ''); });
+      });
+    }
+  },
+  // Read-only helper so combat/player layers can query current footprint
+  // progress for the active arena without touching specific registry keys.
+  getFootprintGraveyardState: function(scene) {
+    if (!scene || !scene.registry || !scene.currentRoomId) return null;
+    var cfg = this.getFootprintGraveyardConfig(scene.currentRoomId);
+    if (!cfg || !cfg.active) return null;
+    var arenaId = cfg.arenaId;
+    var keyCount = 'footprintGraveyardCount_' + arenaId;
+    var keyLegend = 'footprintGraveyardLegendUnlocked_' + arenaId;
+    var keyBuff = 'footprintGraveyardLegendDamageMultiplier_' + arenaId;
+    var count = scene.registry.get(keyCount) || 0;
+    var legendUnlocked = !!scene.registry.get(keyLegend);
+    var dmgMult = scene.registry.get(keyBuff) || (legendUnlocked ? 1.05 : 1.0);
+    return {
+      active:true,
+      arenaId:arenaId,
+      label:cfg.label,
+      footprintCount:count,
+      legendUnlocked:legendUnlocked,
+      legendFootprintThreshold:cfg.legendFootprintThreshold,
+      legendDamageMultiplier:dmgMult
+    };
   },
   // Signature Room Themes helper
   // Lightweight metadata accessor for the backlog's "Signature Room Themes"
@@ -1432,6 +1517,21 @@ window.MMA.Zones = {
         scene.registry.set('ringPowerupTypes', []);
         scene.registry.set('ringPowerupCorners', []);
       }
+      // Ring Out KO metadata: championship-style arenas that enable
+      // instant knockouts when enemies are forced beyond the ropes.
+      // Combat systems should call MMA.Zones.checkRingOut(scene, enemy)
+      // after applying knockback to see if a ring out occurred.
+      if (room.ringOutEnabled) {
+        scene.registry.set('ringOutActive', true);
+        scene.registry.set('ringOutLabel', room.ringOutLabel || 'Ring Out KO');
+        scene.time.delayedCall(2400, function(){
+          scene.registry.set('gameMessage', (room.ringOutLabel || 'Ring Out KO') + ': send opponents over the ropes for an instant finish.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('ringOutActive', false);
+        scene.registry.set('ringOutLabel', '');
+      }
       // Crowd Hypeman metadata: highlighted crowd members that can be
       // acknowledged once per visit for temporary buffs.
       var hypemanCfg = this.getCrowdHypemanConfig(room.id);
@@ -1521,6 +1621,30 @@ window.MMA.Zones = {
         scene.registry.set('hazardVisibilityMultiplier', 1.0);
         scene.registry.set('hazardVfxKey', '');
         scene.registry.set('hazardSfxKey', '');
+      }
+      // Signature Footprint Graveyard metadata: championship mats that
+      // remember fallen opponents as persistent footprint impressions.
+      var graveCfg = this.getFootprintGraveyardConfig(room.id);
+      if (graveCfg && graveCfg.active) {
+        scene.registry.set('footprintGraveyardActive', true);
+        scene.registry.set('footprintGraveyardArenaId', graveCfg.arenaId);
+        scene.registry.set('footprintGraveyardLabel', graveCfg.label);
+        scene.registry.set('footprintGraveyardLegendThreshold', graveCfg.legendFootprintThreshold);
+        // Initialize counters if this is the first time we've loaded this arena
+        var arenaId = graveCfg.arenaId;
+        var keyCount = 'footprintGraveyardCount_' + arenaId;
+        var keyLegend = 'footprintGraveyardLegendUnlocked_' + arenaId;
+        if (scene.registry.get(keyCount) == null) scene.registry.set(keyCount, 0);
+        if (scene.registry.get(keyLegend) == null) scene.registry.set(keyLegend, false);
+        scene.time.delayedCall(2500, function(){
+          scene.registry.set('gameMessage', graveCfg.label + ': every KO leaves a mark on this mat.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('footprintGraveyardActive', false);
+        scene.registry.set('footprintGraveyardArenaId', '');
+        scene.registry.set('footprintGraveyardLabel', '');
+        scene.registry.set('footprintGraveyardLegendThreshold', 0);
       }
       // Blood Moon Arena metadata: rare night-only arena variant with
       // higher enemy threat and double loot. We expose this as simple
