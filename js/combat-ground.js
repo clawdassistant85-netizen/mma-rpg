@@ -218,11 +218,7 @@ Object.assign(window.MMA.Combat, {
       
       // Calculate submission chance based on enemy defense and submission difficulty
       // Higher ground defense = harder to submit
-      var enemyDefense = enemy && enemy.type ? (enemy.type.groundDefense || 0.2) : 0.2;
-      
-      // Show UI text for submissions available
-      var W = scene.cameras.main.width;
-      var H = scene.cameras.main.height;
+      var enemyDefense = enemy && enemy.type ? (enemy.type.groundDefense || 0.2) : 0.2; // eslint-disable-line no-unused-vars
       
       // Show prompt
       MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 60, 'SELECT SUBMISSION', '#ff66ff');

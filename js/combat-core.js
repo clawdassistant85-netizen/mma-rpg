@@ -201,7 +201,7 @@ Object.assign(window.MMA.Combat, {
       "unlockType": "level"
     },
     "rnc": {
-      "name": "RNC",
+      "name": "Choke",
       "type": "sub",
       "damage": 35,
       "staminaCost": 25,

@@ -28,8 +28,13 @@ window.MMA.Zones = {
   // Existing content continues below
 
   ZONE1_ROOMS: {
-    room1:{id:'room1',zone:1,weatherOptions:['clear','clear','rain','night'],weightClass:'light',doors:{left:{col:0,row:5},right:{col:15,row:5},up:{col:7,row:0}},connections:{left:'room2',right:'room3',up:'room4'},spawnPositions:[{col:3,row:3},{col:12,row:3},{col:12,row:9}],enemyPool:['streetThug','streetThug','barBrawler'],name:'Alley Entrance'},
-    room2:{id:'room2',zone:1,weatherOptions:['clear','rain','wind','fog'],weightClass:'light',doors:{right:{col:15,row:5}},connections:{right:'room1'},spawnPositions:[{col:3,row:3},{col:3,row:9}],enemyPool:['streetThug','barBrawler'],name:'Side Alley'},
+    // Room1: 4-way navigation hub
+    // RIGHT → room2 (same difficulty, grind/loop)
+    // LEFT  → room3 (slightly harder, challenge path)
+    // UP    → room4 (significantly harder, boss path)
+    // DOWN  → room_street2 (forward progression)
+    room1:{id:'room1',zone:1,weatherOptions:['clear','clear','rain','night'],weightClass:'light',doors:{left:{col:0,row:5},right:{col:15,row:5},up:{col:7,row:0},down:{col:7,row:11}},connections:{right:'room2',left:'room3',up:'room4',down:'room_street2'},spawnPositions:[{col:3,row:3},{col:12,row:3},{col:12,row:9}],enemyPool:['streetThug','streetThug','barBrawler'],name:'Alley Entrance'},
+    room2:{id:'room2',zone:1,weatherOptions:['clear','rain','wind','fog'],weightClass:'light',doors:{left:{col:0,row:5}},connections:{left:'room1'},spawnPositions:[{col:12,row:3},{col:12,row:9}],enemyPool:['streetThug','barBrawler'],name:'Side Alley (Grind)'},
     // Secret alley with bonus loot hooks – discovered as a side path off the main street
     secret1:{
       id:'secret1',
@@ -46,7 +51,8 @@ window.MMA.Zones = {
       bonusLootTags:['cash','rare'],
       bonusCurrencyMultiplier:2.0
     },
-    room3:{id:'room3',zone:1,weatherOptions:['clear','clear','night','wind','fog'],weightClass:'light',doors:{left:{col:0,row:5}},connections:{left:'room1'},spawnPositions:[{col:3,row:5},{col:12,row:3},{col:12,row:9}],enemyPool:['barBrawler','barBrawler','muayThaiFighter'],name:'Back Lot'},
+    room3:{id:'room3',zone:1,weatherOptions:['clear','clear','night','wind','fog'],weightClass:'light',doors:{right:{col:15,row:5}},connections:{right:'room1'},spawnPositions:[{col:3,row:5},{col:12,row:3},{col:12,row:9}],enemyPool:['barBrawler','barBrawler','muayThaiFighter'],name:'Back Lot (Challenge)'},
+    room_street2:{id:'room_street2',zone:1,weatherOptions:['night','rain','fog'],weightClass:'light',doors:{up:{col:7,row:0},right:{col:15,row:5},left:{col:0,row:5}},connections:{up:'room1',right:'room3',left:'room4'},spawnPositions:[{col:3,row:5},{col:12,row:5},{col:7,row:9}],enemyPool:['barBrawler','muayThaiFighter','streetThug'],name:'Back Street'},
     room4:{id:'room4',zone:1,weatherOptions:['clear','rain','fog'],weightClass:'light',doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'room1',up:'clinic1'},spawnPositions:[{col:3,row:8},{col:12,row:8}],enemyPool:['barBrawler','muayThaiFighter','muayThaiFighter'],name:'Storage Area'},
     // Clinic/Medical Bay: inter-zone recovery space between street and gym
     clinic1:{
@@ -524,6 +530,32 @@ window.MMA.Zones = {
       damageTakenMultiplier: 1.10,   // player takes +10% damage when cornered
       damageDealtMultiplier: 1.15,   // but deals +15% damage when they swing back
       regions: regions
+    };
+  },
+  // Ring Corner Escape configuration helper
+  // Lightweight implementation of the backlog's "Ring Corner Escape" feature.
+  // Certain arena/cage rooms can let players turn being trapped in the corner
+  // into a high-risk escape/QTE trap. Zones only exposes geometry + tuning;
+  // combat systems own input handling, stamina spend, and guaranteed hit logic.
+  getRingCornerEscapeConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.cornerPressure) return null;
+    // Reuse the same 2x2 corner pockets as Corner Pressure so systems
+    // can share grid checks without duplicating data.
+    var cornerCfg = this.getCornerPressureConfig(roomId);
+    if (!cornerCfg || !cornerCfg.active) return null;
+    return {
+      active: true,
+      // Tiles where a Ring Corner Escape QTE can be triggered.
+      regions: cornerCfg.regions.slice(),
+      // How long (in seconds) the QTE window stays open once the player
+      // reaches a valid corner tile.
+      qteWindowSeconds: 0.5,
+      // Stamina cost for successfully turning the corner into a trap.
+      staminaCost: 25,
+      // Duration (in seconds) that a successfully cornered enemy cannot
+      // dodge or block. Actual lockdown logic lives in combat systems.
+      lockoutSeconds: 2.0
     };
   },
   // Arena Wall Tech configuration helper
@@ -1646,6 +1678,26 @@ window.MMA.Zones = {
         scene.registry.set('cornerPressureDamageDealtMultiplier', 1.0);
         scene.registry.set('cornerPressureRegions', []);
       }
+      // Ring Corner Escape metadata: high-risk corner QTE that can turn
+      // being trapped on the ropes into a guaranteed opening.
+      var cornerEscapeCfg = this.getRingCornerEscapeConfig(room.id);
+      if (cornerEscapeCfg && cornerEscapeCfg.active) {
+        scene.registry.set('ringCornerEscapeActive', true);
+        scene.registry.set('ringCornerEscapeRegions', cornerEscapeCfg.regions);
+        scene.registry.set('ringCornerEscapeQteWindowSeconds', cornerEscapeCfg.qteWindowSeconds);
+        scene.registry.set('ringCornerEscapeStaminaCost', cornerEscapeCfg.staminaCost);
+        scene.registry.set('ringCornerEscapeLockoutSeconds', cornerEscapeCfg.lockoutSeconds);
+        scene.time.delayedCall(2375, function(){
+          scene.registry.set('gameMessage', 'Ring Corner Escape: reach the corner and time the escape to corner your opponent for 2 seconds.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('ringCornerEscapeActive', false);
+        scene.registry.set('ringCornerEscapeRegions', []);
+        scene.registry.set('ringCornerEscapeQteWindowSeconds', 0);
+        scene.registry.set('ringCornerEscapeStaminaCost', 0);
+        scene.registry.set('ringCornerEscapeLockoutSeconds', 0);
+      }
       // Arena Wall Tech metadata: environmental interaction zones for bounces/vaults/trips
       var wallTechCfg = this.getArenaWallTechConfig(room.id);
       if (wallTechCfg && wallTechCfg.active) {
@@ -1803,6 +1855,9 @@ window.MMA.Zones = {
       scene.player.setPosition(spawnX, spawnY).setActive(true).setVisible(true);
       if (scene.player.body) scene.player.body.enable = true;
       self.buildRoom(scene, newRoomId);
+      // Bring player above floor/wall tiles (depth 0) so it doesn't get buried
+      scene.player.setDepth(5);
+      if (scene.playerHpGfx) scene.playerHpGfx.setDepth(6);
       scene.enemies.forEach(function(e){
         if (!e) return;
         if (e._hpBarBg) e._hpBarBg.destroy();

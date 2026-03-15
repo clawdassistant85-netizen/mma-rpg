@@ -50,7 +50,7 @@ var MOVE_ROSTER = {
   mountCtrl:  { name:'Mount Control',type:'grapple', damage:0,  staminaCost:8,  cooldown:800,  unlockLevel:5,  unlockType:'level' },
   
   // Level 6
-  rnc:        { name:'RNC',          type:'sub',     damage:35, staminaCost:25, cooldown:2000, unlockLevel:6,  unlockType:'level' },
+  rnc:        { name:'Choke',        type:'sub',     damage:35, staminaCost:25, cooldown:2000, unlockLevel:6,  unlockType:'level' },
   kimura:     { name:'Kimura',       type:'sub',     damage:27, staminaCost:20, cooldown:1800, unlockLevel:6,  unlockType:'level' },
   
   // Level 7
