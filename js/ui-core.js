@@ -490,6 +490,11 @@ Object.assign(window.MMA.UI, {
     var ac = document.getElementById('action-cluster');
     if (dpad) dpad.style.display = show ? 'block' : 'none';
     if (ac) ac.style.display = show ? 'block' : 'none';
+    // Re-run layout after controls become visible so sizing + canvas-relative positioning fires correctly
+    if (show && typeof MMA.UI.handleResponsiveLayout === 'function') {
+      MMA.UI.handleResponsiveLayout();
+      setTimeout(function(){ MMA.UI.handleResponsiveLayout(); }, 200);
+    }
   },
   fightStats: { damageDealt:0, damageTaken:0, hitsLanded:0, hitsTaken:0, longestCombo:0, currentCombo:0, enemiesDefeated:0, critsLanded:0 },
   recordHitDealt: function(damage, isCrit, comboCount) { this.fightStats.damageDealt+=damage; this.fightStats.hitsLanded+=1; if(isCrit)this.fightStats.critsLanded+=1; if(comboCount>this.fightStats.longestCombo)this.fightStats.longestCombo=comboCount; },
