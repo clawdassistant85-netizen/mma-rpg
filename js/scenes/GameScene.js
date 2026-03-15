@@ -57,6 +57,8 @@ var GameScene = new Phaser.Class({
     MMA.Zones.buildRoom(this, this.currentRoomId);
 
     MMA.Player.create(this);
+    // Player indicator circle — helps player find themselves on mobile
+    this.playerIndicator = this.add.graphics().setDepth(4);
     if (window.MMA && MMA.Network && typeof MMA.Network.isMultiplayer === 'function' && MMA.Network.isMultiplayer()) {
       MMA.Player.createP2(this);
       this._setupNetworkHandlers();
@@ -429,6 +431,13 @@ var GameScene = new Phaser.Class({
   },
 
   update: function(time, delta) {
+    // Update player indicator position
+    if (this.playerIndicator && this.player && this.player.active && !this.gameOver) {
+      this.playerIndicator.clear();
+      this.playerIndicator.lineStyle(2, 0x00ff88, 0.75);
+      this.playerIndicator.strokeCircle(this.player.x, this.player.y + 16, 16);
+    }
+
     if (this.infoKey && Phaser.Input.Keyboard.JustDown(this.infoKey)) {
       if (!this.gameOver && !this.roomTransitioning) {
         if (this.paused) this.resumeFromPause();
