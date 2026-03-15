@@ -61,9 +61,9 @@ document it here. The Reviewer agent will integrate these.
 ### Do-or-Die Room Feature
 - **Module**: Zones (js/zones.js)
 - **Target file**: js/combat.js, js/player.js, js/scenes/GameScene.js
-- **Description**: Special room variant where player starts with 1 HP but deals 3x damage. Requires zones.js to flag room type, combat.js for damage multiplier, player.js for HP reset, GameScene.js for room entry handling.
+- **Description**: Special room variant where player starts with 1 HP but deals 3x damage. Zones now marks `rapid1` as a Do-or-Die Rapid Fire Cage and exposes metadata/registry flags (`doOrDieRoom`, `doOrDieDamageMultiplier`, `doOrDieStartingHp`, `doOrDie*` registry keys) via `MMA.Zones.getDoOrDieConfig(...)` and `buildRoom(...)` wiring. Combat.js should read `doOrDieDamageMultiplier` when computing outgoing damage in Do-or-Die rooms; player.js/GameScene.js should clamp starting HP to `doOrDieStartingHp` on room enter and surface any opt-in UI.
 - **Priority**: P2
-- **Status**: 🔲 Not implemented
+- **Status**: 🟡 Zones metadata implemented; combat/player/GameScene hooks still pending
 - **Added**: 2026-03-14
 
 ### Momentum Bank Feature
@@ -103,7 +103,7 @@ document it here. The Reviewer agent will integrate these.
 - **Target file**: js/combat.js, js/enemies.js, js/items.js
 - **Description**: Rare underground zone variant spawning at night (real-time) with +15% enemy damage and double loot drops. Requires zones.js to flag room type, combat.js for damage modifier, enemies.js for loot table boost, items.js for drop handling.
 - **Priority**: P2
-- **Status**: 🔲 Not implemented
+- **Status**: 🟡 Zones metadata/helper implemented; combat/enemies/items hooks still pending
 - **Added**: 2026-03-14
 
 ### Championship Legacy Hall Feature
@@ -382,10 +382,10 @@ document it here. The Reviewer agent will integrate these.
 
 ### Arena Footwork Trails Feature
 - **Module**: Sprites (js/sprites.js)
-- **Target file**: js/player.js, js/enemies.js
-- **Description**: Dust particle trails behind fighters in arena/cage zones. Requires player.js and enemies.js to spawn trail particles based on movement speed and zone type check.
+- **Target file**: js/player.js, js/enemies.js, js/zones.js
+- **Description**: Dust particle trails behind fighters in arena/cage zones. Requires player.js and enemies.js to spawn trail particles based on movement and zone type check. Zones.js provides isArenaFootworkZone() helper to check if current room should have dust effects.
 - **Priority**: P2
-- **Status**: 🔲 Not implemented
+- **Status**: ✅ Implemented - added isArenaFootworkZone() helper in zones.js, dust particle spawning in player.js (handleMovement) and enemies.js (moveTowards/moveAwayFrom). Tested: syntax valid.
 - **Added**: 2026-03-14
 
 ### Move Input Display Feature
@@ -635,10 +635,8 @@ document it here. The Reviewer agent will integrate these.
 - **Priority**: P2
 - **Status**: 🔲 Not implemented
 - **Added**: 2026-03-14
-- [2026-03-14 19:36:15 EDT] Combat module created js/combat.js with Clash Combo Breaker feature, but index.html does not include js/combat.js. Request owner of index.html to add <script src="js/combat.js?v=52"></script> after combat-core/moves/ground includes.
+- [2026-03-14 19:36:15 EDT] Combat module created js/combat.js with Clash Combo Breaker feature, but index.html does not include js/combat.js. Reviewer note (2026-03-15 03:39 UTC): live build is functional without loading this file; split combat files already carry active stamina-break hooks (`onEnemyStaminaHit` / `applyStaminaBreakIfActive` in `js/combat-moves.js`). Treat standalone `js/combat.js` as leftover/optional code, not a blocking integration task.
 
 ## [Combat] Stamina Break hook-up needed
-- Added `js/combat.js` with reusable Stamina Break API (`maybeTriggerStaminaBreak`, `applyStaminaBreakDamageMultiplier`, timers/state).
-- Needs wiring in existing combat flow files owned by other modules:
-  - `index.html`: include `<script src="js/combat.js">` before split combat modules.
-  - `js/combat-core.js`/`js/combat-moves.js`: call `maybeTriggerStaminaBreak(target)` when stamina drops to 0 and `applyStaminaBreakDamageMultiplier(...)` during damage resolution.
+- **Status**: ✅ Already integrated in live split combat modules
+- Reviewer verification (2026-03-15 03:39 UTC): `js/combat-moves.js` already implements enemy stamina state, triggers break on depletion via `onEnemyStaminaHit(...)`, and applies the damage multiplier via `applyStaminaBreakIfActive(...)` during damage resolution. No `index.html` hook-up to standalone `js/combat.js` is required for the current working build.

@@ -609,13 +609,14 @@ Object.assign(window.MMA.Enemies, {
     var dy = distractor.y - player.y;
     var baseAngle = Math.atan2(dy, dx);
     
+    var self = this;
     enemies.forEach(function(e) {
       if (e === distractor) return;
       var ex = e.x - player.x;
       var ey = e.y - player.y;
       var angle = Math.atan2(ey, ex);
       var angleDiff = Math.abs(angle - baseAngle);
-      if (angleDiff > this.GANG_UP_CONFIG.FLANK_ANGLE && angleDiff < Math.PI - this.GANG_UP_CONFIG.FLANK_ANGLE) {
+      if (angleDiff > self.GANG_UP_CONFIG.FLANK_ANGLE && angleDiff < Math.PI - self.GANG_UP_CONFIG.FLANK_ANGLE) {
         flankers.push(e);
       }
     });

@@ -10,6 +10,7 @@ Object.assign(window.MMA.UI, {
   // Hype meter for crowd engagement,
   showComboCounter: function(scene) {
     if (this.comboCounter.container) return this.comboCounter.container;
+    if (!scene || !scene.cameras || !scene.cameras.main) return null;
     var centerX = scene.cameras.main.width / 2;
     var topY = 80;
     
@@ -139,7 +140,7 @@ Object.assign(window.MMA.UI, {
   },
   showHypeMeter: function(scene) {
     if (this.hypeMeter.container) return this.hypeMeter.container;
-    
+    if (!scene || !scene.cameras || !scene.cameras.main) return null;
     var rightX = scene.cameras.main.width - 30;
     var topY = 60;
     

@@ -559,6 +559,14 @@ Object.assign(window.MMA.Combat, {
       }
       return damage;
     },
+  refreshRageState: function(scene, enemy) {
+    if (!enemy) return;
+    var rage = this.ensureRageState(enemy);
+    if (rage.active && scene.time.now > rage.activeUntil) {
+      rage.active = false;
+      if (enemy.combatState) enemy.combatState.attackSpeedMultiplier = 1;
+    }
+  },
   ensureRageState: function(enemy) {
       if (!enemy) return null;
       enemy.combatState = enemy.combatState || {};
