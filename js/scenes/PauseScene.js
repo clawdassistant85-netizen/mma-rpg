@@ -47,6 +47,7 @@ var PauseScene = new Phaser.Class({
     this._setMobileControlsPointerEvents(false);
     var W = CONFIG.CANVAS_W;
     var H = CONFIG.CANVAS_H;
+    var isMobile = !window.matchMedia('(pointer: fine)').matches;
 
     var PANEL_X  = 55;
     var PANEL_Y  = 35;
@@ -89,7 +90,7 @@ var PauseScene = new Phaser.Class({
 
     var statsY = PANEL_Y + 54;
     this.add.text(PANEL_X + 14, statsY, 'STATS', {
-      fontSize: '12px', color: '#888888', stroke: '#000', strokeThickness: 2
+      fontSize: isMobile ? '14px' : '12px', color: '#888888', stroke: '#000', strokeThickness: 2
     }).setDepth(10);
 
     var statsLine = [
@@ -132,125 +133,91 @@ var PauseScene = new Phaser.Class({
       strokeThickness: 2
     }).setDepth(10);
 
-    // ── Outfit info
-    var outfitY = statsY + 70;
-    var equippedOutfit = null;
-    if (window.MMA && MMA.Outfits) {
-      equippedOutfit = MMA.Outfits.getEquippedOutfit();
-    }
-    if (equippedOutfit) {
-      this.add.text(PANEL_X + 14, outfitY, 'EQUIPPED: ' + equippedOutfit.name, {
-        fontSize: '12px',
-        color: '#9b59b6',
-        stroke: '#000000',
-        strokeThickness: 2
-      }).setDepth(10);
-    }
-
-    // ── Second divider
-    var div2 = this.add.graphics();
-    div2.lineStyle(1, 0x555533, 0.6);
-    div2.beginPath();
-    div2.moveTo(PANEL_X + 10, outfitY + 20);
-    div2.lineTo(PANEL_X + PANEL_W - 10, outfitY + 20);
-    div2.strokePath();
-
-    // ── Moves section
-    var movesHeaderY = outfitY + 34;
-    this.add.text(PANEL_X + 14, movesHeaderY, 'UNLOCKED MOVES', {
-      fontSize: '12px', color: '#888888', stroke: '#000', strokeThickness: 2
-    }).setDepth(10);
-
+    // ── Unlocked moves set (needed by mobile controls picker regardless of layout)
     var unlockedMoves = this.registry.get('unlockedMoves') || ['jab', 'cross'];
     var unlockedSet = {};
-    unlockedMoves.forEach(function(moveKey) {
-      unlockedSet[moveKey] = true;
-    });
+    unlockedMoves.forEach(function(moveKey) { unlockedSet[moveKey] = true; });
 
-    var ROW_H   = 24;
-    var COL_W   = Math.floor(PANEL_W / 2);
-    var startY  = movesHeaderY + 18;
-    var KEY_W   = 38;
-    var NAME_W  = 100;
+    var controlsY; // set differently for mobile vs desktop
 
-    unlockedMoves.forEach(function(mk, idx) {
-      var info = PAUSE_MOVE_CONTROLS[mk];
-      if (!info) return;
+    if (!isMobile) {
+      // ── Outfit info (desktop only)
+      var outfitY = statsY + 70;
+      var equippedOutfit = null;
+      if (window.MMA && MMA.Outfits) {
+        equippedOutfit = MMA.Outfits.getEquippedOutfit();
+      }
+      if (equippedOutfit) {
+        this.add.text(PANEL_X + 14, outfitY, 'EQUIPPED: ' + equippedOutfit.name, {
+          fontSize: '12px', color: '#9b59b6', stroke: '#000000', strokeThickness: 2
+        }).setDepth(10);
+      }
 
-      var col = idx % 2;
-      var row = Math.floor(idx / 2);
-      var tx  = PANEL_X + 14 + col * COL_W;
-      var ty  = startY + row * ROW_H;
+      // ── Second divider (desktop only)
+      var div2 = this.add.graphics();
+      div2.lineStyle(1, 0x555533, 0.6);
+      div2.beginPath();
+      div2.moveTo(PANEL_X + 10, outfitY + 20);
+      div2.lineTo(PANEL_X + PANEL_W - 10, outfitY + 20);
+      div2.strokePath();
 
-      // Stop rendering if we overflow the panel
-      if (ty + ROW_H > PANEL_Y + PANEL_H - 30) return;
-
-      // [Key] badge
-      var keyColor = info.key === '-' ? '#555555' : '#e8c830';
-      self.add.text(tx, ty, '[' + info.key + ']', {
-        fontSize: '12px',
-        color: keyColor,
-        stroke: '#000000',
-        strokeThickness: 2
+      // ── Moves section (desktop only)
+      var movesHeaderY = outfitY + 34;
+      this.add.text(PANEL_X + 14, movesHeaderY, 'UNLOCKED MOVES', {
+        fontSize: '12px', color: '#888888', stroke: '#000', strokeThickness: 2
       }).setDepth(10);
 
-      // Move name
-      self.add.text(tx + KEY_W, ty, info.label, {
-        fontSize: '12px',
-        color: '#ffffff',
-        stroke: '#000000',
-        strokeThickness: 2
+      var ROW_H  = 24;
+      var COL_W  = Math.floor(PANEL_W / 2);
+      var startY = movesHeaderY + 18;
+      var KEY_W  = 38;
+      var NAME_W = 100;
+
+      unlockedMoves.forEach(function(mk, idx) {
+        var info = PAUSE_MOVE_CONTROLS[mk];
+        if (!info) return;
+        var col = idx % 2;
+        var row = Math.floor(idx / 2);
+        var tx  = PANEL_X + 14 + col * COL_W;
+        var ty  = startY + row * ROW_H;
+        if (ty + ROW_H > PANEL_Y + PANEL_H - 30) return;
+        var keyColor = info.key === '-' ? '#555555' : '#e8c830';
+        self.add.text(tx, ty, '[' + info.key + ']', { fontSize: '12px', color: keyColor, stroke: '#000000', strokeThickness: 2 }).setDepth(10);
+        self.add.text(tx + KEY_W, ty, info.label, { fontSize: '12px', color: '#ffffff', stroke: '#000000', strokeThickness: 2 }).setDepth(10);
+        var typeColor = info.type === 'Strike' ? '#ff8844' : info.type === 'Grapple' ? '#44aaff' : info.type === 'Sub' ? '#cc44cc' : '#888888';
+        self.add.text(tx + KEY_W + NAME_W, ty, info.type, { fontSize: '11px', color: typeColor, stroke: '#000000', strokeThickness: 2 }).setDepth(10);
+      });
+
+      // ── Loadout section (desktop only)
+      var gameScene = this.scene.get('GameScene');
+      var loadout = ['jab', 'cross', 'takedown', 'hook'];
+      if (gameScene && gameScene.player && gameScene.player.moveLoadout) {
+        loadout = gameScene.player.moveLoadout;
+      }
+      var loadoutY = startY + Math.ceil(unlockedMoves.length / 2) * ROW_H + 20;
+      this.add.text(PANEL_X + 14, loadoutY, 'LOADOUT (J-K-L-U)', {
+        fontSize: '12px', color: '#44aaff', stroke: '#000', strokeThickness: 2
       }).setDepth(10);
+      var slotColors = ['#ff8844', '#ff8844', '#44aaff', '#44aaff'];
+      for (var i = 0; i < 4; i++) {
+        var lMoveKey = loadout[i] || 'jab';
+        var lMoveInfo = PAUSE_MOVE_CONTROLS[lMoveKey] || { label: lMoveKey };
+        var lIsUnlocked = !!unlockedSet[lMoveKey];
+        var slotX = PANEL_X + 14 + i * ((PANEL_W - 28) / 4);
+        var slotBg = this.add.graphics();
+        slotBg.fillStyle(0x222222, 0.8);
+        slotBg.fillRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
+        slotBg.lineStyle(1, lIsUnlocked ? slotColors[i] : '#555555', 0.6);
+        slotBg.strokeRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
+        this.add.text(slotX + 10, loadoutY + 20, (i + 1) + ':', { fontSize: '10px', color: lIsUnlocked ? '#888888' : '#555555' }).setDepth(10);
+        this.add.text(slotX + 24, loadoutY + 24, lMoveInfo.label, { fontSize: '11px', color: lIsUnlocked ? '#ffffff' : '#777777' }).setDepth(10);
+      }
+      controlsY = loadoutY + 65;
 
-      // Type badge
-      var typeColor = '#888888';
-      if (info.type === 'Strike')  typeColor = '#ff8844';
-      if (info.type === 'Grapple') typeColor = '#44aaff';
-      if (info.type === 'Sub')     typeColor = '#cc44cc';
-
-      self.add.text(tx + KEY_W + NAME_W, ty, info.type, {
-        fontSize: '11px',
-        color: typeColor,
-        stroke: '#000000',
-        strokeThickness: 2
-      }).setDepth(10);
-    });
-
-    // ── Loadout section
-    var gameScene = this.scene.get('GameScene');
-    var loadout = ['jab', 'cross', 'takedown', 'hook'];
-    if (gameScene && gameScene.player && gameScene.player.moveLoadout) {
-      loadout = gameScene.player.moveLoadout;
+    } else {
+      // ── Mobile: compact — jump straight to MOBILE CONTROLS after stats
+      controlsY = statsY + 90;
     }
-    
-    var loadoutY = startY + Math.ceil(unlockedMoves.length / 2) * ROW_H + 20;
-    this.add.text(PANEL_X + 14, loadoutY, 'LOADOUT (J-K-L-U)', {
-      fontSize: '12px', color: '#44aaff', stroke: '#000', strokeThickness: 2
-    }).setDepth(10);
-    
-    var slotLabels = ['Jab', 'Cross', 'Takedown', 'Hook'];
-    var slotColors = ['#ff8844', '#ff8844', '#44aaff', '#44aaff'];
-    for (var i = 0; i < 4; i++) {
-      var moveKey = loadout[i] || 'jab';
-      var moveInfo = PAUSE_MOVE_CONTROLS[moveKey] || { label: moveKey };
-      var isUnlocked = !!unlockedSet[moveKey];
-      var slotX = PANEL_X + 14 + i * ((PANEL_W - 28) / 4);
-      var slotBg = this.add.graphics();
-      slotBg.fillStyle(0x222222, 0.8);
-      slotBg.fillRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
-      slotBg.lineStyle(1, isUnlocked ? slotColors[i] : '#555555', 0.6);
-      slotBg.strokeRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
-      
-      var slotNum = this.add.text(slotX + 10, loadoutY + 20, (i + 1) + ':', {
-        fontSize: '10px', color: isUnlocked ? '#888888' : '#555555'
-      }).setDepth(10);
-      
-      this.add.text(slotX + 24, loadoutY + 24, moveInfo.label, {
-        fontSize: '11px', color: isUnlocked ? '#ffffff' : '#777777'
-      }).setDepth(10);
-    }
-
-    var controlsY = loadoutY + 65;
     this.add.text(PANEL_X + 14, controlsY, 'MOBILE CONTROLS (tap slot to remap)', {
       fontSize: '11px', color: '#ffaa44', stroke: '#000', strokeThickness: 2
     }).setDepth(10);
