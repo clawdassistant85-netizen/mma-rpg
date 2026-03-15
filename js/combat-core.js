@@ -320,10 +320,7 @@ Object.assign(window.MMA.Combat, {
         // Client is non-authoritative for combat damage/KO/XP; host applies combat outcomes.
         // TODO: send explicit combat intent to host when input-intent channel is available.
         if (window.MMA_ACTION) {
-          window.MMA_ACTION.jab = false;
-          window.MMA_ACTION.heavy = false;
-          window.MMA_ACTION.grapple = false;
-          window.MMA_ACTION.special = false;
+          ['jab','heavy','grapple','special','cross','hook','lowKick','uppercut','headKick','bodyShot','takedown','guillotine'].forEach(function(k){ window.MMA_ACTION[k] = false; });
         }
         var clientCdMap = scene.player.cooldowns; Object.keys(clientCdMap).forEach(function(k){ if (clientCdMap[k] > 0) clientCdMap[k] = Math.max(0, clientCdMap[k] - delta); });
         return;
@@ -347,10 +344,7 @@ Object.assign(window.MMA.Combat, {
   
         if (attemptedRecoveryTech && this.tryStaggerRecoveryTech(scene)) {
           if (window.MMA_ACTION) {
-            window.MMA_ACTION.jab = false;
-            window.MMA_ACTION.heavy = false;
-            window.MMA_ACTION.grapple = false;
-            window.MMA_ACTION.special = false;
+            ['jab','heavy','grapple','special','cross','hook','lowKick','uppercut','headKick','bodyShot','takedown','guillotine'].forEach(function(k){ window.MMA_ACTION[k] = false; });
           }
         } else {
           var cdMapStun = scene.player.cooldowns; Object.keys(cdMapStun).forEach(function(k){ if (cdMapStun[k] > 0) cdMapStun[k] = Math.max(0, cdMapStun[k] - delta); });
@@ -404,16 +398,25 @@ Object.assign(window.MMA.Combat, {
       if (Phaser.Input.Keyboard.JustDown(scene.guillotineKey)) this.executeAttack(scene, 'guillotine');
       if (Phaser.Input.Keyboard.JustDown(scene.specialKey)) this.executeSpecialMove(scene);
       if (window.MMA_ACTION) {
-        if (window.MMA_ACTION.jab) { window.MMA_ACTION.jab = false; this.executeAttack(scene, 'jab'); }
-        if (window.MMA_ACTION.heavy) { window.MMA_ACTION.heavy = false; this.executeAttack(scene, 'cross'); }
+        // Legacy 4-button names (kept for backward compat)
+        if (window.MMA_ACTION.jab)     { window.MMA_ACTION.jab = false;     this.executeAttack(scene, 'jab'); }
+        if (window.MMA_ACTION.heavy)   { window.MMA_ACTION.heavy = false;   this.executeAttack(scene, 'cross'); }
         if (window.MMA_ACTION.grapple) { window.MMA_ACTION.grapple = false; this.executeAttack(scene, 'takedown'); }
         if (window.MMA_ACTION.special) { window.MMA_ACTION.special = false; this.executeSpecialMove(scene); }
+        // Extended 8-button names (new remappable slots)
+        if (window.MMA_ACTION.cross)       { window.MMA_ACTION.cross = false;       this.executeAttack(scene, 'cross'); }
+        if (window.MMA_ACTION.hook)        { window.MMA_ACTION.hook = false;        this.executeAttack(scene, 'hook'); }
+        if (window.MMA_ACTION.lowKick)     { window.MMA_ACTION.lowKick = false;     this.executeAttack(scene, 'lowKick'); }
+        if (window.MMA_ACTION.uppercut)    { window.MMA_ACTION.uppercut = false;    this.executeAttack(scene, 'uppercut'); }
+        if (window.MMA_ACTION.headKick)    { window.MMA_ACTION.headKick = false;    this.executeAttack(scene, 'headKick'); }
+        if (window.MMA_ACTION.bodyShot)    { window.MMA_ACTION.bodyShot = false;    this.executeAttack(scene, 'bodyShot'); }
+        if (window.MMA_ACTION.takedown)    { window.MMA_ACTION.takedown = false;    this.executeAttack(scene, 'takedown'); }
+        if (window.MMA_ACTION.guillotine)  { window.MMA_ACTION.guillotine = false;  this.executeGroundMove(scene, 'takedown'); }
         // Handle stand up button (separate utility button)
         if (window.MMA_ACTION.standup) { 
           window.MMA_ACTION.standup = false; 
           if (scene.groundState && scene.groundState.active) {
             this.executeGroundMove(scene, 'standup');
-            // Record move for Move Input Display
             MMA.UI.recordMoveInput('standup', scene);
           }
         }

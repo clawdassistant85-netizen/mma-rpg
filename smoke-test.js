@@ -87,7 +87,8 @@ window.smokeTest = async function() {
     gs.enterGroundState(groundEnemy);
     await wait(300);
     gs.groundState.active ? pass('4_ground_enter', 'pos=' + gs.groundState.position) : fail('4_ground_enter', 'ground state not active');
-    var grappBtn = document.querySelector('[data-action="grapple"]');
+    // Ground grapple btn may be data-action="takedown" (new 8-btn) or "grapple" (legacy 4-btn)
+    var grappBtn = document.querySelector('[data-action="takedown"]') || document.querySelector('[data-action="grapple"]');
     var grappLabel = grappBtn ? grappBtn.textContent : 'n/a';
     (grappLabel === 'Choke' || grappLabel.toLowerCase().includes('choke')) ? pass('4_choke_label', grappLabel) : fail('4_choke_label', 'got "' + grappLabel + '" expected "Choke"');
 

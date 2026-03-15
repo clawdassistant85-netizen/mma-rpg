@@ -249,9 +249,64 @@ var PauseScene = new Phaser.Class({
         fontSize: '11px', color: isUnlocked ? '#ffffff' : '#777777'
       }).setDepth(10);
     }
+
+    var controlsY = loadoutY + 65;
+    this.add.text(PANEL_X + 14, controlsY, 'MOBILE CONTROLS (tap slot to remap)', {
+      fontSize: '11px', color: '#ffaa44', stroke: '#000', strokeThickness: 2
+    }).setDepth(10);
+
+    var ALL_MOVES = [
+      {key:'jab',name:'Jab'},{key:'cross',name:'Cross'},{key:'hook',name:'Hook'},
+      {key:'lowKick',name:'Low Kick'},{key:'uppercut',name:'Uppercut'},{key:'bodyShot',name:'Body Shot'},
+      {key:'headKick',name:'Head Kick'},{key:'takedown',name:'Takedown'},
+      {key:'guillotine',name:'Guillotine'},{key:'special',name:'Special'}
+    ];
+    var mobileLoadout = window.MMA_LOADOUT || {1:'jab',2:'cross',3:'hook',4:'lowKick',5:'takedown',6:'special',7:'headKick',8:'guillotine'};
+    var slotRadius = 22;
+    var slotsPerRow = 4;
+    var slotSpacing = (PANEL_W - 28) / slotsPerRow;
+    var slotObjs = [];
+
+    for (var s = 1; s <= 8; s++) {
+      var row = Math.floor((s-1) / slotsPerRow);
+      var col = (s-1) % slotsPerRow;
+      var sx = PANEL_X + 14 + slotSpacing * col + slotSpacing/2;
+      var sy = controlsY + 20 + row * (slotRadius * 2 + 10) + slotRadius;
+      
+      var slotGfx = this.add.graphics().setDepth(10);
+      var moveKey = mobileLoadout[s] || 'jab';
+      var moveObj = ALL_MOVES.find(function(m){ return m.key === moveKey; }) || {key:moveKey, name:moveKey};
+      var isUnlocked = unlockedSet[moveKey] || moveKey === 'jab' || moveKey === 'takedown' || moveKey === 'special';
+      
+      slotGfx.fillStyle(isUnlocked ? 0x222244 : 0x221111, 0.9);
+      slotGfx.fillCircle(sx, sy, slotRadius);
+      slotGfx.lineStyle(2, isUnlocked ? 0x4488ff : 0x553333, 1);
+      slotGfx.strokeCircle(sx, sy, slotRadius);
+      
+      this.add.text(sx - slotRadius + 3, sy - slotRadius + 2, s + '', {
+        fontSize: '8px', color: '#888888'
+      }).setDepth(11);
+      
+      var nameText = this.add.text(sx, sy, moveObj.name, {
+        fontSize: '9px', color: isUnlocked ? '#ffffff' : '#666666',
+        align: 'center', wordWrap: {width: slotRadius * 1.6}
+      }).setOrigin(0.5).setDepth(11);
+      
+      var hitArea = this.add.rectangle(sx, sy, slotRadius*2, slotRadius*2, 0x000000, 0)
+        .setInteractive({cursor:'pointer'}).setDepth(12);
+      
+      (function(slotNum, slotGfxRef, nameTextRef, sxRef, syRef) {
+        hitArea.on('pointerdown', function() {
+          self._showMovePicker(slotNum, sxRef, syRef, unlockedSet, ALL_MOVES, slotGfxRef, nameTextRef, mobileLoadout);
+        });
+      })(s, slotGfx, nameText, sx, sy, mobileLoadout);
+      
+      slotObjs.push({num: s, gfx: slotGfx, text: nameText, x: sx, y: sy});
+    }
+    this._slotObjs = slotObjs;
     
     // ── Ground game controls hint
-    var groundY = loadoutY + 60;
+    var groundY = controlsY + 20 + 2 * (slotRadius * 2 + 10) + 6;
     this.add.text(PANEL_X + 14, groundY, 'GROUND GAME: L for submissions, 1-4 to select', {
       fontSize: '10px', color: '#cc44cc', stroke: '#000', strokeThickness: 2
     }).setDepth(10);
@@ -293,12 +348,74 @@ var PauseScene = new Phaser.Class({
   },
 
   closePause: function() {
+    if (this._pickerContainer) {
+      this._pickerContainer.destroy();
+      this._pickerContainer = null;
+    }
     this._setMobileControlsPointerEvents(true);
-    // Tell GameScene to resume physics + game logic
     var gameScene = this.scene.get('GameScene');
     if (gameScene && gameScene.resumeFromPause) {
       gameScene.resumeFromPause();
     }
     this.scene.stop();
+  },
+
+  _showMovePicker: function(slotNum, slotX, slotY, unlockedSet, ALL_MOVES, slotGfx, nameText, loadout) {
+    var self = this;
+    if (this._pickerContainer) { this._pickerContainer.destroy(); this._pickerContainer = null; }
+
+    var closeBg = self.add.rectangle(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H/2, CONFIG.CANVAS_W, CONFIG.CANVAS_H, 0x000000, 0)
+      .setInteractive().setDepth(19);
+    closeBg.on('pointerdown', function() {
+      if (self._pickerContainer) { self._pickerContainer.destroy(); self._pickerContainer = null; }
+    });
+
+    var pickerHeight = Math.min(ALL_MOVES.length * 22 + 30, 200);
+    var pickerBg = this.add.graphics().setDepth(20);
+    pickerBg.fillStyle(0x111122, 0.97);
+    pickerBg.fillRoundedRect(slotX - 80, slotY - 20, 160, pickerHeight, 8);
+    pickerBg.lineStyle(1, 0x4488ff, 0.8);
+    pickerBg.strokeRoundedRect(slotX - 80, slotY - 20, 160, pickerHeight, 8);
+
+    var children = [closeBg, pickerBg];
+    var header = this.add.text(slotX, slotY - 8, 'SLOT ' + slotNum + ' — Pick Move', {
+      fontSize: '10px', color: '#ffaa44', align: 'center'
+    }).setOrigin(0.5).setDepth(21);
+    children.push(header);
+
+    ALL_MOVES.forEach(function(move, idx) {
+      var isUnlocked = unlockedSet[move.key] || move.key === 'jab' || move.key === 'takedown' || move.key === 'special';
+      var my = slotY + 14 + idx * 20;
+      if (my > slotY + 180) return;
+      var item = self.add.text(slotX, my, move.name, {
+        fontSize: '11px', color: isUnlocked ? '#ffffff' : '#555555', align: 'center'
+      }).setOrigin(0.5).setDepth(21);
+      if (isUnlocked) {
+        item.setInteractive({cursor:'pointer'});
+        item.on('pointerdown', function() {
+          loadout[slotNum] = move.key;
+          window.MMA_LOADOUT = loadout;
+          try { localStorage.setItem('mma_loadout', JSON.stringify(loadout)); } catch(e){}
+          var btn = document.querySelector('[data-slot="' + slotNum + '"]');
+          if (btn) {
+            btn.setAttribute('data-action', move.key);
+            btn.textContent = move.name;
+            btn.setAttribute('aria-label', 'Slot ' + slotNum + ': ' + move.name);
+          }
+          nameText.setText(move.name);
+          if (slotGfx) {
+            slotGfx.clear();
+            slotGfx.fillStyle(0x222244, 0.9);
+            slotGfx.fillCircle(slotX, slotY, 22);
+            slotGfx.lineStyle(2, 0x4488ff, 1);
+            slotGfx.strokeCircle(slotX, slotY, 22);
+          }
+          if (self._pickerContainer) { self._pickerContainer.destroy(); self._pickerContainer = null; }
+        });
+      }
+      children.push(item);
+    });
+
+    this._pickerContainer = self.add.container(0, 0, children).setDepth(20);
   }
 });

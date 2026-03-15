@@ -62,29 +62,46 @@
     #dpad .dpad-left { left: 6px; top: 31px; }
     #dpad .dpad-right { right: 6px; top: 31px; }
 
-    /* Action buttons (bottom-right diamond layout) */
+    /* Action buttons (bottom-right circular cluster) */
     #action-cluster {
       position: fixed;
       right: 18px;
       bottom: 24px;
-      width: 176px;
-      height: 154px;
+      width: 238px;
+      height: 118px;
       pointer-events: auto;
       touch-action: none;
       display: none;
       z-index: 100;
+      gap: 10px;
+      align-items: center;
+    }
+    #action-cluster[style*="display: block"] {
+      display: flex !important;
+    }
+    #action-cluster .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 6px;
     }
     #action-cluster .action-btn {
-      position: absolute;
-      width: 72px;
-      height: 46px;
-      border-radius: 12px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 4px;
+      font: 700 9px/1.2 system-ui, sans-serif;
+      box-sizing: border-box;
       border: 0;
       background-image: linear-gradient(145deg, rgba(255,255,255,0.18), rgba(40,40,40,0.9));
       box-shadow: 0 4px 10px rgba(0,0,0,0.45);
       color: rgba(255,255,255,0.94);
-      font: 700 12px/46px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      text-align: center;
       letter-spacing: 0.03em;
       text-transform: uppercase;
       user-select: none;
@@ -98,23 +115,6 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.55);
       background-image: linear-gradient(145deg, rgba(255,255,255,0.30), rgba(20,20,20,0.95));
     }
-    /* Diamond positions: Jab (top), Heavy (right), Grapple (left), Special (bottom) */
-    #action-cluster .action-btn[data-action="jab"] {
-      left: 52px;
-      top: 4px;
-    }
-    #action-cluster .action-btn[data-action="heavy"] {
-      right: 2px;
-      top: 54px;
-    }
-    #action-cluster .action-btn[data-action="grapple"] {
-      left: 2px;
-      top: 54px;
-    }
-    #action-cluster .action-btn[data-action="special"] {
-      left: 52px;
-      bottom: 4px;
-    }
     /* Cooldown overlay */
     #action-cluster .action-btn .cooldown-overlay {
       position: absolute;
@@ -125,6 +125,7 @@
       border-radius: 12px;
       pointer-events: none;
       transition: height 50ms linear;
+      z-index: 0;
     }
     #action-cluster .action-btn.on-cooldown {
       background-image: linear-gradient(145deg, rgba(100,100,100,0.4), rgba(30,30,30,0.95));
@@ -224,9 +225,66 @@
     #danger-warning-overlay.active {
       animation: dangerFlash 300ms ease-in-out infinite;
     }
+    /* Directional warning arrows */
+    #danger-warning-overlay .danger-arrow {
+      position: absolute;
+      font-size: 32px;
+      color: #ff6600;
+      text-shadow: 0 0 10px #ff3300, 0 2px 4px rgba(0,0,0,0.8);
+      opacity: 0;
+      transition: opacity 150ms ease, transform 150ms ease;
+      font-weight: bold;
+    }
+    #danger-warning-overlay.active .danger-arrow {
+      opacity: 1;
+      animation: dangerArrowPulse 400ms ease-in-out infinite;
+    }
+    #danger-warning-overlay .danger-left { left: 15px; top: 50%; transform: translateY(-50%); }
+    #danger-warning-overlay .danger-right { right: 15px; top: 50%; transform: translateY(-50%); }
+    #danger-warning-overlay .danger-top { left: 50%; top: 15px; transform: translateX(-50%); }
+    #danger-warning-overlay .danger-bottom { left: 50%; bottom: 15px; transform: translateX(-50%); }
+    
+    /* Active direction highlighting */
+    #danger-warning-overlay.danger-left .danger-left,
+    #danger-warning-overlay.danger-right .danger-right,
+    #danger-warning-overlay.danger-top .danger-top,
+    #danger-warning-overlay.danger-bottom .danger-bottom {
+      color: #ff3300;
+      transform: translateY(-50%) scale(1.2);
+      text-shadow: 0 0 20px #ff0000, 0 2px 4px rgba(0,0,0,0.8);
+    }
+    #danger-warning-overlay.danger-top .danger-top,
+    #danger-warning-overlay.danger-bottom .danger-bottom {
+      transform: translateX(-50%) scale(1.2);
+    }
+    
+    /* Warning label */
+    #danger-warning-overlay .danger-label {
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      font-weight: bold;
+      color: #ffcc00;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 150ms ease;
+    }
+    #danger-warning-overlay.active .danger-label {
+      opacity: 1;
+    }
+    
     @keyframes dangerFlash {
       0%, 100% { opacity: 0.7; }
       50% { opacity: 1; }
+    }
+    @keyframes dangerArrowPulse {
+      0%, 100% { transform: translateY(-50%) scale(1); }
+      50% { transform: translateY(-50%) scale(1.15); }
     }
     
     /* Stamina Break Warning Overlay - flashes when enemy is about to stagger */
@@ -473,7 +531,7 @@
 
     @media (orientation: landscape) {
       #dpad { left: 10px; bottom: 10px; width: 88px; height: 88px; }
-      #action-cluster { right: 10px; bottom: 10px; width: 176px; height: 154px; }
+      #action-cluster { right: 10px; bottom: 10px; width: 238px; height: 118px; }
     }
 
     @media (pointer: fine) {
@@ -491,7 +549,13 @@
       <div id="screen-flash-overlay"></div>
       <div id="health-pulse-overlay"></div>
       <div id="mood-lighting-overlay"></div>
-      <div id="danger-warning-overlay"></div>
+      <div id="danger-warning-overlay">
+        <div class="danger-arrow danger-left">◀</div>
+        <div class="danger-arrow danger-right">▶</div>
+        <div class="danger-arrow danger-top">▲</div>
+        <div class="danger-arrow danger-bottom">▼</div>
+        <div class="danger-label"></div>
+      </div>
       <div id="stamina-break-overlay"></div>
       <div id="weight-class-indicator" title="Weight class affects speed/power" style="display:none">
         <span class="wc-icon">⚖️</span>
@@ -533,33 +597,41 @@
     </div>
     <button id="standup-btn" type="button" aria-label="Stand Up" style="position:fixed; left:130px; bottom:40px; width:60px; height:36px; border-radius:10px; border:0; background:rgba(100,100,200,0.7); color:#fff; font:bold 12px system-ui; pointer-events:auto; touch-action:none; display:none; z-index:100;">STAND</button>
     <div id="action-cluster" class="touch-control" aria-label="Action Buttons">
-      <button class="action-btn" data-action="jab" aria-label="Jab">Jab</button>
-      <button class="action-btn" data-action="heavy" aria-label="Heavy">Heavy</button>
-      <button class="action-btn" data-action="grapple" aria-label="Grapple">Grapple</button>
-      <button class="action-btn" data-action="special" aria-label="Special">Special</button>
+      <div class="action-grid" id="action-grid-left">
+        <button class="action-btn" data-slot="1" data-action="hook" aria-label="Slot 1">Hook</button>
+        <button class="action-btn" data-slot="2" data-action="jab" aria-label="Slot 2">Jab</button>
+        <button class="action-btn" data-slot="3" data-action="cross" aria-label="Slot 3">Cross</button>
+        <button class="action-btn" data-slot="4" data-action="lowKick" aria-label="Slot 4">Low Kick</button>
+      </div>
+      <div class="action-grid" id="action-grid-right">
+        <button class="action-btn" data-slot="5" data-action="takedown" aria-label="Slot 5">Takedown</button>
+        <button class="action-btn" data-slot="6" data-action="special" aria-label="Slot 6">Special</button>
+        <button class="action-btn" data-slot="7" data-action="headKick" aria-label="Slot 7">Head Kick</button>
+        <button class="action-btn" data-slot="8" data-action="guillotine" aria-label="Slot 8">Guillotine</button>
+      </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=63"></script>
-  <script src="js/sprites.js?v=63"></script>
-  <script src="js/combat-core.js?v=63"></script>
-  <script src="js/combat-moves.js?v=63"></script>
-  <script src="js/combat-ground.js?v=63"></script>
-  <script src="js/enemies-config.js?v=63"></script>
-  <script src="js/enemies-combat.js?v=63"></script>
-  <script src="js/enemies-core.js?v=63"></script>
-  <script src="js/enemies-ai.js?v=63"></script>
-  <script src="js/zones.js?v=63"></script>
-  <script src="js/player.js?v=63"></script>
-  <script src="js/items.js?v=63"></script>
-  <script src="js/outfits.js?v=63"></script>
-  <script src="js/vfx.js?v=63"></script>
-  <script src="js/ui-core.js?v=63"></script>
-  <script src="js/ui-meters.js?v=63"></script>
-  <script src="js/ui-settings.js?v=63"></script>
+  <script src="js/config.js?v=64"></script>
+  <script src="js/sprites.js?v=64"></script>
+  <script src="js/combat-core.js?v=64"></script>
+  <script src="js/combat-moves.js?v=64"></script>
+  <script src="js/combat-ground.js?v=64"></script>
+  <script src="js/enemies-config.js?v=64"></script>
+  <script src="js/enemies-combat.js?v=64"></script>
+  <script src="js/enemies-core.js?v=64"></script>
+  <script src="js/enemies-ai.js?v=64"></script>
+  <script src="js/zones.js?v=64"></script>
+  <script src="js/player.js?v=64"></script>
+  <script src="js/items.js?v=64"></script>
+  <script src="js/outfits.js?v=64"></script>
+  <script src="js/vfx.js?v=64"></script>
+  <script src="js/ui-core.js?v=64"></script>
+  <script src="js/ui-meters.js?v=64"></script>
+  <script src="js/ui-settings.js?v=64"></script>
 
-  <script src="js/ui-layout.js?v=63"></script>
-  <script src="js/progression.js?v=63"></script>
+  <script src="js/ui-layout.js?v=64"></script>
+  <script src="js/progression.js?v=64"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -629,6 +701,16 @@
         }
       }
     }
+    // K key = KO Gallery toggle
+    if (e.key === 'k' || e.key === 'K') {
+      if (isGameActive && gameScene.player && !gameScene.paused && !gameScene.gameOver) {
+        if (gameScene.activeKOGallery && gameScene.activeKOGallery.close) {
+          gameScene.activeKOGallery.close();
+        } else {
+          if (typeof window.MMA.UI.showKOGallery === 'function') gameScene.activeKOGallery = window.MMA.UI.showKOGallery(gameScene);
+        }
+      }
+    }
   });
   
   // Periodic stamina and health warning check (every 500ms when game is active)
@@ -641,8 +723,203 @@
       window.MMA.UI.updateHealthPulse(gameScene, gameScene.player.stats.hp, gameScene.player.stats.maxHp);
       // Update weight class indicator (guard: function may not exist yet)
       if (typeof window.MMA.UI.updateWeightClassFromDOM === 'function') window.MMA.UI.updateWeightClassFromDOM(gameScene.player.stats);
+      // Check for danger warnings (coordinated attacks, special moves)
+      if (typeof window.MMA.UI.checkDangerWarnings === 'function') window.MMA.UI.checkDangerWarnings(gameScene);
     }
   }, 500);
+  
+  // Danger Proximity Warning System
+  (function() {
+    var dangerState = {
+      active: false,
+      direction: null, // 'left', 'right', 'top', 'bottom'
+      warningType: null, // 'coordination', 'special', 'gangup'
+      timeoutId: null,
+      lastWarningTime: 0,
+      cooldownMs: 2000 // Minimum time between warnings
+    };
+    
+    var overlay = null;
+    var labelEl = null;
+    
+    function getOverlay() {
+      if (!overlay) overlay = document.getElementById('danger-warning-overlay');
+      return overlay;
+    }
+    
+    function getLabel() {
+      if (!labelEl) {
+        var ov = getOverlay();
+        if (ov) labelEl = ov.querySelector('.danger-label');
+      }
+      return labelEl;
+    }
+    
+    function clearDirectionClasses(ov) {
+      if (!ov) return;
+      ov.classList.remove('danger-left', 'danger-right', 'danger-top', 'danger-bottom');
+    }
+    
+    function showDangerWarning(direction, warningType, label) {
+      var now = Date.now();
+      if (now - dangerState.lastWarningTime < dangerState.cooldownMs) return;
+      dangerState.lastWarningTime = now;
+      
+      var ov = getOverlay();
+      if (!ov) return;
+      
+      // Clear any existing timeout
+      if (dangerState.timeoutId) {
+        clearTimeout(dangerState.timeoutId);
+      }
+      
+      // Set direction and label
+      clearDirectionClasses(ov);
+      if (direction) {
+        ov.classList.add('danger-' + direction);
+      }
+      ov.classList.add('active');
+      
+      var lbl = getLabel();
+      if (lbl && label) {
+        lbl.textContent = label;
+      }
+      
+      dangerState.active = true;
+      dangerState.direction = direction;
+      dangerState.warningType = warningType;
+      
+      // Auto-hide after 1.5 seconds
+      dangerState.timeoutId = setTimeout(function() {
+        hideDangerWarning();
+      }, 1500);
+    }
+    
+    function hideDangerWarning() {
+      var ov = getOverlay();
+      if (ov) {
+        ov.classList.remove('active');
+        clearDirectionClasses(ov);
+      }
+      var lbl = getLabel();
+      if (lbl) lbl.textContent = '';
+      dangerState.active = false;
+      dangerState.direction = null;
+      dangerState.warningType = null;
+    }
+    
+    // Main danger check function - exposed to MMA.UI
+    window.MMA = window.MMA || {};
+    window.MMA.UI = window.MMA.UI || {};
+    window.MMA.UI.checkDangerWarnings = function(gameScene) {
+      if (!gameScene || !gameScene.enemies || !gameScene.player) return;
+      
+      var player = gameScene.player;
+      var enemies = gameScene.enemies;
+      var px = player.x || 0;
+      var py = player.y || 0;
+      
+      // Check for coordinated attack preparation (multiple enemies charging)
+      var chargingEnemies = [];
+      var specialEnemies = [];
+      
+      enemies.forEach(function(enemy) {
+        if (!enemy || !enemy.active) return;
+        
+        var ex = enemy.x || 0;
+        var ey = enemy.y || 0;
+        var dist = Math.sqrt((ex - px) * (ex - px) + (ey - py) * (ey - py));
+        
+        // Check if enemy is preparing a special move (telegraph state)
+        var isTelegraphing = enemy.isTelegraphing || (enemy.state && enemy.state.includes('telegraph'));
+        var isCharging = enemy.isCharging || enemy.chargeTime > 0;
+        var isSpecial = enemy.isUsingSpecial || (enemy.currentMove && enemy.currentMove.isSpecial);
+        
+        if (dist < 250) { // Only care about nearby enemies
+          if (isTelegraphing || isCharging) {
+            chargingEnemies.push({ enemy: enemy, x: ex, y: ey });
+          }
+          if (isSpecial) {
+            specialEnemies.push({ enemy: enemy, x: ex, y: ey });
+          }
+        }
+      });
+      
+      // If multiple enemies are charging, show gang-up warning
+      if (chargingEnemies.length >= 2) {
+        // Find the most dangerous direction (closest enemy)
+        var closest = chargingEnemies[0];
+        var minDist = 9999;
+        chargingEnemies.forEach(function(e) {
+          var d = Math.sqrt((e.x - px) * (e.x - px) + (e.y - py) * (e.y - py));
+          if (d < minDist) {
+            minDist = d;
+            closest = e;
+          }
+        });
+        
+        var dir = null;
+        if (closest) {
+          var dx = closest.x - px;
+          var dy = closest.y - py;
+          if (Math.abs(dx) > Math.abs(dy)) {
+            dir = dx > 0 ? 'right' : 'left';
+          } else {
+            dir = dy > 0 ? 'bottom' : 'top';
+          }
+        }
+        
+        showDangerWarning(dir, 'gangup', '⚔️ GANG-UP!');
+        return;
+      }
+      
+      // If one enemy is using a special move, show special attack warning
+      if (specialEnemies.length > 0) {
+        var special = specialEnemies[0];
+        var dx = special.x - px;
+        var dy = special.y - py;
+        var dir = null;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          dir = dx > 0 ? 'right' : 'left';
+        } else {
+          dir = dy > 0 ? 'bottom' : 'top';
+        }
+        
+        var moveName = special.enemy.currentMove ? special.enemy.currentMove.name || 'SPECIAL' : 'SPECIAL';
+        showDangerWarning(dir, 'special', '⚡ ' + moveName.toUpperCase());
+        return;
+      }
+      
+      // Single enemy telegraph warning
+      if (chargingEnemies.length === 1) {
+        var enemy = chargingEnemies[0];
+        var dx = enemy.x - px;
+        var dy = enemy.y - py;
+        var dir = null;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          dir = dx > 0 ? 'right' : 'left';
+        } else {
+          dir = dy > 0 ? 'bottom' : 'top';
+        }
+        
+        // Get move type for label
+        var moveType = 'ATTACK';
+        if (enemy.enemy.currentMove) {
+          var mt = enemy.enemy.currentMove.moveType || enemy.enemy.currentMove.type;
+          if (mt === 'grapple' || mt === 'submission') moveType = 'GRAPPLE';
+          else if (mt === 'special') moveType = 'SPECIAL';
+          else moveType = 'STRIKE';
+        }
+        
+        showDangerWarning(dir, 'coordination', moveType + ' INCOMING');
+      }
+    };
+    
+    // Manual trigger for testing (also called from combat events)
+    window.MMA.UI.triggerDangerWarning = function(direction, label) {
+      showDangerWarning(direction, 'manual', label || 'WARNING!');
+    };
+  })();
   // Start game on first tap (mobile) after audio unlock
   document.addEventListener('touchstart', function(){
     var btn = document.getElementById('dom-start-btn');
@@ -768,39 +1045,60 @@
   (function setupActions(){
     var cluster = document.getElementById('action-cluster');
     if (!cluster) return;
-    if (!window.MMA_ACTION) window.MMA_ACTION = { jab:false, heavy:false, grapple:false, special:false };
+    if (!window.MMA_ACTION) window.MMA_ACTION = {};
+    ['jab','cross','hook','lowKick','uppercut','headKick','bodyShot','takedown','guillotine','special','standup'].forEach(function(m){ if(window.MMA_ACTION[m]===undefined) window.MMA_ACTION[m]=false; });
+    if (!window.MMA_LOADOUT) {
+      var _saved = null;
+      try { _saved = JSON.parse(localStorage.getItem('mma_loadout')); } catch(e){}
+      window.MMA_LOADOUT = _saved || {1:'hook',2:'jab',3:'cross',4:'lowKick',5:'takedown',6:'special',7:'headKick',8:'guillotine'};
+    }
+    function applyLoadout() {
+      if (!window.MMA_LOADOUT) return;
+      Object.keys(window.MMA_LOADOUT).forEach(function(slot) {
+        var btn = document.querySelector('[data-slot="' + slot + '"]');
+        if (!btn) return;
+        var moveKey = window.MMA_LOADOUT[slot];
+        btn.setAttribute('data-action', moveKey);
+        var label = moveKey.replace(/([A-Z])/g, ' $1').replace(/^./, function(s){return s.toUpperCase();});
+        btn.textContent = label;
+        btn.setAttribute('aria-label', 'Slot ' + slot + ': ' + label);
+      });
+    }
+    applyLoadout();
     function setAction(action, on){
       window.MMA_ACTION[action] = !!on;
     }
     function bind(btn){
-      var act = btn.getAttribute('data-action');
+      function currentAction(){
+        return btn.getAttribute('data-action');
+      }
       btn.addEventListener('touchstart', function(e){
         e.preventDefault();
-        setAction(act, true);
+        setAction(currentAction(), true);
         btn.style.transform = 'translateZ(0) scale(0.92)';
       }, {passive:false});
       btn.addEventListener('touchend', function(e){
         e.preventDefault();
-        setAction(act, false);
+        setAction(currentAction(), false);
         btn.style.transform = '';
       }, {passive:false});
       btn.addEventListener('touchcancel', function(){
-        setAction(act, false);
+        setAction(currentAction(), false);
         btn.style.transform = '';
       });
       btn.addEventListener('mousedown', function(e){
         e.preventDefault();
-        setAction(act, true);
+        setAction(currentAction(), true);
         btn.style.transform = 'translateZ(0) scale(0.92)';
       });
       window.addEventListener('mouseup', function(){
-        setAction(act, false);
+        setAction(currentAction(), false);
         btn.style.transform = '';
       });
     }
     Array.prototype.slice.call(cluster.querySelectorAll('.action-btn')).forEach(bind);
     window.addEventListener('blur', function(){
-      window.MMA_ACTION.jab = window.MMA_ACTION.heavy = window.MMA_ACTION.grapple = window.MMA_ACTION.special = false;
+      ['jab','cross','hook','lowKick','uppercut','headKick','bodyShot','takedown','guillotine','special'].forEach(function(m){window.MMA_ACTION[m]=false;});
     });
     // Standup button binding
     var standBtn = document.getElementById('standup-btn');
@@ -812,20 +1110,20 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=63"></script>
-  <script src="js/saveSystem.js?v=63"></script>
-  <script src="js/narrator.js?v=63"></script>
-  <script src="js/scenes/TitleScene.js?v=63"></script>
-  <script src="js/scenes/BootScene.js?v=63"></script>
-  <script src="js/scenes/GameScene.js?v=63"></script>
-  <script src="js/scenes/HUDScene.js?v=63"></script>
-  <script src="js/scenes/PauseScene.js?v=63"></script>
-  <script src="js/scenes/OutfitScene.js?v=63"></script>
-  <script src="js/scenes/UnlockScene.js?v=63"></script>
-  <script src="js/scenes/VictoryScene.js?v=63"></script>
-  <script src="js/scenes/DefeatScene.js?v=63"></script>
-  <script src="js/network.js?v=63"></script>
-  <script src="js/scenes/LobbyScene.js?v=63"></script>
-  <script src="js/main.js?v=63"></script>
+<script src="js/sounds.js?v=64"></script>
+  <script src="js/saveSystem.js?v=64"></script>
+  <script src="js/narrator.js?v=64"></script>
+  <script src="js/scenes/TitleScene.js?v=64"></script>
+  <script src="js/scenes/BootScene.js?v=64"></script>
+  <script src="js/scenes/GameScene.js?v=64"></script>
+  <script src="js/scenes/HUDScene.js?v=64"></script>
+  <script src="js/scenes/PauseScene.js?v=64"></script>
+  <script src="js/scenes/OutfitScene.js?v=64"></script>
+  <script src="js/scenes/UnlockScene.js?v=64"></script>
+  <script src="js/scenes/VictoryScene.js?v=64"></script>
+  <script src="js/scenes/DefeatScene.js?v=64"></script>
+  <script src="js/network.js?v=64"></script>
+  <script src="js/scenes/LobbyScene.js?v=64"></script>
+  <script src="js/main.js?v=64"></script>
 </body>
 </html>

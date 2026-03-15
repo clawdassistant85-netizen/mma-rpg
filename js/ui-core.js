@@ -290,14 +290,23 @@ Object.assign(window.MMA.UI, {
       }
 
       var positionLabels = {
-        fullGuard: { jab: 'G&P', heavy: 'Elbow', grapple: subName, special: 'Improve' },
-        halfGuard: { jab: 'G&P', heavy: 'Elbow', grapple: subName, special: 'Improve' },
-        sideControl: { jab: 'G&P', heavy: 'Elbow', grapple: subName, special: 'Mount' },
-        mount: { jab: 'G&P', heavy: 'Pound', grapple: subName, special: 'Back' },
-        backControl: { jab: 'Choke', heavy: 'Choke', grapple: subName, special: 'Escape' }
+        fullGuard: { jab: 'G&P', cross: 'Elbow', takedown: subName, special: 'Improve' },
+        halfGuard: { jab: 'G&P', cross: 'Elbow', takedown: subName, special: 'Improve' },
+        sideControl: { jab: 'G&P', cross: 'Elbow', takedown: subName, special: 'Mount' },
+        mount: { jab: 'G&P', cross: 'Pound', takedown: subName, special: 'Back' },
+        backControl: { jab: 'Choke', cross: 'Choke', takedown: subName, special: 'Escape' }
       };
-      
-      var labels = positionLabels[position] || positionLabels.fullGuard;
+      // Also support legacy 4-btn names if remapped buttons still use them
+      var legacyLabels = {
+        fullGuard: { heavy: 'Elbow', grapple: subName },
+        halfGuard: { heavy: 'Elbow', grapple: subName },
+        sideControl: { heavy: 'Elbow', grapple: subName },
+        mount: { heavy: 'Pound', grapple: subName },
+        backControl: { heavy: 'Choke', grapple: subName }
+      };
+
+      var labels = Object.assign({}, positionLabels[position] || positionLabels.fullGuard,
+                                     legacyLabels[position] || legacyLabels.fullGuard);
 
       Object.keys(labels).forEach(function(action) {
         var btn = window.MMA.UI.getActionButton(action);
@@ -307,19 +316,26 @@ Object.assign(window.MMA.UI, {
       // Update stand up button visibility
       this.updateStandUpButton(scene);
     } else {
-      // Standing - use loadout to show moves
-      var actionToSlot = { jab: 0, heavy: 1, grapple: 2, special: 3 };
-      Object.keys(actionToSlot).forEach(function(action) {
-        var slotIndex = actionToSlot[action];
-        var moveKey = loadout[slotIndex] || 'jab';
-        var move = roster[moveKey];
-        var btn = window.MMA.UI.getActionButton(action);
-        if (btn && move) {
-          btn.textContent = move.name;
-        } else if (btn) {
-          btn.textContent = action === 'jab' ? 'Jab' : (action === 'heavy' ? 'Heavy' : (action === 'grapple' ? 'Grapple' : 'Special'));
-        }
-      });
+      // Standing — update all 8 loadout slots from window.MMA_LOADOUT if present
+      var domLoadout = window.MMA_LOADOUT || null;
+      if (domLoadout) {
+        Object.keys(domLoadout).forEach(function(slot) {
+          var btn = document.querySelector('[data-slot="' + slot + '"]');
+          var moveKey = domLoadout[slot];
+          var move = roster[moveKey];
+          if (btn) btn.textContent = move ? move.name : moveKey.replace(/([A-Z])/g,' $1').trim();
+        });
+      } else {
+        // Legacy 4-btn fallback
+        var actionToSlot = { jab: 0, heavy: 1, grapple: 2, special: 3 };
+        Object.keys(actionToSlot).forEach(function(action) {
+          var slotIndex = actionToSlot[action];
+          var moveKey = loadout[slotIndex] || 'jab';
+          var move = roster[moveKey];
+          var btn = window.MMA.UI.getActionButton(action);
+          if (btn && move) btn.textContent = move.name;
+        });
+      }
     }
     this.updateSpecialButton(scene || null, !!groundActive);
   },
