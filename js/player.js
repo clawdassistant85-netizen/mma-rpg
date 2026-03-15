@@ -61,7 +61,7 @@ window.MMA.Player = {
       endurance: 10
     };
     // Default move loadout (4 slots)
-    scene.player.moveLoadout = ['jab', 'cross', 'takedown', 'hook'];
+    scene.player.moveLoadout = ['jab', 'takedown', 'cross', 'hook'];
     // Unlocked submissions (for ground game)
     scene.player.unlockedSubmissions = ['rnc']; // Starts with RNC
     // Derived bonuses from attributes and outfit
@@ -71,7 +71,7 @@ window.MMA.Player = {
     scene.player.dodgeChance = 0;
     scene.player.staminaRegenBonus = 0;
     scene.player.cooldowns = {};
-    scene.player.unlockedMoves = ['jab', 'cross', 'takedown', 'hook'];
+    scene.player.unlockedMoves = ['jab', 'takedown']; // Start with basics; unlock more through gameplay
     if (scene._savedGameData) {
       var st = scene._savedGameData.playerStats, mv = scene._savedGameData.playerUnlockedMoves;
       if (st && typeof st === 'object') { 

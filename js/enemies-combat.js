@@ -1601,6 +1601,7 @@ Object.assign(window.MMA.Enemies, {
             if (teachKey && moveInfo) {
               scene.player.unlockedMoves.push(teachKey);
               scene.registry.set('unlockedMoves', scene.player.unlockedMoves.slice());
+              if (window.MMA && MMA.UI && typeof MMA.UI.setActionButtonLabels === 'function') MMA.UI.setActionButtonLabels(false, scene);
               scene.registry.set('gameMessage', 'TUTOR TAUGHT: ' + (moveInfo.name || teachKey));
               scene.time.delayedCall(2200, function(){ scene.registry.set('gameMessage', ''); });
               if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
@@ -1629,6 +1630,7 @@ Object.assign(window.MMA.Enemies, {
       scene.player.justLeveled = true; if (window.sfx) window.sfx.levelup(); var newMoves = [];
       Object.keys(MMA.Combat.MOVE_ROSTER).forEach(function(k){ var m = MMA.Combat.MOVE_ROSTER[k]; if (m.unlockLevel === scene.player.stats.level && m.unlockType === 'level') { if (scene.player.unlockedMoves.indexOf(k) === -1) scene.player.unlockedMoves.push(k); newMoves.push(m.name); } });
       scene.registry.set('unlockedMoves', scene.player.unlockedMoves.slice());
+      if (window.MMA && MMA.UI && typeof MMA.UI.setActionButtonLabels === 'function') MMA.UI.setActionButtonLabels(false, scene);
       if (window.narrate) window.narrate('levelUp', { level: scene.player.stats.level }).then(function(msg){ var current = scene.registry.get('gameMessage') || ''; if (msg && (current === '' || current.indexOf('LEVEL') === 0)) { scene.registry.set('gameMessage', msg); scene.time.delayedCall(3000, function(){ scene.registry.set('gameMessage', ''); }); } });
       scene.registry.set('gameMessage', newMoves.length ? 'LEVEL UP! NEW MOVES: ' + newMoves.join(', ') : 'LEVEL ' + scene.player.stats.level + '!');
       scene.time.delayedCall(2500, function(){ scene.registry.set('gameMessage', ''); });

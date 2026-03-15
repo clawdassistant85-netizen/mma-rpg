@@ -116,8 +116,8 @@ Object.assign(window.MMA.Combat, {
       "damage": 12,
       "staminaCost": 8,
       "cooldown": 600,
-      "unlockLevel": 1,
-      "unlockType": "start"
+      "unlockLevel": 2,
+      "unlockType": "level"
     },
     "hook": {
       "name": "Hook",

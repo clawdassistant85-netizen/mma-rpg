@@ -319,11 +319,22 @@ Object.assign(window.MMA.UI, {
       // Standing — update all 8 loadout slots from window.MMA_LOADOUT if present
       var domLoadout = window.MMA_LOADOUT || null;
       if (domLoadout) {
+        var unlockedForVis = unlocked;
         Object.keys(domLoadout).forEach(function(slot) {
           var btn = document.querySelector('[data-slot="' + slot + '"]');
           var moveKey = domLoadout[slot];
           var move = roster[moveKey];
-          if (btn) btn.textContent = move ? move.name : moveKey.replace(/([A-Z])/g,' $1').trim();
+          if (!btn) return;
+          var isLocked = moveKey && moveKey !== 'special' && unlockedForVis.indexOf(moveKey) === -1;
+          if (isLocked) {
+            btn.textContent = (move ? move.name : moveKey) + ' 🔒';
+            btn.style.opacity = '0.4';
+            btn.style.pointerEvents = 'none';
+          } else {
+            btn.textContent = move ? move.name : moveKey.replace(/([A-Z])/g,' $1').trim();
+            btn.style.opacity = '';
+            btn.style.pointerEvents = '';
+          }
         });
       } else {
         // Legacy 4-btn fallback
