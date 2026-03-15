@@ -470,5 +470,13 @@ Object.assign(window.MMA.UI, {
     var ac = document.getElementById('action-cluster');
     if (dpad) dpad.style.display = show ? 'block' : 'none';
     if (ac) ac.style.display = show ? 'block' : 'none';
-  }
+  },
+  fightStats: { damageDealt:0, damageTaken:0, hitsLanded:0, hitsTaken:0, longestCombo:0, currentCombo:0, enemiesDefeated:0, critsLanded:0 },
+  recordHitDealt: function(damage, isCrit, comboCount) { this.fightStats.damageDealt+=damage; this.fightStats.hitsLanded+=1; if(isCrit)this.fightStats.critsLanded+=1; if(comboCount>this.fightStats.longestCombo)this.fightStats.longestCombo=comboCount; },
+  recordHitTaken: function(damage) { this.fightStats.damageTaken+=damage; this.fightStats.hitsTaken+=1; },
+  incrementCombo: function() { this.fightStats.currentCombo+=1; if(this.fightStats.currentCombo>this.fightStats.longestCombo)this.fightStats.longestCombo=this.fightStats.currentCombo; },
+  resetCombo: function() { this.fightStats.currentCombo=0; },
+  recordEnemyDefeated: function() { this.fightStats.enemiesDefeated+=1; },
+  getFightStats: function() { return Object.assign({}, this.fightStats); },
+  resetFightStats: function() { this.fightStats = { damageDealt:0, damageTaken:0, hitsLanded:0, hitsTaken:0, longestCombo:0, currentCombo:0, enemiesDefeated:0, critsLanded:0 }; }
 });

@@ -838,6 +838,61 @@ window.MMA.Zones = {
     var label = next === 'day' ? 'Day' : (next === 'sunset' ? 'Sunset' : 'Night');
     scene.registry.set('timeOfDayLabel', label);
   },
+  // Elemental Zone Resonance helpers
+  // Lightweight, metadata-driven implementation of the backlog's
+  // "Elemental Zone Resonance" feature. Each zone can advertise a
+  // primary element so that equipment/tech systems can grant bonuses
+  // when loadouts match the arena's identity. Zones does not apply
+  // any damage directly – it only exposes data for other systems to
+  // consume.
+  _getElementalZoneConfigForRoom: function(room) {
+    if (!room) return null;
+    var zone = room.zone || 1;
+    // Baseline mapping follows the backlog proposal:
+    // Fire = gym, Water = beach, Earth = underground, Air = arena.
+    // Current content mostly covers street/gym/arena/dojo, so we
+    // map what exists today and leave room for future zones.
+    var element = null;
+    if (zone === 2) {
+      element = 'fire';
+    } else if (zone === 3) {
+      element = 'air';
+    } else if (zone === 4) {
+      // Champion's Dojo inherits the arena's soaring, high-stakes feel.
+      element = 'air';
+    } else if (zone === 1) {
+      // Street/early game rooms lean into gritty "earth" roots.
+      element = 'earth';
+    }
+    if (!element) return null;
+    var label;
+    if (element === 'fire') label = 'Fire Gym';
+    else if (element === 'water') label = 'Water Beach';
+    else if (element === 'earth') label = 'Earth Streets';
+    else if (element === 'air') label = 'Air Arena';
+    else label = 'Elemental Zone';
+    // Synergy multipliers are intentionally descriptive; combat systems
+    // can choose to fold them into real damage formulas (e.g. +20%
+    // damage when equipment/tech elements match the zone).
+    var synergies = {
+      // Matching element bonus (e.g. Fire gear in Fire zone).
+      matchingElementDamageMultiplier: 1.20,
+      matchingElementStaminaEfficiency: 1.10,
+      // Cross-element combos – purely descriptive tags that other
+      // systems can interpret as they like.
+      comboSynergies: [
+        { id:'fire_earth_magma', elements:['fire','earth'], label:'Magma Synergy', effectHint:'Burning ground damage over time.' },
+        { id:'water_air_storm', elements:['water','air'], label:'Storm Synergy', effectHint:'Stun chance from lightning strikes.' }
+      ]
+    };
+    return {
+      active: true,
+      zone: zone,
+      element: element,
+      label: label,
+      synergies: synergies
+    };
+  },
   // Weather Adaptation System helpers
   // Lightweight, run-local implementation of the backlog's weather affinity
   // concept. We track how many rooms the player has fought in for each
@@ -1255,6 +1310,26 @@ window.MMA.Zones = {
         });
       } else {
         scene.registry.set('weightClassLabel', 'Standard');
+      }
+      // Elemental Zone Resonance metadata: exposes the arena's elemental
+      // identity so loadout/tech systems can award bonuses for matching
+      // elements without zones owning combat math directly.
+      var elemCfg = this._getElementalZoneConfigForRoom(room);
+      if (elemCfg && elemCfg.active) {
+        scene.registry.set('elementalZoneActive', true);
+        scene.registry.set('elementalZoneElement', elemCfg.element);
+        scene.registry.set('elementalZoneLabel', elemCfg.label);
+        scene.registry.set('elementalZoneSynergies', elemCfg.synergies || null);
+        // Lightweight flavor hint to prime players that elements matter here.
+        scene.time.delayedCall(2550, function(){
+          scene.registry.set('gameMessage', elemCfg.label + ': matching elemental gear and techniques hit harder here.');
+          scene.time.delayedCall(2400, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('elementalZoneActive', false);
+        scene.registry.set('elementalZoneElement', '');
+        scene.registry.set('elementalZoneLabel', '');
+        scene.registry.set('elementalZoneSynergies', null);
       }
       // Champion's Dojo metadata: endless arena + leaderboard hooks
       if (room.dojoMode === 'championsDojo') {

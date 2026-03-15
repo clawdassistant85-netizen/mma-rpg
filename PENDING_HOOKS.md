@@ -635,3 +635,4 @@ document it here. The Reviewer agent will integrate these.
 - **Priority**: P2
 - **Status**: 🔲 Not implemented
 - **Added**: 2026-03-14
+- [2026-03-14 19:36:15 EDT] Combat module created js/combat.js with Clash Combo Breaker feature, but index.html does not include js/combat.js. Request owner of index.html to add <script src="js/combat.js?v=52"></script> after combat-core/moves/ground includes.
