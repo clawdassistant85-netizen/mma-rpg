@@ -34,7 +34,7 @@ var LobbyScene = new Phaser.Class({
     this.add.text(cx, 72, 'MMA RPG', {
       fontSize: '44px', color: '#ffd700', fontFamily: 'Arial', fontStyle: 'bold'
     }).setOrigin(0.5);
-    this.add.text(cx, 108, 'by Toby & Digi', {
+    this.add.text(cx, 108, 'by Toby, Digi & ARIA 🌸', {
       fontSize: '18px', color: '#9fb3d1', fontFamily: 'Arial'
     }).setOrigin(0.5);
     if (!showCoop) {

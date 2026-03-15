@@ -57,11 +57,12 @@
     #dpad .dpad-btn.active { transform: translateZ(0) scale(0.92); background: rgba(160,160,160,0.65); }
     #dpad.active .dpad-base { transform: scale(0.98); transition: transform 80ms ease; }
 
-    /* D-pad arrows: % positions work for any container size before JS overrides them */
-    #dpad .dpad-up    { left: 50%; top: 5%;     transform: translateX(-50%); }
-    #dpad .dpad-down  { left: 50%; bottom: 5%;  transform: translateX(-50%); }
-    #dpad .dpad-left  { top: 50%;  left: 5%;    transform: translateY(-50%); }
-    #dpad .dpad-right { top: 50%;  right: 5%;   transform: translateY(-50%); }
+    /* D-pad arrows: pixel positions for default 100px container, JS overrides for dynamic size */
+    /* NO transform here — transform conflicted with JS left/top, causing UP to overlap LEFT */
+    #dpad .dpad-up    { left: 31px; top: 6px; }
+    #dpad .dpad-down  { left: 31px; bottom: 6px; }
+    #dpad .dpad-left  { left: 6px;  top: 31px; }
+    #dpad .dpad-right { right: 6px; top: 31px; }
 
     /* Action buttons (bottom-right circular cluster) */
     #action-cluster {
@@ -541,6 +542,44 @@
       #dpad { display: none; }
       #action-cluster { display: none; }
     }
+
+    /* Touch portrait: 4-wide rectangular button bar, full screen width.
+       display:contents flattens the two 2×2 action-grids into the parent flex.
+       !important beats both JS inline styles and the [style*] display:flex rule. */
+    @media (pointer: coarse) and (max-width: 600px) {
+      /* Mobile portrait: cluster sits right of d-pad as two 4-button rows stacked */
+      #action-cluster[style*="display: block"] {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 4px !important;
+        left: 116px !important;   /* clear d-pad (18px + ~90px + 8px gap) */
+        right: 8px !important;
+        width: auto !important;
+        height: auto !important;
+        padding: 0 !important;
+      }
+      /* Each 2×2 grid becomes a single row of 4 buttons side-by-side */
+      #action-cluster[style*="display: block"] .action-grid {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 4px !important;
+        width: 100% !important;
+      }
+      #action-cluster[style*="display: block"] .action-btn {
+        /* (100% - 3 gaps) / 4 buttons, no grow, no shrink */
+        flex: 0 0 calc((100% - 12px) / 4) !important;
+        height: 30px !important;
+        border-radius: 6px !important;
+        font-size: 7px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        padding: 0 2px !important;
+        line-height: 30px !important;
+        text-align: center !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -614,27 +653,27 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=68"></script>
-  <script src="js/sprites.js?v=68"></script>
-  <script src="js/combat-core.js?v=68"></script>
-  <script src="js/combat-moves.js?v=68"></script>
-  <script src="js/combat-ground.js?v=68"></script>
-  <script src="js/enemies-config.js?v=68"></script>
-  <script src="js/enemies-combat.js?v=68"></script>
-  <script src="js/enemies-core.js?v=68"></script>
-  <script src="js/enemies-ai.js?v=68"></script>
-  <script src="js/zones.js?v=68"></script>
-  <script src="js/player.js?v=68"></script>
-  <script src="js/items.js?v=68"></script>
-  <script src="js/outfits.js?v=68"></script>
-  <script src="js/vfx.js?v=68"></script>
-  <script src="js/ui.js?v=68"></script>
-  <script src="js/ui-core.js?v=68"></script>
-  <script src="js/ui-meters.js?v=68"></script>
-  <script src="js/ui-settings.js?v=68"></script>
+  <script src="js/config.js?v=69"></script>
+  <script src="js/sprites.js?v=69"></script>
+  <script src="js/combat-core.js?v=69"></script>
+  <script src="js/combat-moves.js?v=69"></script>
+  <script src="js/combat-ground.js?v=69"></script>
+  <script src="js/enemies-config.js?v=69"></script>
+  <script src="js/enemies-combat.js?v=69"></script>
+  <script src="js/enemies-core.js?v=69"></script>
+  <script src="js/enemies-ai.js?v=69"></script>
+  <script src="js/zones.js?v=69"></script>
+  <script src="js/player.js?v=69"></script>
+  <script src="js/items.js?v=69"></script>
+  <script src="js/outfits.js?v=69"></script>
+  <script src="js/vfx.js?v=69"></script>
+  <script src="js/ui.js?v=69"></script>
+  <script src="js/ui-core.js?v=69"></script>
+  <script src="js/ui-meters.js?v=69"></script>
+  <script src="js/ui-settings.js?v=69"></script>
 
-  <script src="js/ui-layout.js?v=68"></script>
-  <script src="js/progression.js?v=68"></script>
+  <script src="js/ui-layout.js?v=69"></script>
+  <script src="js/progression.js?v=69"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -711,6 +750,26 @@
           gameScene.activeKOGallery.close();
         } else {
           if (typeof window.MMA.UI.showKOGallery === 'function') gameScene.activeKOGallery = window.MMA.UI.showKOGallery(gameScene);
+        }
+      }
+    }
+    // N key = Style DNA toggle
+    if (e.key === 'n' || e.key === 'N') {
+      if (isGameActive && gameScene.player && !gameScene.paused && !gameScene.gameOver) {
+        if (gameScene.activeStyleDNA && gameScene.activeStyleDNA.close) {
+          gameScene.activeStyleDNA.close();
+        } else {
+          if (typeof window.MMA.UI.showStyleDNA === 'function') gameScene.activeStyleDNA = window.MMA.UI.showStyleDNA(gameScene);
+        }
+      }
+    }
+    // L key = Legacy Records toggle
+    if (e.key === 'l' || e.key === 'L') {
+      if (isGameActive && gameScene.player && !gameScene.paused && !gameScene.gameOver) {
+        if (gameScene.activeLegacyRecords && gameScene.activeLegacyRecords.close) {
+          gameScene.activeLegacyRecords.close();
+        } else {
+          if (typeof window.MMA.UI.showLegacyRecords === 'function') gameScene.activeLegacyRecords = window.MMA.UI.showLegacyRecords(gameScene);
         }
       }
     }
@@ -1113,20 +1172,20 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=68"></script>
-  <script src="js/saveSystem.js?v=68"></script>
-  <script src="js/narrator.js?v=68"></script>
-  <script src="js/scenes/TitleScene.js?v=68"></script>
-  <script src="js/scenes/BootScene.js?v=68"></script>
-  <script src="js/scenes/GameScene.js?v=68"></script>
-  <script src="js/scenes/HUDScene.js?v=68"></script>
-  <script src="js/scenes/PauseScene.js?v=68"></script>
-  <script src="js/scenes/OutfitScene.js?v=68"></script>
-  <script src="js/scenes/UnlockScene.js?v=68"></script>
-  <script src="js/scenes/VictoryScene.js?v=68"></script>
-  <script src="js/scenes/DefeatScene.js?v=68"></script>
-  <script src="js/network.js?v=68"></script>
-  <script src="js/scenes/LobbyScene.js?v=68"></script>
-  <script src="js/main.js?v=68"></script>
+<script src="js/sounds.js?v=69"></script>
+  <script src="js/saveSystem.js?v=69"></script>
+  <script src="js/narrator.js?v=69"></script>
+  <script src="js/scenes/TitleScene.js?v=69"></script>
+  <script src="js/scenes/BootScene.js?v=69"></script>
+  <script src="js/scenes/GameScene.js?v=69"></script>
+  <script src="js/scenes/HUDScene.js?v=69"></script>
+  <script src="js/scenes/PauseScene.js?v=69"></script>
+  <script src="js/scenes/OutfitScene.js?v=69"></script>
+  <script src="js/scenes/UnlockScene.js?v=69"></script>
+  <script src="js/scenes/VictoryScene.js?v=69"></script>
+  <script src="js/scenes/DefeatScene.js?v=69"></script>
+  <script src="js/network.js?v=69"></script>
+  <script src="js/scenes/LobbyScene.js?v=69"></script>
+  <script src="js/main.js?v=69"></script>
 </body>
 </html>
