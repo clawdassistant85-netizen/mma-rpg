@@ -330,7 +330,7 @@ Object.assign(window.MMA.UI, {
     
     // Position-based submission availability
     var positionSubs = {
-      fullGuard: ['triangleChoke', 'armbar'],
+      fullGuard: ['rnc', 'triangleChoke', 'armbar', 'guillotine'],
       halfGuard: ['kimura', 'americana'],
       sideControl: ['americana', 'kimura'],
       mount: ['armbar', 'americana', 'rnc'],
