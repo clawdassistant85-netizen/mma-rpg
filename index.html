@@ -31,8 +31,8 @@
     #dpad .dpad-base {
       position: absolute; inset: 0;
       border-radius: 50%;
-      background: rgba(140,140,140,0.25);
-      border: 2px solid rgba(220,220,220,0.25);
+      background: rgba(80,80,100,0.55);
+      border: 2px solid rgba(220,220,220,0.45);
       backdrop-filter: blur(1px);
       transform: scale(1);
       transition: transform 80ms ease;
@@ -543,41 +543,17 @@
       #action-cluster { display: none; }
     }
 
-    /* Touch portrait: 4-wide rectangular button bar, full screen width.
-       display:contents flattens the two 2×2 action-grids into the parent flex.
-       !important beats both JS inline styles and the [style*] display:flex rule. */
+    /* Touch portrait layout is handled entirely by ui-layout.js JS (absolute positioning).
+       No CSS overrides needed here — they caused !important conflicts with JS inline styles. */
     @media (pointer: coarse) and (max-width: 600px) {
-      /* Mobile portrait: cluster sits right of d-pad as two 4-button rows stacked */
+      /* Ensure cluster shows as flex when showTouchControls sets display:block */
       #action-cluster[style*="display: block"] {
         display: flex !important;
-        flex-direction: column !important;
-        gap: 4px !important;
-        left: 116px !important;   /* clear d-pad (18px + ~90px + 8px gap) */
-        right: 8px !important;
-        width: auto !important;
-        height: auto !important;
-        padding: 0 !important;
       }
-      /* Each 2×2 grid becomes a single row of 4 buttons side-by-side */
-      #action-cluster[style*="display: block"] .action-grid {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 4px !important;
-        width: 100% !important;
-      }
+      /* Placeholder to keep block non-empty; real layout done by JS */
       #action-cluster[style*="display: block"] .action-btn {
-        /* (100% - 3 gaps) / 4 buttons, no grow, no shrink */
-        flex: 0 0 calc((100% - 12px) / 4) !important;
-        height: 30px !important;
-        border-radius: 6px !important;
-        font-size: 7px !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        padding: 0 2px !important;
-        line-height: 30px !important;
-        text-align: center !important;
+        /* Minimal fallback — JS overrides all of these via inline styles */
+        height: 30px;
       }
     }
   </style>
@@ -653,27 +629,27 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=69"></script>
-  <script src="js/sprites.js?v=69"></script>
-  <script src="js/combat-core.js?v=69"></script>
-  <script src="js/combat-moves.js?v=69"></script>
-  <script src="js/combat-ground.js?v=69"></script>
-  <script src="js/enemies-config.js?v=69"></script>
-  <script src="js/enemies-combat.js?v=69"></script>
-  <script src="js/enemies-core.js?v=69"></script>
-  <script src="js/enemies-ai.js?v=69"></script>
-  <script src="js/zones.js?v=69"></script>
-  <script src="js/player.js?v=69"></script>
-  <script src="js/items.js?v=69"></script>
-  <script src="js/outfits.js?v=69"></script>
-  <script src="js/vfx.js?v=69"></script>
-  <script src="js/ui.js?v=69"></script>
-  <script src="js/ui-core.js?v=69"></script>
-  <script src="js/ui-meters.js?v=69"></script>
-  <script src="js/ui-settings.js?v=69"></script>
+  <script src="js/config.js?v=70"></script>
+  <script src="js/sprites.js?v=70"></script>
+  <script src="js/combat-core.js?v=70"></script>
+  <script src="js/combat-moves.js?v=70"></script>
+  <script src="js/combat-ground.js?v=70"></script>
+  <script src="js/enemies-config.js?v=70"></script>
+  <script src="js/enemies-combat.js?v=70"></script>
+  <script src="js/enemies-core.js?v=70"></script>
+  <script src="js/enemies-ai.js?v=70"></script>
+  <script src="js/zones.js?v=70"></script>
+  <script src="js/player.js?v=70"></script>
+  <script src="js/items.js?v=70"></script>
+  <script src="js/outfits.js?v=70"></script>
+  <script src="js/vfx.js?v=70"></script>
+  <script src="js/ui.js?v=70"></script>
+  <script src="js/ui-core.js?v=70"></script>
+  <script src="js/ui-meters.js?v=70"></script>
+  <script src="js/ui-settings.js?v=70"></script>
 
-  <script src="js/ui-layout.js?v=69"></script>
-  <script src="js/progression.js?v=69"></script>
+  <script src="js/ui-layout.js?v=70"></script>
+  <script src="js/progression.js?v=70"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -1172,20 +1148,20 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=69"></script>
-  <script src="js/saveSystem.js?v=69"></script>
-  <script src="js/narrator.js?v=69"></script>
-  <script src="js/scenes/TitleScene.js?v=69"></script>
-  <script src="js/scenes/BootScene.js?v=69"></script>
-  <script src="js/scenes/GameScene.js?v=69"></script>
-  <script src="js/scenes/HUDScene.js?v=69"></script>
-  <script src="js/scenes/PauseScene.js?v=69"></script>
-  <script src="js/scenes/OutfitScene.js?v=69"></script>
-  <script src="js/scenes/UnlockScene.js?v=69"></script>
-  <script src="js/scenes/VictoryScene.js?v=69"></script>
-  <script src="js/scenes/DefeatScene.js?v=69"></script>
-  <script src="js/network.js?v=69"></script>
-  <script src="js/scenes/LobbyScene.js?v=69"></script>
-  <script src="js/main.js?v=69"></script>
+<script src="js/sounds.js?v=70"></script>
+  <script src="js/saveSystem.js?v=70"></script>
+  <script src="js/narrator.js?v=70"></script>
+  <script src="js/scenes/TitleScene.js?v=70"></script>
+  <script src="js/scenes/BootScene.js?v=70"></script>
+  <script src="js/scenes/GameScene.js?v=70"></script>
+  <script src="js/scenes/HUDScene.js?v=70"></script>
+  <script src="js/scenes/PauseScene.js?v=70"></script>
+  <script src="js/scenes/OutfitScene.js?v=70"></script>
+  <script src="js/scenes/UnlockScene.js?v=70"></script>
+  <script src="js/scenes/VictoryScene.js?v=70"></script>
+  <script src="js/scenes/DefeatScene.js?v=70"></script>
+  <script src="js/network.js?v=70"></script>
+  <script src="js/scenes/LobbyScene.js?v=70"></script>
+  <script src="js/main.js?v=70"></script>
 </body>
 </html>

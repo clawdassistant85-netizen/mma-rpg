@@ -55,7 +55,7 @@ Object.assign(window.MMA.UI, {
       cluster.style.right         = clRight + 'px';
       cluster.style.width         = 'auto';
       cluster.style.height        = clusterH + 'px';
-      cluster.style.display       = 'flex';
+      // Do NOT set display here — visibility is controlled solely by showTouchControls()
       cluster.style.flexDirection = 'column';
       cluster.style.gap           = btnGap + 'px';
       cluster.style.padding       = '0';
@@ -108,7 +108,8 @@ Object.assign(window.MMA.UI, {
       clusterH = btnSize * 2 + gridGap;
       cluster.style.width = clusterW + 'px'; cluster.style.height = clusterH + 'px';
       cluster.style.right = '18px'; cluster.style.left = 'auto';
-      cluster.style.display = 'flex'; cluster.style.flexDirection = 'row';
+      // Do NOT set display here — visibility is controlled solely by showTouchControls()
+      cluster.style.flexDirection = 'row';
     }
 
     // ── Vertical positioning (below canvas or near bottom) ────────────────────
