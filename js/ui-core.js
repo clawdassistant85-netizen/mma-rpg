@@ -282,7 +282,7 @@ Object.assign(window.MMA.UI, {
         var anyUnlocked = (scene && scene.player && scene.player.unlockedSubmissions) || ['rnc'];
         posSubs = anyUnlocked;
       }
-      var subName = 'RNC'; // hard default — never "Submit"
+      var subName = 'Choke'; // hard default — covers RNC/guillotine depending on position
       if (posSubs && posSubs.length > 0 && roster[posSubs[0]]) {
         subName = roster[posSubs[0]].name;
       } else if (posSubs && posSubs.length > 0) {
