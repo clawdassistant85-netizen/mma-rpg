@@ -398,23 +398,50 @@ Object.assign(window.MMA.Combat, {
       if (Phaser.Input.Keyboard.JustDown(scene.guillotineKey)) this.executeAttack(scene, 'guillotine');
       if (Phaser.Input.Keyboard.JustDown(scene.specialKey)) this.executeSpecialMove(scene);
       if (window.MMA_ACTION) {
-        // Legacy 4-button names (kept for backward compat)
-        if (window.MMA_ACTION.jab)     { window.MMA_ACTION.jab = false;     this.executeAttack(scene, 'jab'); }
-        if (window.MMA_ACTION.heavy)   { window.MMA_ACTION.heavy = false;   this.executeAttack(scene, 'cross'); }
-        if (window.MMA_ACTION.grapple) { window.MMA_ACTION.grapple = false; this.executeAttack(scene, 'takedown'); }
-        if (window.MMA_ACTION.special) { window.MMA_ACTION.special = false; this.executeSpecialMove(scene); }
-        // Extended 8-button names (new remappable slots)
-        if (window.MMA_ACTION.cross)       { window.MMA_ACTION.cross = false;       this.executeAttack(scene, 'cross'); }
-        if (window.MMA_ACTION.hook)        { window.MMA_ACTION.hook = false;        this.executeAttack(scene, 'hook'); }
-        if (window.MMA_ACTION.lowKick)     { window.MMA_ACTION.lowKick = false;     this.executeAttack(scene, 'lowKick'); }
-        if (window.MMA_ACTION.uppercut)    { window.MMA_ACTION.uppercut = false;    this.executeAttack(scene, 'uppercut'); }
-        if (window.MMA_ACTION.headKick)    { window.MMA_ACTION.headKick = false;    this.executeAttack(scene, 'headKick'); }
-        if (window.MMA_ACTION.bodyShot)    { window.MMA_ACTION.bodyShot = false;    this.executeAttack(scene, 'bodyShot'); }
-        if (window.MMA_ACTION.takedown)    { window.MMA_ACTION.takedown = false;    this.executeAttack(scene, 'takedown'); }
-        if (window.MMA_ACTION.guillotine)  { window.MMA_ACTION.guillotine = false;  this.executeGroundMove(scene, 'takedown'); }
-        // Handle stand up button (separate utility button)
-        if (window.MMA_ACTION.standup) { 
-          window.MMA_ACTION.standup = false; 
+        var inGround = scene.groundState && scene.groundState.active;
+
+        if (inGround) {
+          // ── Ground state: remap all button presses to ground moves ──────────
+          // Buttons relabelled by setActionButtonLabels(true): jab→G&P, cross→Elbow,
+          // takedown→Choke, special→Improve. Other slots do G&P (strikes) or submission (grapple).
+          var self2 = this;
+          var strikeKeys   = ['jab','heavy','cross','hook','lowKick','uppercut','headKick','bodyShot'];
+          var subKeys      = ['grapple','takedown','guillotine'];
+          var improveKeys  = ['special'];
+          var elbowKeys    = []; // cross already in strikeKeys; dedicated elbow remapping below
+
+          var anyFired = false;
+          strikeKeys.forEach(function(k){
+            if (window.MMA_ACTION[k]) { window.MMA_ACTION[k] = false; if (!anyFired) { anyFired = true; self2.executeGroundMove(scene, k === 'cross' ? 'elbow' : 'gnp'); } }
+          });
+          subKeys.forEach(function(k){
+            if (window.MMA_ACTION[k]) { window.MMA_ACTION[k] = false; if (!anyFired) { anyFired = true; self2.executeGroundMove(scene, 'submission'); } }
+          });
+          improveKeys.forEach(function(k){
+            if (window.MMA_ACTION[k]) { window.MMA_ACTION[k] = false; if (!anyFired) { anyFired = true; self2.executeGroundMove(scene, 'improve'); } }
+          });
+
+        } else {
+          // ── Standing state: normal attack routing ────────────────────────────
+          // Legacy 4-button names (kept for backward compat)
+          if (window.MMA_ACTION.jab)     { window.MMA_ACTION.jab = false;     this.executeAttack(scene, 'jab'); }
+          if (window.MMA_ACTION.heavy)   { window.MMA_ACTION.heavy = false;   this.executeAttack(scene, 'cross'); }
+          if (window.MMA_ACTION.grapple) { window.MMA_ACTION.grapple = false; this.executeAttack(scene, 'takedown'); }
+          if (window.MMA_ACTION.special) { window.MMA_ACTION.special = false; this.executeSpecialMove(scene); }
+          // Extended 8-button names (new remappable slots)
+          if (window.MMA_ACTION.cross)       { window.MMA_ACTION.cross = false;       this.executeAttack(scene, 'cross'); }
+          if (window.MMA_ACTION.hook)        { window.MMA_ACTION.hook = false;        this.executeAttack(scene, 'hook'); }
+          if (window.MMA_ACTION.lowKick)     { window.MMA_ACTION.lowKick = false;     this.executeAttack(scene, 'lowKick'); }
+          if (window.MMA_ACTION.uppercut)    { window.MMA_ACTION.uppercut = false;    this.executeAttack(scene, 'uppercut'); }
+          if (window.MMA_ACTION.headKick)    { window.MMA_ACTION.headKick = false;    this.executeAttack(scene, 'headKick'); }
+          if (window.MMA_ACTION.bodyShot)    { window.MMA_ACTION.bodyShot = false;    this.executeAttack(scene, 'bodyShot'); }
+          if (window.MMA_ACTION.takedown)    { window.MMA_ACTION.takedown = false;    this.executeAttack(scene, 'takedown'); }
+          if (window.MMA_ACTION.guillotine)  { window.MMA_ACTION.guillotine = false;  this.executeGroundMove(scene, 'submission'); }
+        }
+
+        // Stand up button works regardless of which block ran
+        if (window.MMA_ACTION.standup) {
+          window.MMA_ACTION.standup = false;
           if (scene.groundState && scene.groundState.active) {
             this.executeGroundMove(scene, 'standup');
             MMA.UI.recordMoveInput('standup', scene);
