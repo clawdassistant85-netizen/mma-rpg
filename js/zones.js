@@ -284,8 +284,8 @@ window.MMA.Zones = {
       footprintGraveyard:true,
       footprintGraveyardLabel:"Dojo Footprint Graveyard",
       footprintGraveyardArenaId:'zone4_dojo',
-      doors:{down:{col:7,row:11}},
-      connections:{down:'oct4'},
+      doors:{down:{col:7,row:11},up:{col:7,row:0}},
+      connections:{down:'oct4',up:'homeArena1'},
       spawnPositions:[{col:7,row:5}],
       enemyPool:['mmaChamp'],
       name:"Champion's Dojo",
@@ -303,6 +303,66 @@ window.MMA.Zones = {
       // Tournament Entry Drill: warmup rhythm minigame before endless waves
       tournamentEntryDrill:true,
       tournamentEntryDrillDifficulty:'standard'
+    },
+    // Signature Home Arena: personal championship venue unlocked after winning the title.
+    // Zones only defines metadata and lightweight customization hooks; player/
+    // UI/progression systems own unlock conditions and actual configuration.
+    homeArena1:{
+      id:'homeArena1',
+      zone:4,
+      weatherOptions:['clear','night'],
+      weightClass:'heavy',
+      cornerPressure:true,
+      crowdSize:700,
+      baseHype:0.75,
+      maxHype:1.0,
+      crowdLabel:'Signature Home Crowd',
+      ringPowerups:true,
+      ringPowerupTypes:['hp','stamina','focus'],
+      crowdFunding:true,
+      crowdHypemen:true,
+      crowdHypemanBuffs:[
+        { id:'damage', label:'+10% damage (3 rooms)' },
+        { id:'hypeGain', label:'+15% hype gain (3 rooms)' },
+        { id:'stamina', label:'+20% stamina regen (3 rooms)' }
+      ],
+      ringOutEnabled:true,
+      ringOutLabel:'Ring Out KO',
+      footprintGraveyard:true,
+      footprintGraveyardLabel:'Home Arena Footprint Graveyard',
+      footprintGraveyardArenaId:'zone4_homeArena',
+      doors:{down:{col:7,row:11}},
+      connections:{down:'dojo1'},
+      spawnPositions:[{col:7,row:5}],
+      enemyPool:['mmaChamp'],
+      name:'Signature Home Arena',
+      narratorStyle:'arenaTitle',
+      // Signature Home Arena metadata: customization options are exposed
+      // purely as data here so UI/progression systems can build a
+      // configuration screen without needing to change zone logic.
+      homeArena:true,
+      homeArenaBaseBuffMultiplier:1.05, // +5% all stats when fighting here
+      homeArenaThemeOptions:[
+        { id:'classic_boxing', label:'Classic Boxing Hall', lightingTint:0xf5f0e6, crowdMood:'respectful' },
+        { id:'modern_mma', label:'Modern MMA Arena', lightingTint:0xffffff, crowdMood:'explosive' },
+        { id:'underground_cage', label:'Underground Cage', lightingTint:0xff3b3b, crowdMood:'hostile' },
+        { id:'beach_venue', label:'Beach Night Venue', lightingTint:0xf7e7ce, crowdMood:'party' }
+      ],
+      homeArenaFeatureOptions:[
+        { id:'cornerPads', label:'Custom Corner Pads', effectHint:'Small defense boost when cornered.' },
+        { id:'entrancePyro', label:'Entrance Pyrotechnics', effectHint:'Start fights with slightly higher crowd hype.' },
+        { id:'anthemIntro', label:'Personal Entrance Music', effectHint:'Sets higher base crowd mood for title defenses.' }
+      ],
+      // Default room theme – actual look can be overridden by the
+      // selected home arena theme at runtime.
+      roomTheme:{
+        id:'home_arena_default',
+        label:'Home Arena Default Theme',
+        lightingTint:0xf5f0e6,
+        vignetteColor:0x111111,
+        ambientParticles:['confettiGold','dustMotes'],
+        intensity:1.0
+      }
     }
   },
   getRoom: function(roomId){ return this.ZONE1_ROOMS[roomId] || this.ZONE2_ROOMS[roomId] || this.ZONE3_ROOMS[roomId] || this.ZONE4_ROOMS[roomId]; },
@@ -877,6 +937,25 @@ window.MMA.Zones = {
       difficulty:difficulty,
       durationSeconds:duration,
       gradeBonuses:gradeBonuses
+    };
+  },
+  // Signature Home Arena helpers
+  // Metadata-only implementation of the backlog's "Signature Home Arena"
+  // feature. Specific rooms can mark themselves as homeArena=true and
+  // expose lightweight customization options so progression/UI systems
+  // can build configuration screens and buff logic without changing
+  // core zone layout code.
+  getSignatureHomeArenaConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.homeArena) return null;
+    var baseBuff = room.homeArenaBaseBuffMultiplier != null ? room.homeArenaBaseBuffMultiplier : 1.05;
+    return {
+      active:true,
+      roomId:room.id,
+      label:room.name || 'Home Arena',
+      baseBuffMultiplier:baseBuff,
+      themeOptions:(room.homeArenaThemeOptions || []).slice(),
+      featureOptions:(room.homeArenaFeatureOptions || []).slice()
     };
   },
   // Rival Crossroads helpers

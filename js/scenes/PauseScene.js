@@ -240,7 +240,6 @@ var PauseScene = new Phaser.Class({
       slotBg.fillRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
       slotBg.lineStyle(1, isUnlocked ? slotColors[i] : '#555555', 0.6);
       slotBg.strokeRoundedRect(slotX, loadoutY + 16, (PANEL_W - 28) / 4 - 4, 32, 4);
-      this.add(slotBg);
       
       var slotNum = this.add.text(slotX + 10, loadoutY + 20, (i + 1) + ':', {
         fontSize: '10px', color: isUnlocked ? '#888888' : '#555555'
