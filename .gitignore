@@ -7,3 +7,8 @@ worker.py
 tasks.json
 node_modules/
 server/node_modules/
+
+# Deleted monoliths — split modules are canonical; prevent phantom re-adds
+js/enemies.js
+js/combat.js
+js/ui.js
