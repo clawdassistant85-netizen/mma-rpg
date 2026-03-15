@@ -1496,6 +1496,17 @@ Object.assign(window.MMA.Enemies, {
     var xp = enemy.type.xpReward; scene.player.stats.xp += xp;
     scene._mmaRoomXpGained = (scene._mmaRoomXpGained || 0) + xp;
     if (scene.registry) {
+      // Post-fight KO summary
+      var _fs = (typeof MMA !== 'undefined' && MMA.UI && MMA.UI.fightStats) ? MMA.UI.fightStats : null;
+      var _ps = (scene.player && scene.player.stats) ? scene.player.stats : null;
+      var _hl = (_fs && typeof _fs.hitsLanded === 'number') ? _fs.hitsLanded : (_ps && typeof _ps.hitsLanded === 'number' ? _ps.hitsLanded : null);
+      var _lc = (_fs && typeof _fs.longestCombo === 'number') ? _fs.longestCombo : (_fs && typeof _fs.maxCombo === 'number' ? _fs.maxCombo : null);
+      var _dt = (_fs && typeof _fs.damageTaken === 'number') ? _fs.damageTaken : null;
+      var _koMsg = (_hl !== null || _lc !== null || _dt !== null)
+        ? 'KO! Hits: ' + (_hl||0) + ' | Combo: ' + (_lc||0) + ' | Dmg taken: ' + (_dt||0)
+        : 'KO! +' + xp + ' XP';
+      scene.registry.set('gameMessage', _koMsg);
+      scene.time.delayedCall(3000, function(){ scene.registry.set('gameMessage', ''); });
       scene.registry.set('lastEnemyDefeated', enemy.type.name || enemy.typeKey || 'Enemy');
       scene.registry.set('xpGained', scene._mmaRoomXpGained);
       scene.registry.set('fightStats', Object.assign({}, MMA.UI.fightStats));

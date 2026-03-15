@@ -1841,6 +1841,8 @@ window.MMA.Zones = {
   transitionToRoom: function(scene, newRoomId, fromDirection) {
     scene.roomTransitioning = true;
     var room = this.getRoom(newRoomId), zone = room && room.zone ? room.zone : 1;
+    var previousZone = scene.currentZone;
+    var isZoneTransition = previousZone != null && previousZone !== zone;
     // Advance time-of-day only for outdoor street zone so players feel a progression
     if (zone === 1) this.advanceTimeOfDay(scene);
     scene.registry.set('gameMessage', 'ENTERING ZONE ' + zone + ' - ' + room.name + '...');
@@ -1858,6 +1860,15 @@ window.MMA.Zones = {
       // Bring player above floor/wall tiles (depth 0) so it doesn't get buried
       scene.player.setDepth(5);
       if (scene.playerHpGfx) scene.playerHpGfx.setDepth(6);
+      // HP regen on room entry (10% per room, 40% on zone transition)
+      if (scene.player && scene.player.stats) {
+        var healPct = isZoneTransition ? 0.40 : 0.10;
+        var healAmt = Math.floor(scene.player.stats.maxHp * healPct);
+        scene.player.stats.hp = Math.min(scene.player.stats.maxHp, scene.player.stats.hp + healAmt);
+        if (healAmt > 0 && window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+          MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, '+' + healAmt + ' HP', '#00FF88');
+        }
+      }
       scene.enemies.forEach(function(e){
         if (!e) return;
         if (e._hpBarBg) e._hpBarBg.destroy();

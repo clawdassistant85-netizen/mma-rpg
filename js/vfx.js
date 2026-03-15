@@ -348,6 +348,41 @@ window.MMA.VFX = {
     return damageText;
   },
 
+  updateLowHpEffect: function(scene) {
+    if (!scene || !scene.player || !scene.player.stats) {
+      if (scene && scene._lowHpOverlay) { scene._lowHpOverlay.destroy(); scene._lowHpOverlay = null; }
+      return;
+    }
+    var ratio = Math.max(0, scene.player.stats.hp) / Math.max(1, scene.player.stats.maxHp);
+    if (ratio >= 0.25) {
+      if (scene._lowHpOverlay) { scene._lowHpOverlay.destroy(); scene._lowHpOverlay = null; }
+      return;
+    }
+    if (!scene._lowHpOverlay || !scene._lowHpOverlay.active) {
+      scene._lowHpOverlay = this._track(scene, scene.add.graphics());
+      scene._lowHpOverlay.setDepth(100).setScrollFactor(0);
+    }
+    var alpha = Math.abs(Math.sin(scene.time.now * 0.003)) * 0.6 * (1 - ratio / 0.25);
+    var cam = scene.cameras ? scene.cameras.main : null;
+    var w = cam ? cam.width : 390, h = cam ? cam.height : 700;
+    scene._lowHpOverlay.clear();
+    scene._lowHpOverlay.lineStyle(18, 0xff2222, alpha);
+    scene._lowHpOverlay.strokeRect(0, 0, w, h);
+  },
+
+  showComboLetter: function(scene, comboCount, x, y) {
+    if (!scene || !scene.add || !scene.tweens) return null;
+    var words = { 5:{text:'NICE!',color:'#FFFFFF'}, 10:{text:'BEAST!',color:'#FFFF00'}, 15:{text:'MONSTER!',color:'#FF8800'}, 20:{text:'LEGEND!',color:'#FFD700'} };
+    var milestones = [20,15,10,5];
+    var hit = milestones.find(function(m){ return comboCount >= m; });
+    if (!hit || comboCount !== hit) return null; // only exact milestones
+    var w = words[hit];
+    var txt = this._track(scene, scene.add.text(x, y - 80, w.text, {fontSize:'28px',fontFamily:'Arial Black',color:w.color,stroke:'#000',strokeThickness:4}));
+    txt.setOrigin(0.5).setDepth(150);
+    scene.tweens.add({targets:txt, y:y-140, alpha:0, duration:1500, onComplete:function(){ txt.destroy(); }});
+    return txt;
+  },
+
   playKOAnimation: function(scene, target, options) {
     if (!scene || !scene.add || !target) return null;
 

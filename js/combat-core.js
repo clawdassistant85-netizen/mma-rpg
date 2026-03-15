@@ -320,7 +320,7 @@ Object.assign(window.MMA.Combat, {
         // Client is non-authoritative for combat damage/KO/XP; host applies combat outcomes.
         // TODO: send explicit combat intent to host when input-intent channel is available.
         if (window.MMA_ACTION) {
-          ['jab','heavy','grapple','special','cross','hook','lowKick','uppercut','headKick','bodyShot','takedown','guillotine'].forEach(function(k){ window.MMA_ACTION[k] = false; });
+          ['jab','heavy','grapple','special','cross','hook','lowKick','uppercut','headKick','bodyShot','takedown','guillotine','dodge'].forEach(function(k){ window.MMA_ACTION[k] = false; });
         }
         var clientCdMap = scene.player.cooldowns; Object.keys(clientCdMap).forEach(function(k){ if (clientCdMap[k] > 0) clientCdMap[k] = Math.max(0, clientCdMap[k] - delta); });
         return;
@@ -344,7 +344,7 @@ Object.assign(window.MMA.Combat, {
   
         if (attemptedRecoveryTech && this.tryStaggerRecoveryTech(scene)) {
           if (window.MMA_ACTION) {
-            ['jab','heavy','grapple','special','cross','hook','lowKick','uppercut','headKick','bodyShot','takedown','guillotine'].forEach(function(k){ window.MMA_ACTION[k] = false; });
+            ['jab','heavy','grapple','special','cross','hook','lowKick','uppercut','headKick','bodyShot','takedown','guillotine','dodge'].forEach(function(k){ window.MMA_ACTION[k] = false; });
           }
         } else {
           var cdMapStun = scene.player.cooldowns; Object.keys(cdMapStun).forEach(function(k){ if (cdMapStun[k] > 0) cdMapStun[k] = Math.max(0, cdMapStun[k] - delta); });
@@ -437,6 +437,23 @@ Object.assign(window.MMA.Combat, {
           if (window.MMA_ACTION.bodyShot)    { window.MMA_ACTION.bodyShot = false;    this.executeAttack(scene, 'bodyShot'); }
           if (window.MMA_ACTION.takedown)    { window.MMA_ACTION.takedown = false;    this.executeAttack(scene, 'takedown'); }
           if (window.MMA_ACTION.guillotine)  { window.MMA_ACTION.guillotine = false;  this.executeGroundMove(scene, 'submission'); }
+        }
+
+        // Dodge: 300ms i-frames + dash in movement direction
+        if (window.MMA_ACTION.dodge) {
+          window.MMA_ACTION.dodge = false;
+          if (scene.player.dodging === undefined) scene.player.dodging = false;
+          if (!scene.player.dodging && !(scene.player.stunnedUntil && scene.time.now < scene.player.stunnedUntil)) {
+            scene.player.dodging = true;
+            scene.player.dodgeUntil = scene.time.now + 300;
+            var dodgeSpeed = 280;
+            var ddx = scene.lastDir ? scene.lastDir.x : -1;
+            var ddy = scene.lastDir ? scene.lastDir.y : 0;
+            if (ddx === 0 && ddy === 0) ddx = -1;
+            if (scene.player.body) scene.player.body.setVelocity(ddx * dodgeSpeed * 3, ddy * dodgeSpeed * 3);
+            scene.time.delayedCall(300, function() { scene.player.dodging = false; });
+            MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 30, 'DODGE!', '#88ffff');
+          }
         }
 
         // Stand up button works regardless of which block ran

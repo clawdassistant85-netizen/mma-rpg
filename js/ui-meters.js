@@ -1,5 +1,7 @@
 window.MMA = window.MMA || {};
 window.MMA.UI = window.MMA.UI || {};
+// Hype meter state (DOM-based, complements Phaser meter)
+MMA.UI.hype = { value: 0, peaked: false };
 
 Object.assign(window.MMA.UI, {
   comboCounter: {
@@ -209,12 +211,32 @@ Object.assign(window.MMA.UI, {
     bar.fillRect(-10, 0, 20, -barHeight);
   },
   addHype: function(scene, amount) {
+    // Update Phaser meter
     var newValue = this.hypeMeter.value + amount;
     this.updateHypeMeter(scene, newValue, this.hypeMeter.maxValue);
+    // Update DOM hype state
+    MMA.UI.hype.value = Math.min(100, MMA.UI.hype.value + amount);
+    var el = document.getElementById('hype-bar');
+    if (el) el.style.width = MMA.UI.hype.value + '%';
+    if (MMA.UI.hype.value >= 100 && !MMA.UI.hype.peaked) {
+      MMA.UI.hype.peaked = true;
+      if (scene && typeof MMA.UI.showDamageText === 'function') {
+        MMA.UI.showDamageText(scene, 200, 40, 'CROWD BOOST! +10% DMG', '#FFD700');
+      }
+    }
   },
-  drainHype: function(scene, amount) {
-    var newValue = this.hypeMeter.value - amount;
-    this.updateHypeMeter(scene, newValue, this.hypeMeter.maxValue);
+  drainHype: function(delta) {
+    MMA.UI.hype.value = Math.max(0, MMA.UI.hype.value - (delta * 0.008));
+    if (MMA.UI.hype.value < 80) MMA.UI.hype.peaked = false;
+    var el = document.getElementById('hype-bar');
+    if (el) el.style.width = MMA.UI.hype.value + '%';
+    // Also drain Phaser meter
+    if (this.hypeMeter && this.hypeMeter.container) {
+      this.updateHypeMeter(null, this.hypeMeter.value - (delta * 0.008), this.hypeMeter.maxValue);
+    }
+  },
+  getHypeBonus: function() {
+    return MMA.UI.hype.value >= 80 ? 1.1 : 1.0;
   },
   destroyHypeMeter: function() {
     if (this.hypeMeter.container) {

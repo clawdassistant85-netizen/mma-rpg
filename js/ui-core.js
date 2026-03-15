@@ -331,7 +331,14 @@ Object.assign(window.MMA.UI, {
             btn.style.opacity = '0.4';
             btn.style.pointerEvents = 'none';
           } else {
-            btn.textContent = move ? move.name : moveKey.replace(/([A-Z])/g,' $1').trim();
+            if (moveKey === 'special') {
+              // Special slot shows the actual best special move name
+              var bestSpecial = (scene && window.MMA && MMA.UI && typeof MMA.UI.getBestSpecialMoveKey === 'function') ? MMA.UI.getBestSpecialMoveKey(scene) : null;
+              var bestSpecialMove = bestSpecial ? roster[bestSpecial] : null;
+              btn.textContent = bestSpecialMove ? bestSpecialMove.name : 'Special';
+            } else {
+              btn.textContent = move ? move.name : moveKey.replace(/([A-Z])/g,' $1').trim();
+            }
             btn.style.opacity = '';
             btn.style.pointerEvents = '';
           }

@@ -96,7 +96,7 @@ var GameScene = new Phaser.Class({
     MMA.UI.bindMobilePauseButton(this);
     this.syncPauseButtonVisibility(true);
     if (typeof MMA.UI.showTouchControls === 'function') MMA.UI.showTouchControls(true);
-    if (typeof MMA.UI.setActionButtonLabels === 'function') MMA.UI.setActionButtonLabels(false);
+    if (typeof MMA.UI.setActionButtonLabels === 'function') MMA.UI.setActionButtonLabels(false, this);
     // Initialize move input display based on settings
     if (MMA.UI.settings && MMA.UI.settings.showInputDisplay) {
       if (typeof MMA.UI.showMoveInputDisplay === 'function') MMA.UI.showMoveInputDisplay();

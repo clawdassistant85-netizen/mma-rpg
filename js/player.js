@@ -71,6 +71,9 @@ window.MMA.Player = {
     scene.player.dodgeChance = 0;
     scene.player.staminaRegenBonus = 0;
     scene.player.cooldowns = {};
+    scene.player.styleGauge = { striking: 0, grappling: 0 };
+    scene.player.secondWindUsed = false;
+    scene.player.secondWindUntil = 0;
     scene.player.unlockedMoves = ['jab', 'takedown']; // Start with basics; unlock more through gameplay
     if (scene._savedGameData) {
       var st = scene._savedGameData.playerStats, mv = scene._savedGameData.playerUnlockedMoves;
@@ -186,6 +189,10 @@ window.MMA.Player = {
   },
   damage: function(scene, damage) {
     if (scene.gameOver) return;
+    // Reset Second Wind eligibility if player healed above 50%
+    if (scene.player.stats.hp > Math.floor(scene.player.stats.maxHp * 0.5)) {
+      scene.player.secondWindUsed = false;
+    }
     // Check for dodge (agility-based)
     var dodgeChance = scene.player.dodgeChance || 0;
     if (Math.random() < dodgeChance) {
@@ -200,6 +207,20 @@ window.MMA.Player = {
     MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 20, '-' + reducedDamage, '#ff8888');
     scene.player.setTint(0xff6666);
     scene.time.delayedCall(200, function() { if (scene.player && scene.player.active) scene.player.clearTint(); });
+    // Second Wind Surge: at ≤15% HP, trigger once per life for 3s attack speed burst
+    if (!scene.player.secondWindUsed && scene.player.stats.hp > 0 &&
+        scene.player.stats.hp <= Math.floor(scene.player.stats.maxHp * 0.15)) {
+      scene.player.secondWindUsed = true;
+      scene.player.secondWindUntil = scene.time.now + 3000;
+      scene.player.stats.attackSpeedBonus = (scene.player.stats.attackSpeedBonus || 0) + 0.4;
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 50, 'SECOND WIND!', '#FFD700');
+      scene.registry.set('gameMessage', 'SECOND WIND!');
+      scene.time.delayedCall(3000, function() {
+        scene.player.stats.attackSpeedBonus = Math.max(0, (scene.player.stats.attackSpeedBonus || 0.4) - 0.4);
+        scene.player.secondWindUntil = 0;
+        scene.registry.set('gameMessage', '');
+      });
+    }
     if (scene.player.stats.hp <= 0) {
       scene.player.stats.hp = 0; scene.gameOver = true; scene.player.body.setVelocity(0,0); scene.registry.set('gameMessage', 'GAME OVER');
     }

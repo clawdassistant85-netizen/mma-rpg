@@ -99,6 +99,13 @@ Object.assign(window.MMA.Combat, {
             var currentCombo = scene.player.comboState ? scene.player.comboState.index : 0;
             if (currentCombo >= 10) window.MMA_AUDIO.onCombo10Plus();
           }
+          // Combo letter reveal (NICE/BEAST/MONSTER/LEGEND at milestones)
+          if (window.MMA && MMA.VFX && typeof MMA.VFX.showComboLetter === 'function') {
+            var comboMilestone = scene.player.comboState ? scene.player.comboState.index : 0;
+            if (comboMilestone === 5 || comboMilestone === 10 || comboMilestone === 15 || comboMilestone === 20) {
+              MMA.VFX.showComboLetter(scene, comboMilestone, enemy.x, enemy.y);
+            }
+          }
           if (window.sfx) window.sfx.hit();
           MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, '-' + dmg, rolled.crit ? '#ff6b6b' : undefined);
           if (rolled.crit) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 38, 'CRIT!', '#ff3333');
