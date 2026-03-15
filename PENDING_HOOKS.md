@@ -636,3 +636,9 @@ document it here. The Reviewer agent will integrate these.
 - **Status**: 🔲 Not implemented
 - **Added**: 2026-03-14
 - [2026-03-14 19:36:15 EDT] Combat module created js/combat.js with Clash Combo Breaker feature, but index.html does not include js/combat.js. Request owner of index.html to add <script src="js/combat.js?v=52"></script> after combat-core/moves/ground includes.
+
+## [Combat] Stamina Break hook-up needed
+- Added `js/combat.js` with reusable Stamina Break API (`maybeTriggerStaminaBreak`, `applyStaminaBreakDamageMultiplier`, timers/state).
+- Needs wiring in existing combat flow files owned by other modules:
+  - `index.html`: include `<script src="js/combat.js">` before split combat modules.
+  - `js/combat-core.js`/`js/combat-moves.js`: call `maybeTriggerStaminaBreak(target)` when stamina drops to 0 and `applyStaminaBreakDamageMultiplier(...)` during damage resolution.

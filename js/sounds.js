@@ -797,4 +797,78 @@
 
   retryCombatAudioPatch(12);
   retryUiAudioPatch(12);
+
+  // Fight Intensity Audio Layers
+  // Music has 5 intensity layers that unlock as fight escalates:
+  // 0=ambient, 1=light percussion, 2=full drums, 3=bass drop, 4=climax fanfare
+  var fightIntensityState = {
+    currentLayer: 0,
+    maxLayer: 4,
+    lastEscalationAt: 0,
+    cooldownMs: 2000, // 2s between layer escalations
+    roomEnteredAt: 0,
+    firstHitAt: 0,
+    firstKOAt: 0,
+    combo10At: 0,
+    finishingMoveAt: 0,
+    roomActive: false
+  };
+
+  function getCombatIntensityLayer() {
+    var now = Date.now();
+    var s = fightIntensityState;
+    if (!s.roomActive) return 0;
+
+    // Escalation order: room entry(0) -> first hit(1) -> first KO(2) -> combo10+(3) -> finishing move(4)
+    if (s.finishingMoveAt > 0 && now - s.finishingMoveAt < 30000) return 4; // Finishing move = max
+    if (s.combo10At > 0 && now - s.combo10At < 60000) return 3; // Combo 10+ = layer 3
+    if (s.firstKOAt > 0 && now - s.firstKOAt < 45000) return 2; // First KO = layer 2
+    if (s.firstHitAt > 0 && now - s.firstHitAt < 30000) return 1; // First hit = layer 1
+    return 0; // Ambient during exploration
+  }
+
+  MMA_AUDIO.onRoomEnter = function() {
+    var now = Date.now();
+    fightIntensityState.roomActive = true;
+    fightIntensityState.roomEnteredAt = now;
+    fightIntensityState.firstHitAt = 0;
+    fightIntensityState.firstKOAt = 0;
+    fightIntensityState.combo10At = 0;
+    fightIntensityState.finishingMoveAt = 0;
+    fightIntensityState.currentLayer = 0;
+    console.log('[Audio] Room entered - fight intensity reset');
+  };
+
+  MMA_AUDIO.onFirstHit = function() {
+    if (fightIntensityState.firstHitAt > 0) return;
+    fightIntensityState.firstHitAt = Date.now();
+    console.log('[Audio] First hit - intensity layer 1');
+  };
+
+  MMA_AUDIO.onFirstKO = function() {
+    if (fightIntensityState.firstKOAt > 0) return;
+    fightIntensityState.firstKOAt = Date.now();
+    console.log('[Audio] First KO - intensity layer 2');
+  };
+
+  MMA_AUDIO.onCombo10Plus = function() {
+    if (fightIntensityState.combo10At > 0) return;
+    fightIntensityState.combo10At = Date.now();
+    console.log('[Audio] Combo 10+ - intensity layer 3');
+  };
+
+  MMA_AUDIO.onFinishingMove = function() {
+    fightIntensityState.finishingMoveAt = Date.now();
+    console.log('[Audio] Finishing move - MAX intensity layer 4');
+  };
+
+  MMA_AUDIO.onRoomExit = function() {
+    fightIntensityState.roomActive = false;
+    console.log('[Audio] Room exited - fight intensity paused');
+  };
+
+  MMA_AUDIO.getFightIntensityLayer = getCombatIntensityLayer;
+
+  // Expose to window for external triggers
+  window.MMA_AUDIO = MMA_AUDIO;
 })();

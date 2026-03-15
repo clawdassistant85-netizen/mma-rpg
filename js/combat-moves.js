@@ -76,6 +76,8 @@ Object.assign(window.MMA.Combat, {
           var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
           if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
           enemy.stats.hp -= dmg;
+          // Audio: Trigger fight intensity layer on first hit
+          if (window.MMA_AUDIO && window.MMA_AUDIO.onFirstHit) window.MMA_AUDIO.onFirstHit();
           var shadowClone = this.applyShadowCloneMirror(scene, enemy, rolled.crit || finishHimAdjusted.finishHim);
           dmg += shadowClone.mirrorDamage;
           // Health Bar Damage Trail: record damage for visual effect
@@ -92,6 +94,11 @@ Object.assign(window.MMA.Combat, {
           MMA.UI.recordMoveUsage(moveKey, scene); // Track move for Style DNA
           MMA.Player.awardStyleXP(scene, moveKey); // Award style XP
           MMA.UI.incrementCombo();
+          // Audio: Trigger combo 10+ intensity layer
+          if (window.MMA_AUDIO && window.MMA_AUDIO.onCombo10Plus) {
+            var currentCombo = scene.player.comboState ? scene.player.comboState.index : 0;
+            if (currentCombo >= 10) window.MMA_AUDIO.onCombo10Plus();
+          }
           if (window.sfx) window.sfx.hit();
           MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, '-' + dmg, rolled.crit ? '#ff6b6b' : undefined);
           if (rolled.crit) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 38, 'CRIT!', '#ff3333');
@@ -163,6 +170,11 @@ Object.assign(window.MMA.Combat, {
           enemy.staggerTimer = Math.max(enemy.staggerTimer || 0, 400 + breakingStunBonus); enemy.state = 'staggered';
           if (window.narrate) window.narrate('bigHit', { move: moveKey, damage: dmg }).then(function(msg){ if (msg) scene.registry.set('gameMessage', msg); scene.time.delayedCall(2500, function(){ scene.registry.set('gameMessage', ''); }); });
           this.maybeTriggerRageMode(scene, enemy);
+          // Audio: Trigger finishing move and first KO intensity on critical kill
+          if (enemy.stats.hp <= 0 && rolled.crit) {
+            if (window.MMA_AUDIO && window.MMA_AUDIO.onFinishingMove) window.MMA_AUDIO.onFinishingMove();
+            if (window.MMA_AUDIO && window.MMA_AUDIO.onFirstKO) window.MMA_AUDIO.onFirstKO();
+          }
           if (enemy.stats.hp > 0) this.maybeArmFinishHim(scene, enemy);
           if (enemy.stats.hp <= 0) MMA.Enemies.killEnemy(scene, enemy);
         }

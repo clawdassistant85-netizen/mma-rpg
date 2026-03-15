@@ -915,198 +915,402 @@ window.MMA.Sprites = {
 
     // --- OPTIONAL TEXTURES (portraits, reactions, auras) ---
     // Skipped during makeEssential() for fast mobile boot. Generated lazily via makeOptional().
-    if (!MMA.Sprites._skipOptionalTextures) {
-    texturePortraitSet('player', playerColors, { accent: window.MMA.Sprites.STYLE_AURA_COLORS.striker });
-    texturePortraitSet('enemy_thug', thugColors, { accent: 0xff7a7a });
-    texturePortraitSet('enemy_brawler', brawlerColors, { accent: 0xffb14d });
-    texturePortraitSet('enemy_boxer', boxerColors, { accent: 0xffffff });
-    texturePortraitSet('enemy_karateka', karatekaColors, { accent: 0xe14848 });
-    texturePortraitSet('enemy_streetfighter', streetFighterColors, { accent: 0xffc34d });
-    texturePortraitSet('enemy_kickboxer', kickboxerColors, { accent: 0x5de0e8 });
-    texturePortraitSet('enemy_judoka', judokaColors, { accent: 0x8d673f });
-    texturePortraitSet('enemy_wrestler', wrestlerColors, { accent: 0xd9e6ff });
-    texturePortraitSet('enemy_groundpounder', groundPounderColors, { accent: 0xe0a35a });
-    texturePortraitSet('enemy_striker', strikerColors, { accent: 0xffb0d0 });
-    texturePortraitSet('enemy_bjj', bjjColors, { accent: 0xaab0bb });
-    texturePortraitSet('enemy_thug_elite', eliteColors, { accent: 0xbca6ff });
-    texturePortraitSet('enemy_brawler_boss', championBossColors, { accent: 0xffd54f });
-    texturePortraitSet('enemy_champion_boss', championBossColors, { accent: 0xffd54f });
-    texturePortraitSet('enemy_underground_king_boss', undergroundBossColors, { accent: 0xd83b4a });
-    texturePortraitSet('enemy_shadow_boss', shadowBossColors, { accent: 0x8a5cff });
-    texturePortraitSet('npc_trainer', trainerColors, { accent: 0x52d8b0 });
-    texturePortraitSet('npc_coach', coachColors, { accent: 0xffd86b });
-    textureReactionFaceSet('player', playerColors);
-    textureReactionFaceSet('enemy_thug', thugColors);
-    textureReactionFaceSet('enemy_brawler', brawlerColors);
-    textureReactionFaceSet('enemy_boxer', boxerColors);
-    textureReactionFaceSet('enemy_karateka', karatekaColors);
-    textureReactionFaceSet('enemy_streetfighter', streetFighterColors);
-    textureReactionFaceSet('enemy_kickboxer', kickboxerColors);
-    textureReactionFaceSet('enemy_judoka', judokaColors);
-    textureReactionFaceSet('enemy_wrestler', wrestlerColors);
-    textureReactionFaceSet('enemy_groundpounder', groundPounderColors);
-    textureReactionFaceSet('enemy_striker', strikerColors);
-    textureReactionFaceSet('enemy_bjj', bjjColors);
-    textureReactionFaceSet('enemy_thug_elite', eliteColors);
-    textureReactionFaceSet('enemy_brawler_boss', championBossColors);
-    textureReactionFaceSet('enemy_champion_boss', championBossColors);
-    textureReactionFaceSet('enemy_underground_king_boss', undergroundBossColors);
-    textureReactionFaceSet('enemy_shadow_boss', shadowBossColors);
-    textureReactionFaceSet('npc_trainer', trainerColors);
-    textureReactionFaceSet('npc_coach', coachColors);
-    textureSilhouette('player', 'player_silhouette', playerColors, { pose: 'special', accent: window.MMA.Sprites.STYLE_AURA_COLORS.striker, tint: 0x180c2d });
-    textureSilhouette('enemy_thug', 'enemy_thug_silhouette', thugColors, { pose: 'stance', accent: 0xff7a7a, tint: 0x1f0c0c });
-    textureSilhouette('enemy_brawler', 'enemy_brawler_silhouette', brawlerColors, { pose: 'grapple', accent: 0xffb14d, tint: 0x271505 });
-    textureSilhouette('enemy_boxer', 'enemy_boxer_silhouette', boxerColors, { pose: 'stance', accent: 0xffffff, tint: 0x1a0a0a });
-    textureSilhouette('enemy_karateka', 'enemy_karateka_silhouette', karatekaColors, { pose: 'special', accent: 0xe14848, tint: 0x161616 });
-    textureSilhouette('enemy_streetfighter', 'enemy_streetfighter_silhouette', streetFighterColors, { pose: 'special', accent: 0xffc34d, tint: 0x241106 });
-    textureSilhouette('enemy_kickboxer', 'enemy_kickboxer_silhouette', kickboxerColors, { pose: 'special', accent: 0x5de0e8, tint: 0x0a1820 });
-    textureSilhouette('enemy_judoka', 'enemy_judoka_silhouette', judokaColors, { pose: 'grapple', accent: 0x8d673f, tint: 0x131313 });
-    textureSilhouette('enemy_wrestler', 'enemy_wrestler_silhouette', wrestlerColors, { pose: 'grapple', accent: 0xd9e6ff, tint: 0x0d1531 });
-    textureSilhouette('enemy_groundpounder', 'enemy_groundpounder_silhouette', groundPounderColors, { pose: 'grapple', accent: 0xe0a35a, tint: 0x1b1209 });
-    textureSilhouette('enemy_striker', 'enemy_striker_silhouette', strikerColors, { pose: 'special', accent: 0xffb0d0, tint: 0x170b17 });
-    textureSilhouette('enemy_bjj', 'enemy_bjj_silhouette', bjjColors, { pose: 'grapple', accent: 0xaab0bb, tint: 0x111214 });
-    textureSilhouette('enemy_thug_elite', 'enemy_thug_elite_silhouette', eliteColors, { pose: 'stance', accent: 0xbca6ff, tint: 0x140d23 });
-    textureSilhouette('enemy_brawler_boss', 'enemy_brawler_boss_silhouette', championBossColors, { pose: 'special', accent: 0xffd54f, tint: 0x241a06 });
-    textureSilhouette('enemy_champion_boss', 'enemy_champion_boss_silhouette', championBossColors, { pose: 'special', accent: 0xffd54f, tint: 0x241a06 });
-    textureSilhouette('enemy_underground_king_boss', 'enemy_underground_king_boss_silhouette', undergroundBossColors, { pose: 'grapple', accent: 0xd83b4a, tint: 0x2a080d });
-    textureSilhouette('enemy_shadow_boss', 'enemy_shadow_boss_silhouette', shadowBossColors, { pose: 'special', accent: 0x8a5cff, tint: 0x12091f });
-    textureSilhouette('npc_trainer', 'npc_trainer_silhouette', trainerColors, { pose: 'stance', accent: 0x52d8b0, tint: 0x071814 });
-    textureSilhouette('npc_coach', 'npc_coach_silhouette', coachColors, { pose: 'grapple', accent: 0xffd86b, tint: 0x180d28 });
-    window.MMA.Sprites.VISUAL_VARIANTS = {
-      mmaChamp: 'enemy_champion_boss',
-      boss: 'enemy_champion_boss',
-      champion: 'enemy_champion_boss',
-      championBoss: 'enemy_champion_boss',
-      titleBoss: 'enemy_champion_boss',
-      undergroundKing: 'enemy_underground_king_boss',
-      underground_boss: 'enemy_underground_king_boss',
-      cageBoss: 'enemy_underground_king_boss',
-      rival: 'enemy_shadow_boss',
-      shadow: 'enemy_shadow_boss',
-      shadowBoss: 'enemy_shadow_boss',
-      shadowRival: 'enemy_shadow_boss',
-      elite: 'enemy_thug_elite',
-      boxer: 'enemy_boxer',
-      karateka: 'enemy_karateka',
-      streetFighter: 'enemy_streetfighter',
-      kickboxer: 'enemy_kickboxer',
-      judoka: 'enemy_judoka',
-      wrestler: 'enemy_wrestler',
-      groundNPounder: 'enemy_groundpounder',
-      striker: 'enemy_striker',
-      bjjBlackBelt: 'enemy_bjj',
-      muayThaiFighter: 'enemy_kickboxer',
-      trainer: 'npc_trainer',
-      coach: 'npc_coach',
-      sparringPartner: 'npc_trainer',
-      gymNpc: 'npc_trainer'
-    };
-    textureDecorationBarrel('decoration_barrel');
-    textureDecorationTrash('decoration_trash');
-    textureDecorationGraffiti('decoration_graffiti');
-    textureDecorationHeavyBag('decoration_heavybag');
-    textureDecorationSpeedBag('decoration_speedbag');
-    textureDecorationWeights('decoration_weights');
-    textureDecorationMirror('decoration_mirror');
-    textureDecorationBoxingRing('decoration_boxingring');
-    textureDecorationOctagon('decoration_octagon');
-    textureDecorationCorner('decoration_corner');
-    textureDecorationTunnel('decoration_tunnel');
-    textureDecorationCrowd('decoration_crowd');
-    window.MMA.Sprites.registerEnemyVariant('streetThug', 'enemy_thug');
-    window.MMA.Sprites.registerEnemyVariant('barBrawler', 'enemy_brawler');
-    window.MMA.Sprites.registerEnemyVariant('muayThaiFighter', 'enemy_kickboxer');
-    window.MMA.Sprites.registerEnemyVariant('wrestler', 'enemy_wrestler');
-    window.MMA.Sprites.registerEnemyVariant('judoka', 'enemy_judoka');
-    window.MMA.Sprites.registerEnemyVariant('groundNPounder', 'enemy_groundpounder');
-    window.MMA.Sprites.registerEnemyVariant('bjjBlackBelt', 'enemy_bjj');
-    window.MMA.Sprites.registerEnemyVariant('kickboxer', 'enemy_kickboxer');
-    window.MMA.Sprites.registerEnemyVariant('striker', 'enemy_striker');
-    window.MMA.Sprites.registerEnemyVariant('boxer', 'enemy_boxer');
-    window.MMA.Sprites.registerEnemyVariant('karateka', 'enemy_karateka');
-    window.MMA.Sprites.registerEnemyVariant('streetFighter', 'enemy_streetfighter');
-    window.MMA.Sprites.registerEnemyVariant('coach', 'npc_coach');
-    window.MMA.Sprites.registerEnemyVariant('shadowRival', 'enemy_shadow_boss');
-    window.MMA.Sprites.registerEnemyVariant('mmaChamp', 'enemy_brawler_boss');
-    window.MMA.Sprites.DECORATIONS = {
-      zone1: {
-        barrel: { texture: 'decoration_barrel', size: { w: 0.95, h: 0.95 } },
-        trashCan: { texture: 'decoration_trash', size: { w: 0.95, h: 0.95 } },
-        crates: { texture: 'crateProp', size: { w: 1.1, h: 1.1 } },
-        streetLamp: { texture: 'lampProp', size: { w: 1.0, h: 1.0 }, kind: 'pulse', alpha: 0.9 },
-        graffiti: { texture: 'decoration_graffiti', size: { w: 1.8, h: 0.9 }, alpha: 0.86 }
-      },
-      zone2: {
-        heavyBag: { texture: 'decoration_heavybag', size: { w: 0.95, h: 1.25 }, kind: 'sway' },
-        speedBag: { texture: 'decoration_speedbag', size: { w: 0.8, h: 0.9 }, kind: 'sway' },
-        weightRack: { texture: 'decoration_weights', size: { w: 1.2, h: 1.0 } },
-        mirror: { texture: 'decoration_mirror', size: { w: 1.0, h: 1.25 }, alpha: 0.9 },
-        boxingRing: { texture: 'decoration_boxingring', size: { w: 2.7, h: 1.7 }, alpha: 0.88 }
-      },
-      zone3: {
-        octagon: { texture: 'decoration_octagon', size: { w: 2.7, h: 2.2 }, alpha: 0.92 },
-        cornerPost: { texture: 'decoration_corner', size: { w: 0.8, h: 1.0 } },
-        entranceTunnel: { texture: 'decoration_tunnel', size: { w: 2.6, h: 1.6 }, alpha: 0.9 },
-        crowdSilhouette: { texture: 'decoration_crowd', size: { w: 2.5, h: 1.2 }, kind: 'pulse', alpha: 0.72 }
-      }
-    };
-    textureAura('aura_striker', window.MMA.Sprites.STYLE_AURA_COLORS.striker, 0.16, 'core');
-    textureAura('aura_striker_ring', window.MMA.Sprites.STYLE_AURA_COLORS.striker, 0.22, 'ring');
-    textureAura('aura_striker_flare', window.MMA.Sprites.STYLE_AURA_COLORS.striker, 0.2, 'flare');
-    textureAura('aura_grappler', window.MMA.Sprites.STYLE_AURA_COLORS.grappler, 0.16, 'core');
-    textureAura('aura_grappler_ring', window.MMA.Sprites.STYLE_AURA_COLORS.grappler, 0.22, 'ring');
-    textureAura('aura_grappler_flare', window.MMA.Sprites.STYLE_AURA_COLORS.grappler, 0.2, 'flare');
-    textureAura('aura_balanced', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.14, 'core');
-    textureAura('aura_balanced_ring', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.2, 'ring');
-    textureAura('aura_balanced_flare', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.18, 'flare');
-    var lastChanceCfg = window.MMA.Sprites.LAST_CHANCE_CONFIG || {};
-    textureAura('last_chance_pulse', lastChanceCfg.tint || 0xff3b30, lastChanceCfg.alpha || 0.24, 'core');
-    textureAura('last_chance_pulse_ring', lastChanceCfg.glow || 0xffb0aa, lastChanceCfg.ringAlpha || 0.18, 'ring');
-    textureAura('last_chance_pulse_flare', lastChanceCfg.tint || 0xff3b30, lastChanceCfg.flareAlpha || 0.14, 'flare');
-    window.MMA.Sprites.LAST_CHANCE_TEXTURES = {
-      core: 'last_chance_pulse',
-      ring: 'last_chance_pulse_ring',
-      flare: 'last_chance_pulse_flare'
-    };
-    Object.keys(window.MMA.Sprites.BOSS_AURA_CONFIGS).forEach(function(auraKey) {
-      var cfg = window.MMA.Sprites.BOSS_AURA_CONFIGS[auraKey];
-      textureAura('boss_aura_' + cfg.key, cfg.color, cfg.alpha || 0.22, 'core');
-      textureAura('boss_aura_' + cfg.key + '_ring', cfg.glow || cfg.color, cfg.ringAlpha || 0.2, 'ring');
-      textureAura('boss_aura_' + cfg.key + '_flare', cfg.color, cfg.flareAlpha || 0.18, 'flare');
+    function addOptionalTask(fn) {
+      if (MMA.Sprites._skipOptionalTextures) {
+        if (!MMA.Sprites._deferredTasks) MMA.Sprites._deferredTasks = [];
+        MMA.Sprites._deferredTasks.push(fn);
+      } else { fn(); }
+    }
+    addOptionalTask(function() {
+          texturePortraitSet('player', playerColors, { accent: window.MMA.Sprites.STYLE_AURA_COLORS.striker });
     });
-    window.MMA.Sprites.AURA_TEXTURES = {
-      striker: 'aura_striker',
-      grappler: 'aura_grappler',
-      balanced: 'aura_balanced'
-    };
-    window.MMA.Sprites.AURA_LAYER_TEXTURES = {
-      striker: { core: 'aura_striker', ring: 'aura_striker_ring', flare: 'aura_striker_flare' },
-      grappler: { core: 'aura_grappler', ring: 'aura_grappler_ring', flare: 'aura_grappler_flare' },
-      balanced: { core: 'aura_balanced', ring: 'aura_balanced_ring', flare: 'aura_balanced_flare' }
-    };
-    var resonanceCfg = window.MMA.Sprites.RESONANCE_CONFIG || {};
-    var resonanceColors = resonanceCfg.colors || {};
-    textureResonance('resonance_striker', resonanceColors.striker || 0xff5a5a, resonanceCfg.alpha || 0.2, 'core');
-    textureResonance('resonance_striker_ring', resonanceColors.striker || 0xff5a5a, resonanceCfg.ringAlpha || 0.14, 'ring');
-    textureResonance('resonance_striker_flare', resonanceColors.striker || 0xff5a5a, resonanceCfg.flareAlpha || 0.12, 'flare');
-    textureResonance('resonance_grappler', resonanceColors.grappler || 0x5aa8ff, resonanceCfg.alpha || 0.2, 'core');
-    textureResonance('resonance_grappler_ring', resonanceColors.grappler || 0x5aa8ff, resonanceCfg.ringAlpha || 0.14, 'ring');
-    textureResonance('resonance_grappler_flare', resonanceColors.grappler || 0x5aa8ff, resonanceCfg.flareAlpha || 0.12, 'flare');
-    textureResonance('resonance_hybrid', resonanceColors.hybrid || 0xb678ff, resonanceCfg.alpha || 0.2, 'core');
-    textureResonance('resonance_hybrid_ring', resonanceColors.hybrid || 0xb678ff, resonanceCfg.ringAlpha || 0.14, 'ring');
-    textureResonance('resonance_hybrid_flare', resonanceColors.hybrid || 0xb678ff, resonanceCfg.flareAlpha || 0.12, 'flare');
-    textureResonance('resonance_signature', resonanceColors.signature || 0xffd166, resonanceCfg.alpha || 0.22, 'core');
-    textureResonance('resonance_signature_ring', resonanceColors.signature || 0xffd166, resonanceCfg.ringAlpha || 0.16, 'ring');
-    textureResonance('resonance_signature_flare', resonanceColors.signature || 0xffd166, resonanceCfg.flareAlpha || 0.14, 'flare');
-    window.MMA.Sprites.RESONANCE_TEXTURES = {
-      striker: { core: 'resonance_striker', ring: 'resonance_striker_ring', flare: 'resonance_striker_flare' },
-      grappler: { core: 'resonance_grappler', ring: 'resonance_grappler_ring', flare: 'resonance_grappler_flare' },
-      hybrid: { core: 'resonance_hybrid', ring: 'resonance_hybrid_ring', flare: 'resonance_hybrid_flare' },
-      signature: { core: 'resonance_signature', ring: 'resonance_signature_ring', flare: 'resonance_signature_flare' },
-      default: { core: 'resonance_hybrid', ring: 'resonance_hybrid_ring', flare: 'resonance_hybrid_flare' }
-    };
-    } // end optional textures block
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_thug', thugColors, { accent: 0xff7a7a });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_brawler', brawlerColors, { accent: 0xffb14d });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_boxer', boxerColors, { accent: 0xffffff });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_karateka', karatekaColors, { accent: 0xe14848 });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_streetfighter', streetFighterColors, { accent: 0xffc34d });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_kickboxer', kickboxerColors, { accent: 0x5de0e8 });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_judoka', judokaColors, { accent: 0x8d673f });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_wrestler', wrestlerColors, { accent: 0xd9e6ff });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_groundpounder', groundPounderColors, { accent: 0xe0a35a });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_striker', strikerColors, { accent: 0xffb0d0 });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_bjj', bjjColors, { accent: 0xaab0bb });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_thug_elite', eliteColors, { accent: 0xbca6ff });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_brawler_boss', championBossColors, { accent: 0xffd54f });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_champion_boss', championBossColors, { accent: 0xffd54f });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_underground_king_boss', undergroundBossColors, { accent: 0xd83b4a });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('enemy_shadow_boss', shadowBossColors, { accent: 0x8a5cff });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('npc_trainer', trainerColors, { accent: 0x52d8b0 });
+    });
+    addOptionalTask(function() {
+          texturePortraitSet('npc_coach', coachColors, { accent: 0xffd86b });
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('player', playerColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_thug', thugColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_brawler', brawlerColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_boxer', boxerColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_karateka', karatekaColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_streetfighter', streetFighterColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_kickboxer', kickboxerColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_judoka', judokaColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_wrestler', wrestlerColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_groundpounder', groundPounderColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_striker', strikerColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_bjj', bjjColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_thug_elite', eliteColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_brawler_boss', championBossColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_champion_boss', championBossColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_underground_king_boss', undergroundBossColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('enemy_shadow_boss', shadowBossColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('npc_trainer', trainerColors);
+    });
+    addOptionalTask(function() {
+          textureReactionFaceSet('npc_coach', coachColors);
+    });
+    addOptionalTask(function() {
+          textureSilhouette('player', 'player_silhouette', playerColors, { pose: 'special', accent: window.MMA.Sprites.STYLE_AURA_COLORS.striker, tint: 0x180c2d });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_thug', 'enemy_thug_silhouette', thugColors, { pose: 'stance', accent: 0xff7a7a, tint: 0x1f0c0c });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_brawler', 'enemy_brawler_silhouette', brawlerColors, { pose: 'grapple', accent: 0xffb14d, tint: 0x271505 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_boxer', 'enemy_boxer_silhouette', boxerColors, { pose: 'stance', accent: 0xffffff, tint: 0x1a0a0a });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_karateka', 'enemy_karateka_silhouette', karatekaColors, { pose: 'special', accent: 0xe14848, tint: 0x161616 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_streetfighter', 'enemy_streetfighter_silhouette', streetFighterColors, { pose: 'special', accent: 0xffc34d, tint: 0x241106 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_kickboxer', 'enemy_kickboxer_silhouette', kickboxerColors, { pose: 'special', accent: 0x5de0e8, tint: 0x0a1820 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_judoka', 'enemy_judoka_silhouette', judokaColors, { pose: 'grapple', accent: 0x8d673f, tint: 0x131313 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_wrestler', 'enemy_wrestler_silhouette', wrestlerColors, { pose: 'grapple', accent: 0xd9e6ff, tint: 0x0d1531 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_groundpounder', 'enemy_groundpounder_silhouette', groundPounderColors, { pose: 'grapple', accent: 0xe0a35a, tint: 0x1b1209 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_striker', 'enemy_striker_silhouette', strikerColors, { pose: 'special', accent: 0xffb0d0, tint: 0x170b17 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_bjj', 'enemy_bjj_silhouette', bjjColors, { pose: 'grapple', accent: 0xaab0bb, tint: 0x111214 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_thug_elite', 'enemy_thug_elite_silhouette', eliteColors, { pose: 'stance', accent: 0xbca6ff, tint: 0x140d23 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_brawler_boss', 'enemy_brawler_boss_silhouette', championBossColors, { pose: 'special', accent: 0xffd54f, tint: 0x241a06 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_champion_boss', 'enemy_champion_boss_silhouette', championBossColors, { pose: 'special', accent: 0xffd54f, tint: 0x241a06 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_underground_king_boss', 'enemy_underground_king_boss_silhouette', undergroundBossColors, { pose: 'grapple', accent: 0xd83b4a, tint: 0x2a080d });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('enemy_shadow_boss', 'enemy_shadow_boss_silhouette', shadowBossColors, { pose: 'special', accent: 0x8a5cff, tint: 0x12091f });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('npc_trainer', 'npc_trainer_silhouette', trainerColors, { pose: 'stance', accent: 0x52d8b0, tint: 0x071814 });
+    });
+    addOptionalTask(function() {
+          textureSilhouette('npc_coach', 'npc_coach_silhouette', coachColors, { pose: 'grapple', accent: 0xffd86b, tint: 0x180d28 });
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.VISUAL_VARIANTS = {
+            mmaChamp: 'enemy_champion_boss',
+            boss: 'enemy_champion_boss',
+            champion: 'enemy_champion_boss',
+            championBoss: 'enemy_champion_boss',
+            titleBoss: 'enemy_champion_boss',
+            undergroundKing: 'enemy_underground_king_boss',
+            underground_boss: 'enemy_underground_king_boss',
+            cageBoss: 'enemy_underground_king_boss',
+            rival: 'enemy_shadow_boss',
+            shadow: 'enemy_shadow_boss',
+            shadowBoss: 'enemy_shadow_boss',
+            shadowRival: 'enemy_shadow_boss',
+            elite: 'enemy_thug_elite',
+            boxer: 'enemy_boxer',
+            karateka: 'enemy_karateka',
+            streetFighter: 'enemy_streetfighter',
+            kickboxer: 'enemy_kickboxer',
+            judoka: 'enemy_judoka',
+            wrestler: 'enemy_wrestler',
+            groundNPounder: 'enemy_groundpounder',
+            striker: 'enemy_striker',
+            bjjBlackBelt: 'enemy_bjj',
+            muayThaiFighter: 'enemy_kickboxer',
+            trainer: 'npc_trainer',
+            coach: 'npc_coach',
+            sparringPartner: 'npc_trainer',
+            gymNpc: 'npc_trainer'
+          };
+    });
+    addOptionalTask(function() {
+          textureDecorationBarrel('decoration_barrel');
+    });
+    addOptionalTask(function() {
+          textureDecorationTrash('decoration_trash');
+    });
+    addOptionalTask(function() {
+          textureDecorationGraffiti('decoration_graffiti');
+    });
+    addOptionalTask(function() {
+          textureDecorationHeavyBag('decoration_heavybag');
+    });
+    addOptionalTask(function() {
+          textureDecorationSpeedBag('decoration_speedbag');
+    });
+    addOptionalTask(function() {
+          textureDecorationWeights('decoration_weights');
+    });
+    addOptionalTask(function() {
+          textureDecorationMirror('decoration_mirror');
+    });
+    addOptionalTask(function() {
+          textureDecorationBoxingRing('decoration_boxingring');
+    });
+    addOptionalTask(function() {
+          textureDecorationOctagon('decoration_octagon');
+    });
+    addOptionalTask(function() {
+          textureDecorationCorner('decoration_corner');
+    });
+    addOptionalTask(function() {
+          textureDecorationTunnel('decoration_tunnel');
+    });
+    addOptionalTask(function() {
+          textureDecorationCrowd('decoration_crowd');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('streetThug', 'enemy_thug');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('barBrawler', 'enemy_brawler');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('muayThaiFighter', 'enemy_kickboxer');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('wrestler', 'enemy_wrestler');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('judoka', 'enemy_judoka');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('groundNPounder', 'enemy_groundpounder');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('bjjBlackBelt', 'enemy_bjj');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('kickboxer', 'enemy_kickboxer');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('striker', 'enemy_striker');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('boxer', 'enemy_boxer');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('karateka', 'enemy_karateka');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('streetFighter', 'enemy_streetfighter');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('coach', 'npc_coach');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('shadowRival', 'enemy_shadow_boss');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.registerEnemyVariant('mmaChamp', 'enemy_brawler_boss');
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.DECORATIONS = {
+            zone1: {
+              barrel: { texture: 'decoration_barrel', size: { w: 0.95, h: 0.95 } },
+              trashCan: { texture: 'decoration_trash', size: { w: 0.95, h: 0.95 } },
+              crates: { texture: 'crateProp', size: { w: 1.1, h: 1.1 } },
+              streetLamp: { texture: 'lampProp', size: { w: 1.0, h: 1.0 }, kind: 'pulse', alpha: 0.9 },
+              graffiti: { texture: 'decoration_graffiti', size: { w: 1.8, h: 0.9 }, alpha: 0.86 }
+            },
+            zone2: {
+              heavyBag: { texture: 'decoration_heavybag', size: { w: 0.95, h: 1.25 }, kind: 'sway' },
+              speedBag: { texture: 'decoration_speedbag', size: { w: 0.8, h: 0.9 }, kind: 'sway' },
+              weightRack: { texture: 'decoration_weights', size: { w: 1.2, h: 1.0 } },
+              mirror: { texture: 'decoration_mirror', size: { w: 1.0, h: 1.25 }, alpha: 0.9 },
+              boxingRing: { texture: 'decoration_boxingring', size: { w: 2.7, h: 1.7 }, alpha: 0.88 }
+            },
+            zone3: {
+              octagon: { texture: 'decoration_octagon', size: { w: 2.7, h: 2.2 }, alpha: 0.92 },
+              cornerPost: { texture: 'decoration_corner', size: { w: 0.8, h: 1.0 } },
+              entranceTunnel: { texture: 'decoration_tunnel', size: { w: 2.6, h: 1.6 }, alpha: 0.9 },
+              crowdSilhouette: { texture: 'decoration_crowd', size: { w: 2.5, h: 1.2 }, kind: 'pulse', alpha: 0.72 }
+            }
+          };
+    });
+    addOptionalTask(function() {
+          textureAura('aura_striker', window.MMA.Sprites.STYLE_AURA_COLORS.striker, 0.16, 'core');
+    });
+    addOptionalTask(function() {
+          textureAura('aura_striker_ring', window.MMA.Sprites.STYLE_AURA_COLORS.striker, 0.22, 'ring');
+    });
+    addOptionalTask(function() {
+          textureAura('aura_striker_flare', window.MMA.Sprites.STYLE_AURA_COLORS.striker, 0.2, 'flare');
+    });
+    addOptionalTask(function() {
+          textureAura('aura_grappler', window.MMA.Sprites.STYLE_AURA_COLORS.grappler, 0.16, 'core');
+    });
+    addOptionalTask(function() {
+          textureAura('aura_grappler_ring', window.MMA.Sprites.STYLE_AURA_COLORS.grappler, 0.22, 'ring');
+    });
+    addOptionalTask(function() {
+          textureAura('aura_grappler_flare', window.MMA.Sprites.STYLE_AURA_COLORS.grappler, 0.2, 'flare');
+    });
+    addOptionalTask(function() {
+          textureAura('aura_balanced', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.14, 'core');
+    });
+    addOptionalTask(function() {
+          textureAura('aura_balanced_ring', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.2, 'ring');
+    });
+    addOptionalTask(function() {
+          textureAura('aura_balanced_flare', window.MMA.Sprites.STYLE_AURA_COLORS.balanced, 0.18, 'flare');
+    });
+    addOptionalTask(function() {
+      var lastChanceCfg = window.MMA.Sprites.LAST_CHANCE_CONFIG || {};
+      textureAura('last_chance_pulse', lastChanceCfg.tint || 0xff3b30, lastChanceCfg.alpha || 0.24, 'core');
+      textureAura('last_chance_pulse_ring', lastChanceCfg.glow || 0xffb0aa, lastChanceCfg.ringAlpha || 0.18, 'ring');
+      textureAura('last_chance_pulse_flare', lastChanceCfg.tint || 0xff3b30, lastChanceCfg.flareAlpha || 0.14, 'flare');
+      window.MMA.Sprites.LAST_CHANCE_TEXTURES = {
+        core: 'last_chance_pulse',
+        ring: 'last_chance_pulse_ring',
+        flare: 'last_chance_pulse_flare'
+      };
+    });
+    addOptionalTask(function() {
+          Object.keys(window.MMA.Sprites.BOSS_AURA_CONFIGS).forEach(function(auraKey) {
+            var cfg = window.MMA.Sprites.BOSS_AURA_CONFIGS[auraKey];
+            textureAura('boss_aura_' + cfg.key, cfg.color, cfg.alpha || 0.22, 'core');
+            textureAura('boss_aura_' + cfg.key + '_ring', cfg.glow || cfg.color, cfg.ringAlpha || 0.2, 'ring');
+            textureAura('boss_aura_' + cfg.key + '_flare', cfg.color, cfg.flareAlpha || 0.18, 'flare');
+          });
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.AURA_TEXTURES = {
+            striker: 'aura_striker',
+            grappler: 'aura_grappler',
+            balanced: 'aura_balanced'
+          };
+    });
+    addOptionalTask(function() {
+          window.MMA.Sprites.AURA_LAYER_TEXTURES = {
+            striker: { core: 'aura_striker', ring: 'aura_striker_ring', flare: 'aura_striker_flare' },
+            grappler: { core: 'aura_grappler', ring: 'aura_grappler_ring', flare: 'aura_grappler_flare' },
+            balanced: { core: 'aura_balanced', ring: 'aura_balanced_ring', flare: 'aura_balanced_flare' }
+          };
+    });
+    addOptionalTask(function() {
+      var resonanceCfg = window.MMA.Sprites.RESONANCE_CONFIG || {};
+      var resonanceColors = resonanceCfg.colors || {};
+      textureResonance('resonance_striker', resonanceColors.striker || 0xff5a5a, resonanceCfg.alpha || 0.2, 'core');
+      textureResonance('resonance_striker_ring', resonanceColors.striker || 0xff5a5a, resonanceCfg.ringAlpha || 0.14, 'ring');
+      textureResonance('resonance_striker_flare', resonanceColors.striker || 0xff5a5a, resonanceCfg.flareAlpha || 0.12, 'flare');
+      textureResonance('resonance_grappler', resonanceColors.grappler || 0x5aa8ff, resonanceCfg.alpha || 0.2, 'core');
+      textureResonance('resonance_grappler_ring', resonanceColors.grappler || 0x5aa8ff, resonanceCfg.ringAlpha || 0.14, 'ring');
+      textureResonance('resonance_grappler_flare', resonanceColors.grappler || 0x5aa8ff, resonanceCfg.flareAlpha || 0.12, 'flare');
+      textureResonance('resonance_hybrid', resonanceColors.hybrid || 0xb678ff, resonanceCfg.alpha || 0.2, 'core');
+      textureResonance('resonance_hybrid_ring', resonanceColors.hybrid || 0xb678ff, resonanceCfg.ringAlpha || 0.14, 'ring');
+      textureResonance('resonance_hybrid_flare', resonanceColors.hybrid || 0xb678ff, resonanceCfg.flareAlpha || 0.12, 'flare');
+      textureResonance('resonance_signature', resonanceColors.signature || 0xffd166, resonanceCfg.alpha || 0.22, 'core');
+      textureResonance('resonance_signature_ring', resonanceColors.signature || 0xffd166, resonanceCfg.ringAlpha || 0.16, 'ring');
+      textureResonance('resonance_signature_flare', resonanceColors.signature || 0xffd166, resonanceCfg.flareAlpha || 0.14, 'flare');
+      window.MMA.Sprites.RESONANCE_TEXTURES = {
+        striker: { core: 'resonance_striker', ring: 'resonance_striker_ring', flare: 'resonance_striker_flare' },
+        grappler: { core: 'resonance_grappler', ring: 'resonance_grappler_ring', flare: 'resonance_grappler_flare' },
+        hybrid: { core: 'resonance_hybrid', ring: 'resonance_hybrid_ring', flare: 'resonance_hybrid_flare' },
+        signature: { core: 'resonance_signature', ring: 'resonance_signature_ring', flare: 'resonance_signature_flare' },
+        default: { core: 'resonance_hybrid', ring: 'resonance_hybrid_ring', flare: 'resonance_hybrid_flare' }
+      };
+    });
     texturePickup('item_pickup');
     texturePickup('pickup_health');
     textureSweatParticle('impact_sweat', { fill: 0x9fd4ff, highlight: 0xffffff, alpha: 0.92 });
@@ -1169,23 +1373,19 @@ window.MMA.Sprites = {
   makeOptional: function(scene) {
     if (MMA.Sprites._optionalDone) return;
     MMA.Sprites._optionalDone = true;
-    MMA.Sprites._skipOptionalTextures = false;
-    // Re-run makeAll with optional flag cleared — only the guarded block will actually
-    // re-generate textures that don't already exist in the texture manager.
-    // We do this by temporarily wrapping generateTexture to skip existing keys.
-    var mgr = scene && scene.textures;
-    if (!mgr) return;
-    var orig = scene.make && scene.make.graphics ? scene.make.graphics.bind(scene.make) : null;
-    if (!orig) return;
-    // Monkey-patch: skip generateTexture if key already exists
-    var _origGenTex = Phaser.GameObjects.Graphics.prototype.generateTexture;
-    Phaser.GameObjects.Graphics.prototype.generateTexture = function(key, w, h) {
-      if (!mgr.exists(key)) { _origGenTex.call(this, key, w, h); }
-      return this;
-    };
-    try { this.makeAll(scene); } finally {
-      Phaser.GameObjects.Graphics.prototype.generateTexture = _origGenTex;
+    var tasks = MMA.Sprites._deferredTasks;
+    if (!tasks || !tasks.length) return;
+    var i = 0;
+    function runNext() {
+      if (i >= tasks.length) return;
+      try { tasks[i](); } catch(e) { console.warn('makeOptional task error:', e); }
+      i++;
+      if (i < tasks.length) {
+        if (window.requestIdleCallback) requestIdleCallback(runNext, { timeout: 200 });
+        else setTimeout(runNext, 16);
+      }
     }
+    runNext();
   },
 
   // Generate player outfit variant textures

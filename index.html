@@ -481,25 +481,25 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=52"></script>
-  <script src="js/sprites.js?v=52"></script>
-  <script src="js/combat-core.js?v=52"></script>
-  <script src="js/combat-moves.js?v=52"></script>
-  <script src="js/combat-ground.js?v=52"></script>
-  <script src="js/enemies-config.js?v=52"></script>
-  <script src="js/enemies-combat.js?v=52"></script>
-  <script src="js/enemies-core.js?v=52"></script>
-  <script src="js/enemies-ai.js?v=52"></script>
-  <script src="js/zones.js?v=52"></script>
-  <script src="js/player.js?v=52"></script>
-  <script src="js/items.js?v=52"></script>
-  <script src="js/outfits.js?v=52"></script>
-  <script src="js/vfx.js?v=52"></script>
-  <script src="js/ui-core.js?v=52"></script>
-  <script src="js/ui-meters.js?v=52"></script>
-  <script src="js/ui-settings.js?v=52"></script>
-  <script src="js/ui-layout.js?v=52"></script>
-  <script src="js/progression.js?v=52"></script>
+  <script src="js/config.js?v=53"></script>
+  <script src="js/sprites.js?v=53"></script>
+  <script src="js/combat-core.js?v=53"></script>
+  <script src="js/combat-moves.js?v=53"></script>
+  <script src="js/combat-ground.js?v=53"></script>
+  <script src="js/enemies-config.js?v=53"></script>
+  <script src="js/enemies-combat.js?v=53"></script>
+  <script src="js/enemies-core.js?v=53"></script>
+  <script src="js/enemies-ai.js?v=53"></script>
+  <script src="js/zones.js?v=53"></script>
+  <script src="js/player.js?v=53"></script>
+  <script src="js/items.js?v=53"></script>
+  <script src="js/outfits.js?v=53"></script>
+  <script src="js/vfx.js?v=53"></script>
+  <script src="js/ui-core.js?v=53"></script>
+  <script src="js/ui-meters.js?v=53"></script>
+  <script src="js/ui-settings.js?v=53"></script>
+  <script src="js/ui-layout.js?v=53"></script>
+  <script src="js/progression.js?v=53"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -545,7 +545,7 @@
         if (gameScene.activeFighterCard && gameScene.activeFighterCard.close) {
           gameScene.activeFighterCard.close();
         } else {
-          gameScene.activeFighterCard = window.MMA.UI.showFighterCard(gameScene);
+          if (typeof window.MMA.UI.showFighterCard === 'function') gameScene.activeFighterCard = window.MMA.UI.showFighterCard(gameScene);
         }
       }
     }
@@ -555,7 +555,7 @@
         if (gameScene.activeTrophyRoom && gameScene.activeTrophyRoom.close) {
           gameScene.activeTrophyRoom.close();
         } else {
-          gameScene.activeTrophyRoom = window.MMA.UI.showTrophyRoom(gameScene);
+          if (typeof window.MMA.UI.showTrophyRoom === 'function') gameScene.activeTrophyRoom = window.MMA.UI.showTrophyRoom(gameScene);
         }
       }
     }
@@ -565,7 +565,7 @@
         if (gameScene.activeFighterDiary && gameScene.activeFighterDiary.close) {
           gameScene.activeFighterDiary.close();
         } else {
-          gameScene.activeFighterDiary = window.MMA.UI.showFighterDiary(gameScene);
+          if (typeof window.MMA.UI.showFighterDiary === 'function') gameScene.activeFighterDiary = window.MMA.UI.showFighterDiary(gameScene);
         }
       }
     }
@@ -752,20 +752,20 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=52"></script>
-  <script src="js/saveSystem.js?v=52"></script>
-  <script src="js/narrator.js?v=52"></script>
-  <script src="js/scenes/TitleScene.js?v=52"></script>
-  <script src="js/scenes/BootScene.js?v=52"></script>
-  <script src="js/scenes/GameScene.js?v=52"></script>
-  <script src="js/scenes/HUDScene.js?v=52"></script>
-  <script src="js/scenes/PauseScene.js?v=52"></script>
-  <script src="js/scenes/OutfitScene.js?v=52"></script>
-  <script src="js/scenes/UnlockScene.js?v=52"></script>
-  <script src="js/scenes/VictoryScene.js?v=52"></script>
-  <script src="js/scenes/DefeatScene.js?v=52"></script>
-  <script src="js/network.js?v=52"></script>
-  <script src="js/scenes/LobbyScene.js?v=52"></script>
-  <script src="js/main.js?v=52"></script>
+<script src="js/sounds.js?v=53"></script>
+  <script src="js/saveSystem.js?v=53"></script>
+  <script src="js/narrator.js?v=53"></script>
+  <script src="js/scenes/TitleScene.js?v=53"></script>
+  <script src="js/scenes/BootScene.js?v=53"></script>
+  <script src="js/scenes/GameScene.js?v=53"></script>
+  <script src="js/scenes/HUDScene.js?v=53"></script>
+  <script src="js/scenes/PauseScene.js?v=53"></script>
+  <script src="js/scenes/OutfitScene.js?v=53"></script>
+  <script src="js/scenes/UnlockScene.js?v=53"></script>
+  <script src="js/scenes/VictoryScene.js?v=53"></script>
+  <script src="js/scenes/DefeatScene.js?v=53"></script>
+  <script src="js/network.js?v=53"></script>
+  <script src="js/scenes/LobbyScene.js?v=53"></script>
+  <script src="js/main.js?v=53"></script>
 </body>
 </html>

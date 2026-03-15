@@ -1,5 +1,32 @@
 window.MMA = window.MMA || {};
 window.MMA.Zones = {
+  // --- New Feature: Ring Out KO Detection ---
+  // In championship arena rooms (zone 4), if an enemy is pushed beyond the ring
+  // boundaries (col < 0 or col > 15), they are considered knocked out of the ring.
+  // This method can be called by combat logic after applying knockback forces.
+  // Returns true if a ring out occurred and sets a registry flag for UI/score.
+  checkRingOut: function(scene, enemy) {
+    if (!scene || !enemy) return false;
+    // Only apply in arena-style zones where ring out is enabled.
+    var room = this.getRoom(scene.currentRoomId);
+    if (!room || !room.ringOutEnabled) return false;
+    // Enemy position in tile coordinates (assuming enemy.x/y are world pixels).
+    var DT = CONFIG.DISPLAY_TILE;
+    var col = Math.floor(enemy.x / DT);
+    // Ring boundaries are at columns 0 and 15 (walls). Outside means col < 0 or >15.
+    if (col < 0 || col > 15) {
+      // Mark the enemy as ring out KO.
+      enemy.setActive(false).setVisible(false);
+      // Store a flag for the current room so UI can display a message.
+      scene.registry.set('ringOutOccurred', true);
+      scene.registry.set('ringOutTargetId', enemy.id || null);
+      return true;
+    }
+    return false;
+  },
+
+  // Existing content continues below
+
   ZONE1_ROOMS: {
     room1:{id:'room1',zone:1,weatherOptions:['clear','clear','rain','night'],weightClass:'light',doors:{left:{col:0,row:5},right:{col:15,row:5},up:{col:7,row:0}},connections:{left:'room2',right:'room3',up:'room4'},spawnPositions:[{col:3,row:3},{col:12,row:3},{col:12,row:9}],enemyPool:['streetThug','streetThug','barBrawler'],name:'Alley Entrance'},
     room2:{id:'room2',zone:1,weatherOptions:['clear','rain','wind','fog'],weightClass:'light',doors:{right:{col:15,row:5}},connections:{right:'room1'},spawnPositions:[{col:3,row:3},{col:3,row:9}],enemyPool:['streetThug','barBrawler'],name:'Side Alley'},

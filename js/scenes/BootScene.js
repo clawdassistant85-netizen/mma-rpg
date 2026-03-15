@@ -73,10 +73,11 @@ var BootScene = new Phaser.Class({
     this._updateLoadBar('Style Aura');
   },
   _bootStep_auraHooks: function() {
-    // Permanently disabled: this prototype hook regressed earlier and reintroduced
-    // expensive per-sprite per-frame work on slower devices.
-    // this.installBossChromaAuraHook();
-    this._updateLoadBar('Boss Aura');
+    // Boss chroma aura only activates for boss/rival-tagged sprites and reuses
+    // lazily generated optional aura textures, so it stays off the hot path for
+    // normal enemies while restoring the rank/title visual identity feature.
+    this.installBossChromaAuraHook();
+    this._updateLoadBar('Boss Chroma Aura');
   },
   _bootStep_combatHooks: function() {
     // this.installImpactSweatHook();
