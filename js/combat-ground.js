@@ -135,7 +135,13 @@ Object.assign(window.MMA.Combat, {
         if (improveSuccess) {
           // Show position change
           var newPos = scene.groundState.position;
-          var posNames = { fullGuard: 'HALF GUARD', halfGuard: 'SIDE CONTROL', sideControl: 'MOUNT', mount: 'MOUNT', backControl: 'BACK CONTROL' };
+          var posNames = {
+            fullGuard: 'FULL GUARD',
+            halfGuard: 'HALF GUARD ↑',
+            sideControl: 'SIDE CONTROL ↑',
+            mount: 'MOUNT ↑',
+            backControl: 'BACK CONTROL ↑'
+          };
           MMA.UI.showGroundBanner(posNames[newPos] || 'POSITION UP!');
         }
         // Update UI to show new position
@@ -205,6 +211,9 @@ Object.assign(window.MMA.Combat, {
       MMA.UI.recordHitDealt(dmg, false, 1);
       MMA.UI.recordMoveUsage(moveKey, scene); // Track move for Style DNA
       MMA.Player.awardStyleXP(scene, moveKey); // Award style XP
+      // Show move name above damage
+      var gnpLabel = (moveKey === 'cross') ? 'ELBOW!' : 'G&P!';
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 38, gnpLabel, '#ff9900');
       MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, '-' + dmg, '#ffd54f');
       MMA.VFX.flashEnemyHit(scene, enemy, 90);
       // Mounted combo finisher at 5+ ground hits

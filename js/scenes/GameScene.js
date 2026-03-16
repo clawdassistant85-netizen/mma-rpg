@@ -174,6 +174,9 @@ var GameScene = new Phaser.Class({
       position: 'fullGuard',  // Start in full guard
       improveTick: 0
     };
+    if (window.MMA && MMA.UI && typeof MMA.UI.showGroundBanner === 'function') {
+      MMA.UI.showGroundBanner('FULL GUARD');
+    }
     MMA.UI.setActionButtonLabels(true, this);
     MMA.UI.showGroundBanner('TAKEDOWN!');
     this.registry.set('gameMessage', 'GROUND GAME');
@@ -699,6 +702,16 @@ var GameScene = new Phaser.Class({
       if (this.groundState.enemy && this.groundState.enemy.active && this.groundState.enemy.state !== 'dead') {
         this.groundState.timer -= delta;
         this.groundState.escapeTick -= delta;
+        // Track ground time for unlock system (once per second to avoid spamming localStorage)
+        if (!this._groundTimeTrackTs || this.time.now - this._groundTimeTrackTs > 1000) {
+          this._groundTimeTrackTs = this.time.now;
+          try {
+            var _gt = JSON.parse(localStorage.getItem('mma_move_history') || '{}');
+            _gt._meta = _gt._meta || {};
+            _gt._meta.totalGroundTime = (_gt._meta.totalGroundTime || 0) + 1;
+            localStorage.setItem('mma_move_history', JSON.stringify(_gt));
+          } catch(e) {}
+        }
         var enemy = this.groundState.enemy;
         this.player.setPosition(enemy.x - 12, enemy.y);
         if (this.groundState.escapeTick <= 0) {

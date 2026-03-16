@@ -201,6 +201,13 @@ window.MMA.Player = {
     }
     var reducedDamage = Math.max(1, Math.round(damage - (scene.player.defenseBonus || 0)));
     scene.player.stats.hp -= reducedDamage;
+    // Track damage taken for unlock system
+    try {
+      var _mu = JSON.parse(localStorage.getItem('mma_move_history') || '{}');
+      _mu._meta = _mu._meta || {};
+      _mu._meta.damageTaken = (_mu._meta.damageTaken || 0) + reducedDamage;
+      localStorage.setItem('mma_move_history', JSON.stringify(_mu));
+    } catch(e) {}
     // Decrease durability of equipped gear on damage
     if (scene.player && scene.player.equipmentDurability) {
       for (var gearKey in scene.player.equipmentDurability) {
@@ -376,75 +383,144 @@ window.MMA.Player = {
     var s = scene.player.stats;
     return Math.floor((s.strikingLevel + s.grapplingLevel + s.submissionLevel) / 3);
   },
-  // Check and unlock moves based on style levels
   checkMoveUnlocksByStyle: function(scene) {
     var s = scene.player.stats;
     var unlocked = scene.player.unlockedMoves;
     var newUnlocks = [];
-    
-    // Striking unlocks
-    if (s.strikingLevel >= 2 && unlocked.indexOf('hook') === -1) { unlocked.push('hook'); newUnlocks.push('Hook'); }
-    if (s.strikingLevel >= 2 && unlocked.indexOf('lowKick') === -1) { unlocked.push('lowKick'); newUnlocks.push('Low Kick'); }
-    if (s.strikingLevel >= 3 && unlocked.indexOf('uppercut') === -1) { unlocked.push('uppercut'); newUnlocks.push('Uppercut'); }
-    if (s.strikingLevel >= 4 && unlocked.indexOf('bodyShot') === -1) { unlocked.push('bodyShot'); newUnlocks.push('Body Shot'); }
-    if (s.strikingLevel >= 5 && unlocked.indexOf('headKick') === -1) { unlocked.push('headKick'); newUnlocks.push('Head Kick'); }
-    if (s.strikingLevel >= 7 && unlocked.indexOf('spinningBackFist') === -1) { unlocked.push('spinningBackFist'); newUnlocks.push('Spinning BF'); }
-    
-    // Grappling unlocks
-    if (s.grapplingLevel >= 2 && unlocked.indexOf('hipThrow') === -1) { unlocked.push('hipThrow'); newUnlocks.push('Hip Throw'); }
-    if (s.grapplingLevel >= 3 && unlocked.indexOf('singleLeg') === -1) { unlocked.push('singleLeg'); newUnlocks.push('Single Leg'); }
-    if (s.grapplingLevel >= 4 && unlocked.indexOf('guardPass') === -1) { unlocked.push('guardPass'); newUnlocks.push('Guard Pass'); }
-    if (s.grapplingLevel >= 5 && unlocked.indexOf('mountCtrl') === -1) { unlocked.push('mountCtrl'); newUnlocks.push('Mount Ctrl'); }
-    
-    // Submission unlocks
-    if (s.submissionLevel >= 2 && unlocked.indexOf('armbar') === -1) { 
-      unlocked.push('armbar'); 
-      // Also add to ground submissions
-      if (scene.player.unlockedSubmissions.indexOf('armbar') === -1) {
+
+    // Read usage from localStorage
+    var history = {};
+    try { history = JSON.parse(localStorage.getItem('mma_move_history') || '{}'); } catch(e) {}
+    var meta = history._meta || {};
+    var wins = meta.wins || s.wins || (scene.registry && scene.registry.get('wins')) || 0;
+    var level = s.level || this.getOverallLevel(scene) || 1;
+    var damageTaken = meta.damageTaken || 0;
+    var totalGroundTime = meta.totalGroundTime || 0;
+
+    var has = function(key) { return unlocked.indexOf(key) !== -1; };
+    var grant = function(key, label) {
+      if (!has(key)) {
+        unlocked.push(key);
+        newUnlocks.push(label);
+        // Show in-game unlock banner
+        if (window.MMA && MMA.UI && typeof MMA.UI.showUnlockBanner === 'function') {
+          MMA.UI.showUnlockBanner(scene, key, label);
+        }
+      }
+    };
+
+    // Helper: total strike uses
+    var totalStrikes = (history.jab||0) + (history.cross||0) + (history.hook||0) + (history.uppercut||0) + (history.bodyShot||0);
+
+    // === UNLOCK CONDITIONS ===
+
+    // CROSS: jab x30 OR level 3
+    if (!has('cross')) {
+      if ((history.jab||0) >= 30 || level >= 3)
+        grant('cross', 'Cross');
+    }
+
+    // HOOK: jab x20 + cross x20 OR level 5
+    if (!has('hook')) {
+      if (((history.jab||0) >= 20 && (history.cross||0) >= 20) || level >= 5)
+        grant('hook', 'Hook');
+    }
+
+    // UPPERCUT: cross x25 OR level 6
+    if (!has('uppercut')) {
+      if ((history.cross||0) >= 25 || level >= 6)
+        grant('uppercut', 'Uppercut');
+    }
+
+    // LOW KICK: 40 total strikes OR level 4
+    if (!has('lowKick')) {
+      if (totalStrikes >= 40 || level >= 4)
+        grant('lowKick', 'Low Kick');
+    }
+
+    // HEAD KICK: lowKick x20 OR (level 7 + 10 wins)
+    if (!has('headKick')) {
+      if ((history.lowKick||0) >= 20 || (level >= 7 && wins >= 10))
+        grant('headKick', 'Head Kick');
+    }
+
+    // BODY SHOT: hook x15 OR cross x25 OR (level 5 + 5 wins)
+    if (!has('bodyShot')) {
+      if ((history.hook||0) >= 15 || (history.cross||0) >= 25 || (level >= 5 && wins >= 5))
+        grant('bodyShot', 'Body Shot');
+    }
+
+    // GUILLOTINE: takedown x15 OR level 4
+    if (!has('guillotine')) {
+      if ((history.takedown||0) >= 15 || level >= 4)
+        grant('guillotine', 'Guillotine');
+    }
+
+    // DODGE: damageTaken >= 100 OR level 3
+    if (!has('dodge')) {
+      if (damageTaken >= 100 || level >= 3)
+        grant('dodge', 'Dodge');
+    }
+
+    // GNP: takedown x10 + groundTime 60s OR level 5
+    if (!has('gnp')) {
+      if (((history.takedown||0) >= 10 && totalGroundTime >= 60) || level >= 5)
+        grant('gnp', 'Ground & Pound');
+    }
+
+    // ELBOW: gnp x15 OR level 6
+    if (!has('elbow')) {
+      if ((history.gnp||0) >= 15 || level >= 6)
+        grant('elbow', 'Elbow');
+    }
+
+    // SUBMISSION: guillotine x10 OR (level 7 + 15 wins)
+    if (!has('submission')) {
+      if ((history.guillotine||0) >= 10 || (level >= 7 && wins >= 15))
+        grant('submission', 'Submission');
+    }
+
+    // IMPROVE POSITION: any ground move x20 + groundTime 90s OR (level 6 + 10 wins)
+    if (!has('improvePosition')) {
+      var groundMoves = (history.gnp||0) + (history.elbow||0) + (history.submission||0);
+      if ((groundMoves >= 20 && totalGroundTime >= 90) || (level >= 6 && wins >= 10))
+        grant('improvePosition', 'Improve Position');
+    }
+
+    // SPECIAL: 5+ moves unlocked + 20 wins (prestige)
+    if (!has('special')) {
+      if (unlocked.length >= 5 && wins >= 20)
+        grant('special', 'Special Move');
+    }
+
+    // Existing style-level unlocks for submissions (keep these — they add armbar/triangle/kimura)
+    if (s.submissionLevel >= 2 && unlocked.indexOf('armbar') === -1) {
+      unlocked.push('armbar');
+      if (scene.player.unlockedSubmissions && scene.player.unlockedSubmissions.indexOf('armbar') === -1)
         scene.player.unlockedSubmissions.push('armbar');
-      }
-      newUnlocks.push('Armbar'); 
+      newUnlocks.push('Armbar');
     }
-    if (s.submissionLevel >= 3 && unlocked.indexOf('triangleChoke') === -1) { 
-      unlocked.push('triangleChoke'); 
-      if (scene.player.unlockedSubmissions.indexOf('triangleChoke') === -1) {
+    if (s.submissionLevel >= 3 && unlocked.indexOf('triangleChoke') === -1) {
+      unlocked.push('triangleChoke');
+      if (scene.player.unlockedSubmissions && scene.player.unlockedSubmissions.indexOf('triangleChoke') === -1)
         scene.player.unlockedSubmissions.push('triangleChoke');
-      }
-      newUnlocks.push('Triangle'); 
+      newUnlocks.push('Triangle');
     }
-    if (s.submissionLevel >= 4 && unlocked.indexOf('kimura') === -1) { 
-      unlocked.push('kimura'); 
-      if (scene.player.unlockedSubmissions.indexOf('kimura') === -1) {
+    if (s.submissionLevel >= 4 && unlocked.indexOf('kimura') === -1) {
+      unlocked.push('kimura');
+      if (scene.player.unlockedSubmissions && scene.player.unlockedSubmissions.indexOf('kimura') === -1)
         scene.player.unlockedSubmissions.push('kimura');
-      }
-      newUnlocks.push('Kimura'); 
+      newUnlocks.push('Kimura');
     }
-    if (s.submissionLevel >= 5 && unlocked.indexOf('americana') === -1) { 
-      unlocked.push('americana'); 
-      if (scene.player.unlockedSubmissions.indexOf('americana') === -1) {
-        scene.player.unlockedSubmissions.push('americana');
-      }
-      newUnlocks.push('Americana'); 
+
+    // Announce new unlocks
+    if (newUnlocks.length > 0 && window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 60, 
+        'UNLOCKED: ' + newUnlocks.join(', '), '#FFD700');
     }
-    if (s.submissionLevel >= 6 && unlocked.indexOf('heelHook') === -1) { 
-      unlocked.push('heelHook'); 
-      if (scene.player.unlockedSubmissions.indexOf('heelHook') === -1) {
-        scene.player.unlockedSubmissions.push('heelHook');
-      }
-      newUnlocks.push('Heel Hook'); 
-    }
-    if (s.submissionLevel >= 7 && unlocked.indexOf('kneebar') === -1) { 
-      unlocked.push('kneebar'); 
-      if (scene.player.unlockedSubmissions.indexOf('kneebar') === -1) {
-        scene.player.unlockedSubmissions.push('kneebar');
-      }
-      newUnlocks.push('Kneebar'); 
-    }
-    
-    if (newUnlocks.length > 0) {
-      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 60, 'NEW MOVE: ' + newUnlocks.join(', '), '#ffd700');
-    }
-    
+
+    // Persist updated state
+    scene.registry.set('unlockedMoves', unlocked.slice());
     return newUnlocks;
   },
   // Set a move in a loadout slot
@@ -711,6 +787,11 @@ MMA.Player.recordWin = MMA.Player.recordWin || function() {
     localStorage.setItem('mma_total_wins', wins);
     var fights = parseInt(localStorage.getItem('mma_total_fights') || '0') + 1;
     localStorage.setItem('mma_total_fights', fights);
+    // Track wins for move unlock system
+    var _wmu = JSON.parse(localStorage.getItem('mma_move_history') || '{}');
+    _wmu._meta = _wmu._meta || {};
+    _wmu._meta.wins = (_wmu._meta.wins || 0) + 1;
+    localStorage.setItem('mma_move_history', JSON.stringify(_wmu));
   } catch(e) {}
 };
 

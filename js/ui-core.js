@@ -308,10 +308,21 @@ Object.assign(window.MMA.UI, {
       var labels = Object.assign({}, positionLabels[position] || positionLabels.fullGuard,
                                      legacyLabels[position] || legacyLabels.fullGuard);
 
-      Object.keys(labels).forEach(function(action) {
-        var btn = window.MMA.UI.getActionButton(action);
-        if (btn) btn.textContent = labels[action];
+      // Hide all action buttons first, then show only ground-relevant ones
+      Array.prototype.slice.call(document.querySelectorAll('.action-btn')).forEach(function(btn) {
+        btn.style.display = 'none';
       });
+
+      // Show only jab (G&P), cross (Elbow), and takedown (submission)
+      var groundSlots = ['jab', 'cross', 'takedown'];
+      groundSlots.forEach(function(action) {
+        var btn = window.MMA.UI.getActionButton(action);
+        if (btn) {
+          btn.style.display = '';
+          btn.textContent = labels[action] || action;
+        }
+      });
+
       Array.prototype.slice.call(document.querySelectorAll('.action-btn')).forEach(function(btn) {
         if (!btn.querySelector('.cooldown-overlay')) {
           var overlay = document.createElement('div');
@@ -326,6 +337,10 @@ Object.assign(window.MMA.UI, {
       // Standing — ensure ground-only standup button is hidden/reset
       this.updateStandUpButton(scene);
       // Standing — update all 8 loadout slots from window.MMA_LOADOUT if present
+      // First restore all buttons to visible (they may have been hidden in ground state)
+      Array.prototype.slice.call(document.querySelectorAll('.action-btn')).forEach(function(btn) {
+        btn.style.display = '';
+      });
       var domLoadout = window.MMA_LOADOUT || null;
       if (domLoadout) {
         var unlockedForVis = unlocked;
@@ -336,10 +351,11 @@ Object.assign(window.MMA.UI, {
           if (!btn) return;
           var isLocked = moveKey && moveKey !== 'special' && unlockedForVis.indexOf(moveKey) === -1;
           if (isLocked) {
-            btn.textContent = (move ? move.name : moveKey) + ' 🔒';
-            btn.style.opacity = '0.4';
-            btn.style.pointerEvents = 'none';
+            btn.style.display = 'none';
+            btn.style.opacity = '';
+            btn.style.pointerEvents = '';
           } else {
+            btn.style.display = '';
             if (moveKey === 'special') {
               // Special slot shows the actual best special move name
               var bestSpecial = (scene && window.MMA && MMA.UI && typeof MMA.UI.getBestSpecialMoveKey === 'function') ? MMA.UI.getBestSpecialMoveKey(scene) : null;
@@ -861,6 +877,12 @@ Object.assign(window.MMA.UI, {
       if (mu.hasOwnProperty(moveKey)) {
         mu[moveKey]++;
       }
+      // Persist move usage to localStorage for unlock system
+      try {
+        var storedHistory = JSON.parse(localStorage.getItem('mma_move_history') || '{}');
+        storedHistory[moveKey] = (storedHistory[moveKey] || 0) + 1;
+        localStorage.setItem('mma_move_history', JSON.stringify(storedHistory));
+      } catch(e) {}
       // Also update style points
       var strikeMoves = { jab:1, cross:1, hook:1, kick:1, uppercut:1 };
       var grappleMoves = { takedown:1, grapple:1, submission:1, clinch:1 };
@@ -2007,5 +2029,34 @@ MMA.UI.showNGPlusBadge = MMA.UI.showNGPlusBadge || function() {
     el.textContent = 'NG+' + ng;
     var gc = document.getElementById('game-container') || document.body;
     gc.appendChild(el);
+  } catch(e) {}
+};
+
+// Move unlock banner — shows a prominent notification when a new move is unlocked
+MMA.UI.showUnlockBanner = MMA.UI.showUnlockBanner || function(scene, moveKey, moveName) {
+  try {
+    var banner = document.createElement('div');
+    banner.style.cssText = [
+      'position:fixed',
+      'top:50%',
+      'left:50%',
+      'transform:translate(-50%,-50%)',
+      'background:rgba(0,0,0,0.88)',
+      'border:2px solid #FFD700',
+      'border-radius:12px',
+      'padding:20px 32px',
+      'z-index:99999',
+      'text-align:center',
+      'pointer-events:none',
+      'transition:opacity 0.3s ease',
+      'min-width:260px'
+    ].join(';');
+    banner.innerHTML = '<div style="font-size:28px;font-weight:bold;color:#FFD700;letter-spacing:2px;text-transform:uppercase">🥊 ' + moveName + '</div>' +
+      '<div style="font-size:14px;color:#ccc;margin-top:6px">NEW MOVE UNLOCKED</div>';
+    document.body.appendChild(banner);
+    setTimeout(function() {
+      banner.style.opacity = '0';
+      setTimeout(function() { if (banner.parentNode) banner.parentNode.removeChild(banner); }, 400);
+    }, 3000);
   } catch(e) {}
 };
