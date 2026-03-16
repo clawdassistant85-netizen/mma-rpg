@@ -312,10 +312,19 @@ Object.assign(window.MMA.UI, {
         var btn = window.MMA.UI.getActionButton(action);
         if (btn) btn.textContent = labels[action];
       });
+      Array.prototype.slice.call(document.querySelectorAll('.action-btn')).forEach(function(btn) {
+        if (!btn.querySelector('.cooldown-overlay')) {
+          var overlay = document.createElement('div');
+          overlay.className = 'cooldown-overlay';
+          btn.appendChild(overlay);
+        }
+      });
       
       // Update stand up button visibility
       this.updateStandUpButton(scene);
     } else {
+      // Standing — ensure ground-only standup button is hidden/reset
+      this.updateStandUpButton(scene);
       // Standing — update all 8 loadout slots from window.MMA_LOADOUT if present
       var domLoadout = window.MMA_LOADOUT || null;
       if (domLoadout) {
@@ -341,6 +350,11 @@ Object.assign(window.MMA.UI, {
             }
             btn.style.opacity = '';
             btn.style.pointerEvents = '';
+          }
+          if (!btn.querySelector('.cooldown-overlay')) {
+            var overlay = document.createElement('div');
+            overlay.className = 'cooldown-overlay';
+            btn.appendChild(overlay);
           }
         });
       } else {
@@ -422,10 +436,18 @@ Object.assign(window.MMA.UI, {
   updateSpecialButton: function(scene, forceGround) {
     var btn = this.getActionButton('special');
     if (!btn) return;
+    function ensureOverlay() {
+      if (!btn.querySelector('.cooldown-overlay')) {
+        var overlay = document.createElement('div');
+        overlay.className = 'cooldown-overlay';
+        btn.appendChild(overlay);
+      }
+    }
     var onGround = !!forceGround || !!(scene && scene.groundState && scene.groundState.active);
     if (onGround) {
       btn.style.display = '';
       btn.textContent = 'Stand Up';
+      ensureOverlay();
       return;
     }
     var best = this.getBestSpecialMoveKey(scene);
@@ -436,6 +458,7 @@ Object.assign(window.MMA.UI, {
     btn.style.display = '';
     var move = MMA.Combat.MOVE_ROSTER[best];
     btn.textContent = (move && move.name) ? move.name : 'Special';
+    ensureOverlay();
   },
   bindMobilePauseButton: function(scene) {
     var btn = this.getMobilePauseButton();
@@ -458,7 +481,11 @@ Object.assign(window.MMA.UI, {
   setPauseButtonVisible: function(show) {
     var btn = this.getMobilePauseButton();
     if (!btn) return;
-    btn.style.display = show ? 'block' : 'none';
+    var isMobileLike = window.innerWidth <= 480 || (window.matchMedia && !window.matchMedia('(pointer: fine)').matches);
+    btn.style.display = (show && isMobileLike) ? 'block' : 'none';
+    if (show && isMobileLike && typeof MMA.UI.handleResponsiveLayout === 'function') {
+      MMA.UI.handleResponsiveLayout();
+    }
   },
   showGroundBanner: function(text) {
     var el = document.getElementById('ground-banner');
@@ -502,12 +529,14 @@ Object.assign(window.MMA.UI, {
     }
   },
   showTouchControls: function(show) {
-    var isMobile = window.matchMedia && !window.matchMedia('(pointer: fine)').matches;
-    if (!isMobile) return;
+    var isMobileLike = window.innerWidth <= 480 || (window.matchMedia && !window.matchMedia('(pointer: fine)').matches);
+    if (!isMobileLike) return;
     var dpad = document.getElementById('dpad');
     var ac = document.getElementById('action-cluster');
+    var pauseBtn = document.getElementById('mobile-pause-btn');
     if (dpad) dpad.style.display = show ? 'block' : 'none';
     if (ac) ac.style.display = show ? 'block' : 'none';
+    if (pauseBtn) pauseBtn.style.display = show ? 'block' : 'none';
     // Re-run layout after controls become visible so sizing + canvas-relative positioning fires correctly
     if (show && typeof MMA.UI.handleResponsiveLayout === 'function') {
       MMA.UI.handleResponsiveLayout();
@@ -978,6 +1007,17 @@ Object.assign(window.MMA.UI, {
     },
     checkAchievements: function(fightData) {
       var st = this.fighterCard.stats;
+      var scene = fightData && fightData.scene;
+      var stats = {
+        kos: st.enemiesDefeated || 0,
+        longestCombo: st.longestCombo || 0
+      };
+      
+      // Diary entry on first KO
+      if (stats && stats.kos === 1) MMA.UI.logDiaryEntry(scene, 'First KO!');
+      // Diary entry on combo milestones
+      if (stats && stats.longestCombo >= 10) MMA.UI.logDiaryEntry(scene, '10+ combo!');
+      if (stats && stats.longestCombo >= 20) MMA.UI.logDiaryEntry(scene, '20-hit LEGEND combo!');
       if (fightData.won && st.wins === 0) this.unlockAchievement('firstFight');
       if (st.wins >= 3 && !this.hasAchievement('threeWins')) this.unlockAchievement('threeWins');
       if (st.wins >= 10 && !this.hasAchievement('tenWins')) this.unlockAchievement('tenWins');
@@ -1582,3 +1622,390 @@ Object.assign(window.MMA.UI, {
     scene.tweens.add({ targets: msg, alpha: 0, y: y - 40, duration: 2500, ease:'Power2', onComplete: function() { msg.destroy(); } });
   },
 });
+
+// Hype Meter
+MMA.UI.hypeLevel = MMA.UI.hypeLevel || 0;
+MMA.UI._hypeLastDrain = MMA.UI._hypeLastDrain || 0;
+
+MMA.UI.addHype = function(amount) {
+  MMA.UI.hypeLevel = Math.min(100, (MMA.UI.hypeLevel || 0) + (amount || 5));
+  MMA.UI.renderHypeMeter();
+};
+
+MMA.UI.drainHype = function(amount) {
+  MMA.UI.hypeLevel = Math.max(0, (MMA.UI.hypeLevel || 0) - (amount || 1));
+  MMA.UI.renderHypeMeter();
+};
+
+MMA.UI.renderHypeMeter = function() {
+  var el = document.getElementById('hype-meter-fill');
+  if (!el) return;
+  var hype = MMA.UI.hypeLevel || 0;
+  el.style.width = hype + '%';
+  var color = hype < 33 ? '#888888' : hype < 66 ? '#FFD700' : '#ff4400';
+  el.style.background = color;
+  var label = document.getElementById('hype-meter-label');
+  if (label) {
+    var text = hype >= 90 ? 'ON FIRE!' : hype >= 66 ? 'HYPED' : hype >= 33 ? 'WARMING UP' : 'COLD';
+    label.textContent = '🎤 ' + text;
+  }
+};
+
+MMA.UI.updateHypeDrain = function() {
+  var now = Date.now();
+  if (now - (MMA.UI._hypeLastDrain || 0) > 3000) {
+    MMA.UI._hypeLastDrain = now;
+    MMA.UI.drainHype(2);
+  }
+};
+
+// Fighter's Diary
+MMA.UI.logDiaryEntry = function(scene, text) {
+  try {
+    var diary = JSON.parse(localStorage.getItem('mma_diary') || '[]');
+    var zone = scene && scene.currentZone ? scene.currentZone : 1;
+    diary.push({ text: text, zone: zone, ts: Date.now() });
+    if (diary.length > 100) diary = diary.slice(-100);
+    localStorage.setItem('mma_diary', JSON.stringify(diary));
+  } catch(e) {}
+};
+
+MMA.UI.getDiary = function() {
+  try { return JSON.parse(localStorage.getItem('mma_diary') || '[]'); } catch(e) { return []; }
+};
+
+MMA.UI.CREED_OPTIONS = {
+  fist: { label: "Way of the Fist", icon: '🥊', bonus: 'strike +20%', key: 'fist' },
+  hold: { label: "Art of the Hold", icon: '🤼', bonus: 'grapple +15%', key: 'hold' },
+  balance: { label: "Balance Doctrine", icon: '⚖', bonus: 'all +10%', key: 'balance' },
+};
+MMA.UI.getCreed = function() { try { return localStorage.getItem('mma_creed') || null; } catch(e) { return null; } };
+MMA.UI.setCreed = function(key) { try { localStorage.setItem('mma_creed', key); } catch(e) {} };
+MMA.UI.getCreedBonus = function(damageType) {
+  var creed = MMA.UI.getCreed();
+  if (!creed) return 1.0;
+  if (creed === 'fist' && damageType === 'strike') return 1.2;
+  if (creed === 'hold' && damageType === 'grapple') return 1.15;
+  if (creed === 'balance') return 1.10;
+  return 1.0;
+};
+MMA.UI.showEquityInSettings = function() {
+  var el = document.getElementById('settings-equity');
+  if (!el) { el = document.createElement('div'); el.id='settings-equity'; el.style.cssText='font-size:9px;color:#888;margin:4px 0;'; var sp=document.getElementById('settings-panel')||document.body; sp.appendChild(el); }
+  var eq = window.MMA && MMA.Player && typeof MMA.Player.getEquityStats==='function' ? MMA.Player.getEquityStats() : {dealt:0,taken:0};
+  var ratio = eq.taken>0 ? (eq.dealt/eq.taken).toFixed(1) : 'N/A';
+  var tier = window.MMA && MMA.Player && typeof MMA.Player.getEquityTier==='function' ? MMA.Player.getEquityTier(eq) : 0;
+  var tierLabel = ['None','🥉 Bronze','🥈 Silver','🥇 Gold'][tier]||'None';
+  el.textContent = '💧 EQUITY: '+ratio+'x ('+tierLabel+')';
+};
+MMA.UI.showDiaryInSettings = function() {
+  var el = document.getElementById('settings-diary');
+  if (!el) { el = document.createElement('div'); el.id='settings-diary'; el.style.cssText='font-size:8px;color:#888;margin:4px 0;max-height:60px;overflow-y:auto;'; var sp=document.getElementById('settings-panel')||document.body; sp.appendChild(el); }
+  var diary = window.MMA && MMA.UI && typeof MMA.UI.getDiary==='function' ? MMA.UI.getDiary() : [];
+  if (diary.length===0) { el.textContent='📓 Diary: No entries yet.'; return; }
+  el.innerHTML = '📓 <b>Diary:</b><br>' + diary.slice(-5).reverse().map(function(d){ return '· '+d.text+(d.zone?' (Z'+d.zone+')':''); }).join('<br>');
+};
+
+// Feature 1: Technique Combo DNA Visual
+MMA.UI.renderStyleDNA = function(scene) {
+  var el = document.getElementById('style-dna-canvas');
+  if (!el) {
+    el = document.createElement('canvas');
+    el.id = 'style-dna-canvas';
+    el.width = 60; el.height = 60;
+    el.style.cssText = 'position:absolute;bottom:80px;right:4px;z-index:50;opacity:0.85;border-radius:50%;';
+    var gc = document.getElementById('game-container') || document.body;
+    gc.appendChild(el);
+  }
+  var ctx = el.getContext('2d');
+  ctx.clearRect(0, 0, 60, 60);
+
+  var p = scene && scene.player;
+  var dna = (p && p._styleDNACounts) || { strike: 0, grapple: 0, kick: 0, special: 0 };
+  var total = (dna.strike||0) + (dna.grapple||0) + (dna.kick||0) + (dna.special||0);
+  if (total === 0) { total = 1; dna.strike = 1; }
+
+  var slices = [
+    { key: 'strike', color: '#ff4400', label: 'S' },
+    { key: 'grapple', color: '#0044ff', label: 'G' },
+    { key: 'kick', color: '#00cc44', label: 'K' },
+    { key: 'special', color: '#FFD700', label: 'X' },
+  ];
+
+  var startAngle = -Math.PI / 2;
+  var cx = 30, cy = 30, r = 26;
+
+  slices.forEach(function(sl) {
+    var val = (dna[sl.key] || 0) / total;
+    var endAngle = startAngle + val * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle = sl.color;
+    ctx.globalAlpha = 0.75;
+    ctx.fill();
+    startAngle = endAngle;
+  });
+
+  // Center circle
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 10, 0, Math.PI*2);
+  ctx.fillStyle = '#111111';
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 8px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('DNA', cx, cy);
+};
+
+// Feature 2: Fight Club Reputation
+MMA.UI.addReputation = function(zoneNum, repType, amount) {
+  try {
+    var rep = JSON.parse(localStorage.getItem('mma_reputation') || '{}');
+    if (!rep[zoneNum]) rep[zoneNum] = { fearsome: 0, respect: 0, survivor: 0 };
+    rep[zoneNum][repType] = (rep[zoneNum][repType] || 0) + (amount || 1);
+    localStorage.setItem('mma_reputation', JSON.stringify(rep));
+  } catch(e) {}
+};
+MMA.UI.getZoneReputation = function(zoneNum) {
+  try {
+    var rep = JSON.parse(localStorage.getItem('mma_reputation') || '{}');
+    var r = rep[zoneNum] || { fearsome: 0, respect: 0, survivor: 0 };
+    var max = 0, rank = 'newcomer';
+    if (r.fearsome > max) { max = r.fearsome; rank = 'fearsome'; }
+    if (r.respect > max) { max = r.respect; rank = 'respected'; }
+    if (r.survivor > max) { max = r.survivor; rank = 'survivor'; }
+    return rank;
+  } catch(e) { return 'newcomer'; }
+};
+MMA.UI.getRepBonus = function(zoneNum) {
+  var rank = MMA.UI.getZoneReputation(zoneNum);
+  if (rank === 'fearsome') return { damage: 1.15 };
+  if (rank === 'respected') return { crit: 1.10 };
+  if (rank === 'survivor') return { hp: 1.20 };
+  return {};
+};
+
+MMA.UI._showDiarySettingsFragment = function() {
+  var el = document.getElementById('settings-diary');
+  if (!el) { el = document.createElement('div'); el.id='settings-diary'; el.style.cssText='font-size:8px;color:#888;margin:4px 0;max-height:60px;overflow-y:auto;'; var sp=document.getElementById('settings-panel')||document.body; sp.appendChild(el); }
+  var diary = window.MMA && MMA.UI && typeof MMA.UI.getDiary==='function' ? MMA.UI.getDiary() : [];
+  if (diary.length===0) { el.textContent='📓 Diary: No entries yet.'; return; }
+  el.innerHTML = '📓 <b>Diary:</b><br>' + diary.slice(-5).reverse().map(function(d){ return '· '+d.text+(d.zone?' (Z'+d.zone+')':''); }).join('<br>');
+};
+// === TECHNIQUE COMBO DNA VISUAL ===
+// Builds a visual DNA string from move types used this session
+MMA.UI.updateComboDNA = MMA.UI.updateComboDNA || function(scene) {
+  var el = document.getElementById('combo-dna-bar');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'combo-dna-bar';
+    el.style.cssText = 'position:absolute;bottom:80px;left:50%;transform:translateX(-50%);font-size:8px;color:#00ffcc;font-family:monospace;letter-spacing:1px;z-index:50;pointer-events:none;';
+    var gc = document.getElementById('game-container') || document.body;
+    gc.appendChild(el);
+  }
+  var p = scene && scene.player;
+  if (!p || !p._styleDNACounts) { el.textContent = ''; return; }
+  var dna = p._styleDNACounts;
+  var total = (dna.strike || 0) + (dna.grapple || 0) + (dna.kick || 0) + (dna.special || 0);
+  if (total === 0) { el.textContent = ''; return; }
+  // Build DNA string: S=strike G=grapple K=kick X=special
+  var str = '';
+  var bars = [
+    { key: 'strike', ch: 'S', color: '#ff4400' },
+    { key: 'grapple', ch: 'G', color: '#4444ff' },
+    { key: 'kick', ch: 'K', color: '#ffaa00' },
+    { key: 'special', ch: 'X', color: '#cc00ff' }
+  ];
+  bars.forEach(function(b) {
+    var count = dna[b.key] || 0;
+    var reps = Math.min(5, Math.round((count / total) * 10));
+    for (var i = 0; i < reps; i++) str += b.ch;
+  });
+  el.textContent = str;
+};
+
+// === FIGHT CLUB REPUTATION ===
+// Zone-specific reputation tier that unlocks perks
+MMA.UI.getFightClubRep = MMA.UI.getFightClubRep || function(zoneNum) {
+  try {
+    var rep = JSON.parse(localStorage.getItem('mma_fight_rep') || '{}');
+    return rep[zoneNum] || 0;
+  } catch(e) { return 0; }
+};
+
+MMA.UI.addFightClubRep = MMA.UI.addFightClubRep || function(scene, zoneNum, amount) {
+  try {
+    var rep = JSON.parse(localStorage.getItem('mma_fight_rep') || '{}');
+    rep[zoneNum] = Math.min(100, (rep[zoneNum] || 0) + (amount || 5));
+    localStorage.setItem('mma_fight_rep', JSON.stringify(rep));
+    var tier = MMA.UI.getFightClubRepTier(rep[zoneNum]);
+    if (tier && scene && window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+      MMA.UI.queueAchievementToast(scene, 'Zone ' + zoneNum + ' Rep: ' + tier, '⚡');
+    }
+  } catch(e) {}
+};
+
+MMA.UI.getFightClubRepTier = MMA.UI.getFightClubRepTier || function(rep) {
+  if (rep >= 100) return 'LEGEND';
+  if (rep >= 75) return 'FEARED';
+  if (rep >= 50) return 'KNOWN';
+  if (rep >= 25) return 'NEWCOMER';
+  return null;
+};
+
+MMA.UI.getFightClubRepBonus = MMA.UI.getFightClubRepBonus || function(zoneNum) {
+  var rep = MMA.UI.getFightClubRep(zoneNum);
+  if (rep >= 100) return { gold: 1.3, xp: 1.2 };
+  if (rep >= 75) return { gold: 1.15, xp: 1.1 };
+  if (rep >= 50) return { gold: 1.1 };
+  return {};
+};
+
+// === UNDERDOG BONUS SYSTEM ===
+// If entering a zone above your current level, gain bonus XP and damage
+MMA.UI.getUnderdogBonus = MMA.UI.getUnderdogBonus || function(scene) {
+  var p = scene && scene.player;
+  if (!p || !p.stats) return 1.0;
+  var playerLevel = p.stats.level || 1;
+  var zone = scene.currentZone || 1;
+  var expectedLevel = zone * 3; // Zone 1=L3, Zone 2=L6, Zone 3=L9, Zone 4=L12
+  if (playerLevel < expectedLevel - 2) {
+    // Underdog: +15% damage, +25% XP
+    return { damage: 1.15, xp: 1.25, label: '🐶 UNDERDOG' };
+  }
+  return { damage: 1.0, xp: 1.0, label: null };
+};
+// === STREAK COUNTER DISPLAY ===
+MMA.UI.updateStreakDisplay = MMA.UI.updateStreakDisplay || function(scene) {
+  var el = document.getElementById('streak-display');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'streak-display';
+    el.style.cssText = 'position:absolute;top:38px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:bold;color:#FFD700;text-shadow:0 0 6px #ff8800;z-index:60;pointer-events:none;transition:opacity 0.3s;';
+    var gc = document.getElementById('game-container') || document.body;
+    gc.appendChild(el);
+  }
+  var streak = window.MMA && MMA.Combat ? (MMA.Combat._playerHitStreak || 0) : 0;
+  var momentum = window.MMA && MMA.Combat && MMA.Combat._playerMomentumUntil && Date.now() < MMA.Combat._playerMomentumUntil;
+  if (momentum) {
+    el.textContent = '🔥 ON FIRE!';
+    el.style.opacity = '1';
+  } else if (streak >= 2) {
+    el.textContent = streak + ' HIT STREAK';
+    el.style.opacity = '1';
+  } else {
+    el.style.opacity = '0';
+  }
+};
+
+// === FIGHT SUMMARY OVERLAY ===
+// Post-fight stats shown before zone transition
+MMA.UI.showFightSummary = MMA.UI.showFightSummary || function(scene, stats) {
+  var overlay = document.getElementById('fight-summary');
+  if (overlay) overlay.remove();
+  overlay = document.createElement('div');
+  overlay.id = 'fight-summary';
+  overlay.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.82);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:monospace;';
+  var s = stats || {};
+  var verdict = (window.MMA && MMA.Combat && typeof MMA.Combat.getJudgeVerdict === 'function') ? MMA.Combat.getJudgeVerdict() : { label: 'CLEAR' };
+  overlay.innerHTML = [
+    '<div style="font-size:18px;font-weight:bold;color:#FFD700;margin-bottom:12px;">⚔️ FIGHT OVER</div>',
+    '<div style="font-size:13px;color:#aaffaa;margin-bottom:6px;">JUDGE: ' + verdict.label + '</div>',
+    s.combo ? '<div>Max Combo: <b>' + s.combo + '</b></div>' : '',
+    s.damage ? '<div>Damage Dealt: <b>' + s.damage + '</b></div>' : '',
+    s.time ? '<div>Time: <b>' + s.time + 's</b></div>' : '',
+    '<div style="margin-top:14px;font-size:10px;color:#888;">Tap to continue</div>'
+  ].join('');
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(overlay);
+  overlay.addEventListener('click', function() { overlay.remove(); });
+  scene.time.delayedCall(5000, function() { if (overlay.parentNode) overlay.remove(); });
+};
+
+// === ZONE CLEAR BANNER ===
+MMA.UI.showZoneClearBanner = MMA.UI.showZoneClearBanner || function(scene, zoneNum) {
+  var el = document.getElementById('zone-clear-banner');
+  if (el) el.remove();
+  el = document.createElement('div');
+  el.id = 'zone-clear-banner';
+  el.style.cssText = 'position:absolute;top:35%;left:50%;transform:translateX(-50%);font-size:22px;font-weight:bold;color:#FFD700;text-shadow:0 0 16px #ff8800,0 0 32px #ff4400;z-index:150;pointer-events:none;white-space:nowrap;';
+  el.textContent = '✅ ZONE ' + zoneNum + ' CLEAR!';
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(el);
+  var self = el;
+  scene.time.delayedCall(2200, function() { if (self.parentNode) self.remove(); });
+};
+// === PRE-FIGHT BETTING UI ===
+MMA.UI.showBettingPanel = MMA.UI.showBettingPanel || function(scene, onConfirm) {
+  var existing = document.getElementById('betting-panel');
+  if (existing) existing.remove();
+  var p = scene && scene.player;
+  var gold = (p && p.stats) ? (p.stats.gold || 0) : 0;
+  var panel = document.createElement('div');
+  panel.id = 'betting-panel';
+  panel.style.cssText = 'position:absolute;top:30%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.9);border:1px solid #FFD700;border-radius:8px;padding:16px;z-index:200;color:#fff;font-family:monospace;min-width:220px;text-align:center;';
+  panel.innerHTML = [
+    '<div style="font-size:14px;color:#FFD700;margin-bottom:10px;">🎰 PRE-FIGHT BET</div>',
+    '<div style="font-size:11px;color:#aaa;margin-bottom:10px;">Gold: <b style="color:#FFD700">' + gold + 'g</b></div>',
+    '<div style="display:flex;gap:8px;justify-content:center;margin-bottom:10px;">',
+    '<button data-bet="0" style="padding:4px 8px;background:#333;color:#aaa;border:1px solid #555;border-radius:4px;cursor:pointer;">Skip</button>',
+    '<button data-bet="10" style="padding:4px 8px;background:#333;color:#fff;border:1px solid #888;border-radius:4px;cursor:pointer;">10g</button>',
+    '<button data-bet="25" style="padding:4px 8px;background:#333;color:#fff;border:1px solid #888;border-radius:4px;cursor:pointer;">25g</button>',
+    '<button data-bet="50" style="padding:4px 8px;background:#333;color:#FFD700;border:1px solid #FFD700;border-radius:4px;cursor:pointer;">50g</button>',
+    '</div>',
+    '<div style="font-size:9px;color:#888;">Win = 2× payout</div>'
+  ].join('');
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(panel);
+  panel.querySelectorAll('button[data-bet]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var amount = parseInt(btn.getAttribute('data-bet'));
+      panel.remove();
+      if (onConfirm) onConfirm(amount);
+    });
+  });
+  // Auto-close after 8s
+  scene.time.delayedCall(8000, function() { if (panel.parentNode) { panel.remove(); if (onConfirm) onConfirm(0); } });
+};
+
+// === WEATHER HAZARD ROOM HUD ===
+MMA.UI.showWeatherHazardBanner = MMA.UI.showWeatherHazardBanner || function(scene, weatherType) {
+  var hazards = {
+    rain:  { label: '🌧️ WET FLOOR — dodge -20%', color: '#4488ff' },
+    ice:   { label: '🧊 ICY FLOOR — dodge -35%, speed -15%', color: '#aaddff' },
+    heat:  { label: '🌡️ EXTREME HEAT — stamina drains faster', color: '#ff8800' }
+  };
+  var h = hazards[weatherType];
+  if (!h) return;
+  var el = document.getElementById('weather-hazard-banner');
+  if (el) el.remove();
+  el = document.createElement('div');
+  el.id = 'weather-hazard-banner';
+  el.style.cssText = 'position:absolute;top:55px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:bold;padding:3px 12px;border-radius:4px;z-index:65;pointer-events:none;white-space:nowrap;';
+  el.style.color = h.color;
+  el.style.background = 'rgba(0,0,0,0.7)';
+  el.style.border = '1px solid ' + h.color;
+  el.textContent = h.label;
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(el);
+};
+
+// === NG+ DISPLAY ===
+MMA.UI.showNGPlusBadge = MMA.UI.showNGPlusBadge || function() {
+  try {
+    var ng = parseInt(localStorage.getItem('mma_ng_plus') || '0');
+    if (ng <= 0) return;
+    var el = document.getElementById('ng-plus-badge');
+    if (el) { el.textContent = 'NG+' + ng; return; }
+    el = document.createElement('div');
+    el.id = 'ng-plus-badge';
+    el.style.cssText = 'position:absolute;top:6px;left:8px;font-size:9px;font-weight:bold;color:#cc00ff;background:rgba(0,0,0,0.6);padding:1px 5px;border-radius:3px;z-index:60;pointer-events:none;';
+    el.textContent = 'NG+' + ng;
+    var gc = document.getElementById('game-container') || document.body;
+    gc.appendChild(el);
+  } catch(e) {}
+};

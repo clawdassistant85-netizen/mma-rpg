@@ -65,6 +65,7 @@ var BootScene = new Phaser.Class({
     // this.installPortraitHook();
     // this.installReactionFaceHook();
     this.installTechniqueTattooHook();
+    this.installTechniqueFamilyEmblemHook();
     this._updateLoadBar('Variant Hooks');
   },
   _bootStep_portraitHooks: function() {
@@ -91,10 +92,13 @@ var BootScene = new Phaser.Class({
     // this.installSignatureSilhouetteHook();
     // this.installMuscleTensionHook();
     this.installExertionCueHook();
+    this.installBreathSignatureHook();
+    this.installMemoryKnockoutHook();
+    this.installRingRustHook();
     // this.installLastChancePulseHook();
     // this.installFightIqAuraReadHook();
     // this.installEnemyFearTrembleHook();
-    this._updateLoadBar('Exertion Cues');
+    this._updateLoadBar('Exertion + Breath FX');
   },
   _bootStep_launchGame: function() {
     if (this._loadBg) this._loadBg.destroy();
@@ -720,6 +724,200 @@ var BootScene = new Phaser.Class({
     };
 
     Phaser.Physics.Arcade.Sprite.prototype._mmaTechniqueTattooHookInstalled = true;
+  },
+  installTechniqueFamilyEmblemHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaTechniqueFamilyEmblemHookInstalled) return;
+
+    function getEmblemConfig() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.EMBLEM_CONFIG) || {};
+    }
+
+    function getEmblemTextures() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.EMBLEM_TEXTURES && window.MMA.Sprites.EMBLEM_TEXTURES.player) || null;
+    }
+
+    function readMasteryMap(sprite) {
+      if (!sprite) return null;
+      var isPlayer = !!(sprite.scene && sprite.scene.player === sprite);
+      var sources = [
+        sprite.techniqueMastery,
+        sprite.mastery,
+        sprite.stats && sprite.stats.techniqueMastery,
+        sprite.stats && sprite.stats.mastery,
+        sprite.meta && sprite.meta.techniqueMastery,
+        sprite.meta && sprite.meta.mastery
+      ];
+      if (sprite.data && typeof sprite.data.get === 'function') {
+        sources.push(sprite.data.get('techniqueMastery'));
+        sources.push(sprite.data.get('mastery'));
+      }
+      for (var i = 0; i < sources.length; i++) {
+        if (sources[i] && typeof sources[i] === 'object') return sources[i];
+      }
+      if (!isPlayer) return null;
+      try {
+        if (window.localStorage) {
+          var raw = window.localStorage.getItem('mma_rpg_save');
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            return (parsed && (parsed.techniqueMastery || (parsed.player && parsed.player.techniqueMastery) || parsed.mastery)) || null;
+          }
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    function inferFamily(token) {
+      token = String(token || '').toLowerCase();
+      if (!token) return null;
+      if (token.indexOf('jab') !== -1 || token.indexOf('cross') !== -1 || token.indexOf('hook') !== -1 || token.indexOf('uppercut') !== -1 || token.indexOf('haymaker') !== -1 || token.indexOf('box') !== -1) return 'boxing';
+      if (token.indexOf('grapple') !== -1 || token.indexOf('throw') !== -1 || token.indexOf('slam') !== -1 || token.indexOf('armbar') !== -1 || token.indexOf('triangle') !== -1 || token.indexOf('wrest') !== -1 || token.indexOf('clinch') !== -1 || token.indexOf('take') !== -1 || token.indexOf('submission') !== -1 || token.indexOf('judo') !== -1 || token.indexOf('bjj') !== -1) return 'wrestling';
+      if (token.indexOf('kick') !== -1 || token.indexOf('muay') !== -1 || token.indexOf('karate') !== -1 || token.indexOf('roundhouse') !== -1 || token.indexOf('spinning') !== -1 || token.indexOf('elbow') !== -1 || token.indexOf('knee') !== -1 || token.indexOf('streetfighter') !== -1 || token.indexOf('martial') !== -1) return 'martial';
+      return null;
+    }
+
+    function scoreFamilyCounts(counts) {
+      var best = 'hybrid';
+      var bestScore = 0;
+      var nonZero = 0;
+      Object.keys(counts).forEach(function(key) {
+        if (counts[key] > 0) nonZero++;
+        if (counts[key] > bestScore) {
+          best = key;
+          bestScore = counts[key];
+        }
+      });
+      if (nonZero >= 2) {
+        var values = [counts.boxing, counts.wrestling, counts.martial].sort(function(a, b) { return b - a; });
+        if (values[0] > 0 && values[1] >= values[0] * 0.6) return 'hybrid';
+      }
+      return bestScore > 0 ? best : 'hybrid';
+    }
+
+    function inferFamilyFromIdentity(sprite) {
+      if (!sprite) return 'hybrid';
+      var counts = { boxing: 0, wrestling: 0, martial: 0 };
+      var values = [
+        sprite.typeKey,
+        sprite.role,
+        sprite.npcRole,
+        sprite.enemyClass,
+        sprite.archetype,
+        sprite.title,
+        sprite.bossTitle,
+        sprite.name,
+        sprite.displayName,
+        sprite._mmaVisualBaseKey,
+        sprite._mmaBaseTextureKey,
+        sprite.meta && sprite.meta.typeKey,
+        sprite.meta && sprite.meta.role,
+        sprite.meta && sprite.meta.archetype,
+        sprite.meta && sprite.meta.title,
+        sprite.meta && sprite.meta.bossTitle,
+        sprite.meta && sprite.meta.name
+      ];
+      if (sprite.data && typeof sprite.data.get === 'function') {
+        values.push(sprite.data.get('typeKey'));
+        values.push(sprite.data.get('role'));
+        values.push(sprite.data.get('archetype'));
+        values.push(sprite.data.get('title'));
+        values.push(sprite.data.get('bossTitle'));
+        values.push(sprite.data.get('name'));
+      }
+      for (var i = 0; i < values.length; i++) {
+        var fam = inferFamily(values[i]);
+        if (fam) counts[fam] += 2;
+      }
+      if (sprite.isBoss || sprite.isRival || sprite.isShadow) counts.martial += 1;
+      return scoreFamilyCounts(counts);
+    }
+
+    function getDominantTechniqueFamily(sprite) {
+      var mastery = readMasteryMap(sprite);
+      if (!mastery) return inferFamilyFromIdentity(sprite);
+      var counts = { boxing: 0, wrestling: 0, martial: 0 };
+      Object.keys(mastery).forEach(function(key) {
+        var fam = inferFamily(key);
+        if (!fam) return;
+        var value = mastery[key];
+        counts[fam] += typeof value === 'number' ? value : 1;
+      });
+      var result = scoreFamilyCounts(counts);
+      return result === 'hybrid' ? inferFamilyFromIdentity(sprite) : result;
+    }
+
+    function shouldShowTechniqueFamilyEmblem(sprite) {
+      if (!sprite || !sprite.scene || !sprite.active) return false;
+      if (sprite.scene.player === sprite) return true;
+      if (sprite.stats && sprite.stats.maxHp) return true;
+      return !!(sprite.typeKey || sprite.role || sprite.enemyClass || sprite.archetype || sprite.npcRole || sprite._mmaVisualBaseKey);
+    }
+
+    function ensureEmblem(sprite) {
+      if (!sprite || !sprite.scene || !sprite.active) return null;
+      if (sprite._mmaTechniqueFamilyEmblem && sprite._mmaTechniqueFamilyEmblem.active) return sprite._mmaTechniqueFamilyEmblem;
+      var textures = getEmblemTextures();
+      if (!textures || !textures.hybrid) return null;
+      var emblem = sprite.scene.add.image(sprite.x, sprite.y, textures.hybrid);
+      emblem.setBlendMode(Phaser.BlendModes.SCREEN);
+      emblem.setVisible(false);
+      emblem.setDepth((sprite.depth || 0) + 2);
+      sprite._mmaTechniqueFamilyEmblem = emblem;
+      return emblem;
+    }
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+
+      if (!this.active || !this.scene || !shouldShowTechniqueFamilyEmblem(this)) {
+        if (this._mmaTechniqueFamilyEmblem) this._mmaTechniqueFamilyEmblem.setVisible(false);
+        return;
+      }
+
+      var textures = getEmblemTextures();
+      if (!textures) return;
+      var emblem = ensureEmblem(this);
+      if (!emblem) return;
+      var cfg = getEmblemConfig();
+      var families = cfg.families || {};
+      var family = getDominantTechniqueFamily(this);
+      var familyCfg = families[family] || families.hybrid || {};
+      var isPlayer = !!(this.scene && this.scene.player === this);
+      var textureKey = textures[family] || textures.hybrid;
+      var pulse = 0.76 + Math.abs(Math.sin(time * (cfg.pulseSpeed || 0.006))) * 0.24;
+      var scaleBase = isPlayer ? 0.52 : 0.44;
+      var yOffset = isPlayer ? (cfg.offsetY || -2) : -30;
+      if (emblem.texture && emblem.texture.key !== textureKey) emblem.setTexture(textureKey);
+      emblem.setVisible(true);
+      emblem.setPosition(this.x, this.y + yOffset);
+      emblem.setDepth((this.depth || 0) + (isPlayer ? 2 : 5));
+      emblem.setScale((this.scaleX || 1) * (scaleBase + pulse * 0.05), (this.scaleY || 1) * (scaleBase + pulse * 0.05));
+      emblem.setFlipX(!!this.flipX);
+      emblem.setAlpha((isPlayer ? (cfg.alpha || 0.82) : Math.min(0.72, (cfg.alpha || 0.82) * 0.82)) * pulse);
+      emblem.setTint((familyCfg.color || 0xffffff));
+      emblem.setAngle(this.flipX ? -8 : 8);
+      this._mmaTechniqueFamily = family;
+
+      var now = this.scene && this.scene.time && typeof this.scene.time.now === 'number' ? this.scene.time.now : 0;
+      var cooldown = typeof cfg.labelCooldown === 'number' ? cfg.labelCooldown : 2200;
+      if (isPlayer && window.MMA && window.MMA.UI && typeof MMA.UI.showDamageText === 'function' && this._mmaTechniqueFamilyLabel !== family && (!this._mmaTechniqueFamilyLabelAt || now - this._mmaTechniqueFamilyLabelAt >= cooldown)) {
+        MMA.UI.showDamageText(this.scene, this.x, this.y - 76, familyCfg.title || 'TECHNIQUE CREST', '#f3e8ff');
+        this._mmaTechniqueFamilyLabel = family;
+        this._mmaTechniqueFamilyLabelAt = now;
+      }
+    };
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      if (this._mmaTechniqueFamilyEmblem) {
+        this._mmaTechniqueFamilyEmblem.destroy();
+        this._mmaTechniqueFamilyEmblem = null;
+      }
+      return originalDestroy.call(this, fromScene);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaTechniqueFamilyEmblemHookInstalled = true;
   },
   installResonanceAuraHook: function() {
     if (Phaser.Physics.Arcade.Sprite.prototype._mmaResonanceAuraHookInstalled) return;
@@ -2171,6 +2369,108 @@ var BootScene = new Phaser.Class({
 
     Phaser.Physics.Arcade.Sprite.prototype._mmaExertionCueHookInstalled = true;
   },
+  installBreathSignatureHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaBreathSignatureHookInstalled) return;
+
+    function getBreathConfig() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.BREATH_SIGNATURE_CONFIG) || {};
+    }
+
+    function getBreathTextures() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.BREATH_SIGNATURE_TEXTURES) || {};
+    }
+
+    function isGrappleMove(moveKey) {
+      var token = String(moveKey || '').toLowerCase();
+      return token.indexOf('grapple') !== -1 || token.indexOf('throw') !== -1 || token.indexOf('slam') !== -1 || token.indexOf('submission') !== -1 || token.indexOf('clinch') !== -1 || token.indexOf('armbar') !== -1 || token.indexOf('triangle') !== -1 || token.indexOf('take') !== -1;
+    }
+
+    function inferDominantStyle(sprite) {
+      if (!sprite) return 'balanced';
+      if (sprite.dominantStyle) return sprite.dominantStyle;
+      if (sprite.stats && sprite.stats.dominantStyle) return sprite.stats.dominantStyle;
+      if (sprite.styleGauge && typeof sprite.styleGauge === 'object') {
+        if ((sprite.styleGauge.grappler || 0) > (sprite.styleGauge.striker || 0)) return 'grappler';
+        if ((sprite.styleGauge.striker || 0) > (sprite.styleGauge.grappler || 0)) return 'striker';
+      }
+      var moves = sprite.unlockedMoves || (sprite.scene && sprite.scene.player === sprite && sprite.scene.player.unlockedMoves) || [];
+      var grappleCount = 0;
+      var strikeCount = 0;
+      for (var i = 0; i < moves.length; i++) {
+        if (isGrappleMove(moves[i])) grappleCount++;
+        else if (moves[i]) strikeCount++;
+      }
+      if (grappleCount > strikeCount) return 'grappler';
+      if (strikeCount > grappleCount) return 'striker';
+      return 'balanced';
+    }
+
+    function ensureBreathSignature(sprite) {
+      if (!sprite || !sprite.scene || !sprite.active) return null;
+      if (sprite._mmaBreathSignature && sprite._mmaBreathSignature.active) return sprite._mmaBreathSignature;
+      var textures = getBreathTextures();
+      var signature = sprite.scene.add.image(sprite.x, sprite.y, textures.default || 'breath_signature_balanced');
+      signature.setBlendMode(Phaser.BlendModes.SCREEN);
+      signature.setVisible(false);
+      signature.setDepth((sprite.depth || 0) + 6);
+      sprite._mmaBreathSignature = signature;
+      return signature;
+    }
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+
+      if (!this.active || !this.scene || !this._mmaBaseTextureKey || !this.stats || !this.stats.maxStamina) {
+        if (this._mmaBreathSignature) this._mmaBreathSignature.setVisible(false);
+        return;
+      }
+
+      var cfg = getBreathConfig();
+      var textures = getBreathTextures();
+      if (!textures.default) return;
+      var signature = ensureBreathSignature(this);
+      if (!signature) return;
+
+      var staminaRatio = this.stats.maxStamina > 0 ? Phaser.Math.Clamp(this.stats.stamina / this.stats.maxStamina, 0, 1) : 1;
+      var speed = this.body ? Math.abs(this.body.velocity.x || 0) + Math.abs(this.body.velocity.y || 0) : 0;
+      var styleKey = inferDominantStyle(this);
+      var charged = !!(this._mmaMuscleTensionUntil && this._mmaMuscleTensionUntil > time);
+      var active = speed >= (cfg.minSpeed || 18) || staminaRatio <= 0.34 || charged;
+      if (!active) {
+        signature.setVisible(false);
+        return;
+      }
+
+      var textureKey = textures[styleKey] || textures.default;
+      if (signature.texture && signature.texture.key !== textureKey) signature.setTexture(textureKey);
+      var styleCfg = (cfg.styles && cfg.styles[styleKey]) || (cfg.styles && cfg.styles.balanced) || {};
+      var fatigue = Phaser.Math.Clamp(1 - staminaRatio, 0, 1);
+      var pulse = 0.72 + Math.abs(Math.sin(time * (cfg.pulseSpeed || 0.008))) * 0.28;
+      var dirX = this.flipX ? -1 : 1;
+      if (this.body && Math.abs(this.body.velocity.x) > 6) dirX = Math.sign(this.body.velocity.x) || dirX;
+      signature.setVisible(true);
+      signature.setPosition(this.x + dirX * 12, this.y + (cfg.offsetY || -16) - Math.abs(Math.sin(time * 0.012)) * 2);
+      signature.setDepth((this.depth || 0) + 6);
+      signature.setFlipX(dirX < 0);
+      signature.setTint(styleCfg.color || 0xffffff);
+      signature.setAlpha((charged ? (cfg.chargedAlpha || 0.9) : (cfg.alpha || 0.74)) * (0.45 + fatigue * 0.55) * pulse);
+      var scale = charged ? (cfg.chargedScale || 0.82) : (cfg.scale || 0.58);
+      signature.setScale(scale + fatigue * 0.18 + pulse * 0.06);
+      signature.setAngle(dirX < 0 ? -10 : 10);
+    };
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      if (this._mmaBreathSignature) {
+        this._mmaBreathSignature.destroy();
+        this._mmaBreathSignature = null;
+      }
+      return originalDestroy.call(this, fromScene);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaBreathSignatureHookInstalled = true;
+  },
   installLastChancePulseHook: function() {
     if (Phaser.Physics.Arcade.Sprite.prototype._mmaLastChancePulseHookInstalled) return;
 
@@ -2418,6 +2718,218 @@ var BootScene = new Phaser.Class({
     };
 
     Phaser.Physics.Arcade.Sprite.prototype._mmaFightIqAuraReadHookInstalled = true;
+  },
+  installMemoryKnockoutHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaMemoryKnockoutHookInstalled) return;
+
+    function getMemoryConfig() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.MEMORY_KNOCKOUT_CONFIG) || {};
+    }
+
+    function getMemoryTextures() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.MEMORY_KNOCKOUT_TEXTURES) || {};
+    }
+
+    function normalizeToken(value) {
+      return String(value || '').toLowerCase();
+    }
+
+    function inferMemoryTier(sprite) {
+      if (!sprite) return 'grunt';
+      if (sprite.isShadow || sprite.isRival) return 'rival';
+      if (sprite.isBoss) return 'boss';
+      if (sprite.isElite) return 'elite';
+      var values = [
+        sprite.typeKey,
+        sprite.role,
+        sprite.enemyClass,
+        sprite.archetype,
+        sprite.title,
+        sprite.bossTitle,
+        sprite.name,
+        sprite.displayName,
+        sprite._mmaVisualBaseKey,
+        sprite._mmaBaseTextureKey,
+        sprite.meta && sprite.meta.role,
+        sprite.meta && sprite.meta.typeKey,
+        sprite.meta && sprite.meta.title,
+        sprite.meta && sprite.meta.bossTitle,
+        sprite.meta && sprite.meta.name
+      ];
+      if (sprite.data && typeof sprite.data.get === 'function') {
+        values.push(sprite.data.get('role'));
+        values.push(sprite.data.get('typeKey'));
+        values.push(sprite.data.get('title'));
+        values.push(sprite.data.get('bossTitle'));
+        values.push(sprite.data.get('name'));
+      }
+      for (var i = 0; i < values.length; i++) {
+        var token = normalizeToken(values[i]);
+        if (!token) continue;
+        if (token.indexOf('shadow') !== -1 || token.indexOf('rival') !== -1) return 'rival';
+        if (token.indexOf('boss') !== -1 || token.indexOf('champion') !== -1 || token.indexOf('king') !== -1) return 'boss';
+        if (token.indexOf('elite') !== -1) return 'elite';
+      }
+      return 'grunt';
+    }
+
+    function spawnMemoryKnockout(sprite) {
+      if (!sprite || !sprite.scene || !sprite.scene.add || !sprite.scene.tweens) return;
+      if (sprite.scene.player === sprite) return;
+      var textures = getMemoryTextures();
+      var cfg = getMemoryConfig();
+      var tier = inferMemoryTier(sprite);
+      var textureKey = textures[tier] || textures.grunt;
+      if (!textureKey) return;
+      var card = sprite.scene.add.image(sprite.x, sprite.y - 6, textureKey);
+      card.setDepth((sprite.depth || sprite.y || 0) + 10);
+      card.setBlendMode(Phaser.BlendModes.SCREEN);
+      card.setScale(cfg.startScale || 0.92);
+      card.setAlpha(cfg.alpha || 0.72);
+      card.setAngle(sprite.flipX ? -6 : 6);
+      var tint = ((cfg.palette || {})[tier]) || 0xffffff;
+      card.setTint(tint);
+      var riseDistance = typeof cfg.riseDistance === 'number' ? cfg.riseDistance : 22;
+      sprite.scene.tweens.add({
+        targets: card,
+        y: card.y - riseDistance,
+        alpha: 0,
+        scaleX: cfg.endScale || 1.08,
+        scaleY: cfg.endScale || 1.08,
+        angle: card.angle + (sprite.flipX ? -5 : 5),
+        duration: cfg.duration || 420,
+        ease: 'Cubic.easeOut',
+        onComplete: function() {
+          if (card && card.active) card.destroy();
+        }
+      });
+      if (window.MMA && window.MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        var now = sprite.scene && sprite.scene.time && typeof sprite.scene.time.now === 'number' ? sprite.scene.time.now : 0;
+        var cooldown = typeof cfg.labelCooldown === 'number' ? cfg.labelCooldown : 900;
+        if (!sprite.scene._mmaMemoryKnockoutLabelAt || now - sprite.scene._mmaMemoryKnockoutLabelAt >= cooldown) {
+          MMA.UI.showDamageText(sprite.scene, sprite.x, sprite.y - 74, 'MEMORY FLASH', '#d8deff');
+          sprite.scene._mmaMemoryKnockoutLabelAt = now;
+        }
+      }
+    }
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      if (!this._mmaMemoryKnockoutPlayed && this.active && this.scene && this.scene.player !== this && this.stats && typeof this.stats.hp === 'number' && this.stats.hp <= 0) {
+        this._mmaMemoryKnockoutPlayed = true;
+        spawnMemoryKnockout(this);
+      }
+      return originalDestroy.call(this, fromScene);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaMemoryKnockoutHookInstalled = true;
+  },
+  installRingRustHook: function() {
+    if (Phaser.Physics.Arcade.Sprite.prototype._mmaRingRustHookInstalled) return;
+
+    function getRingRustConfig() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.RING_RUST_CONFIG) || {};
+    }
+
+    function getRingRustTextures() {
+      return (window.MMA && window.MMA.Sprites && window.MMA.Sprites.RING_RUST_TEXTURES) || {};
+    }
+
+    function readRingRustDays(sprite) {
+      if (!sprite) return 0;
+      var candidates = [
+        sprite.ringRustDays,
+        sprite.stats && sprite.stats.ringRustDays,
+        sprite.meta && sprite.meta.ringRustDays,
+        sprite.debuffs && sprite.debuffs.ringRustDays
+      ];
+      if (sprite.data && typeof sprite.data.get === 'function') {
+        candidates.push(sprite.data.get('ringRustDays'));
+      }
+      for (var i = 0; i < candidates.length; i++) {
+        if (typeof candidates[i] === 'number' && !isNaN(candidates[i])) return candidates[i];
+      }
+      var flags = [
+        sprite.ringRust,
+        sprite.stats && sprite.stats.ringRust,
+        sprite.meta && sprite.meta.ringRust,
+        sprite.debuffs && sprite.debuffs.ringRust
+      ];
+      if (sprite.data && typeof sprite.data.get === 'function') flags.push(sprite.data.get('ringRust'));
+      for (var j = 0; j < flags.length; j++) {
+        if (flags[j] === true) return (getRingRustConfig().minDays || 3);
+      }
+      return 0;
+    }
+
+    function ensureRingRustOverlay(sprite) {
+      if (!sprite || !sprite.scene || !sprite.active) return null;
+      if (sprite._mmaRingRustOverlay && sprite._mmaRingRustOverlay.active) return sprite._mmaRingRustOverlay;
+      var textures = getRingRustTextures();
+      var overlay = sprite.scene.add.image(sprite.x, sprite.y, textures.light || 'ring_rust_overlay');
+      overlay.setBlendMode(Phaser.BlendModes.MULTIPLY);
+      overlay.setVisible(false);
+      overlay.setDepth((sprite.depth || 0) + 4);
+      sprite._mmaRingRustOverlay = overlay;
+      return overlay;
+    }
+
+    var originalPreUpdate = Phaser.Physics.Arcade.Sprite.prototype.preUpdate;
+    Phaser.Physics.Arcade.Sprite.prototype.preUpdate = function(time, delta) {
+      originalPreUpdate.call(this, time, delta);
+
+      if (!this.active || !this.scene || !this._mmaBaseTextureKey) {
+        if (this._mmaRingRustOverlay) this._mmaRingRustOverlay.setVisible(false);
+        return;
+      }
+
+      var cfg = getRingRustConfig();
+      var textures = getRingRustTextures();
+      if (!textures.light) return;
+      var days = readRingRustDays(this);
+      var minDays = typeof cfg.minDays === 'number' ? cfg.minDays : 3;
+      if (days < minDays) {
+        if (this._mmaRingRustOverlay) this._mmaRingRustOverlay.setVisible(false);
+        return;
+      }
+
+      var overlay = ensureRingRustOverlay(this);
+      if (!overlay) return;
+      var severity = Phaser.Math.Clamp((days - minDays) / 4, 0, 1);
+      var heavy = severity >= 0.65;
+      var textureKey = heavy ? (textures.heavy || textures.light) : textures.light;
+      if (overlay.texture && overlay.texture.key !== textureKey) overlay.setTexture(textureKey);
+      var pulse = 0.72 + Math.abs(Math.sin(time * (cfg.pulseSpeed || 0.0048))) * 0.28;
+      var scaleBase = heavy ? (cfg.heavyScale || 1.18) : (cfg.scale || 1.12);
+      var alphaBase = heavy ? (cfg.heavyAlpha || 0.38) : (cfg.alpha || 0.26);
+      overlay.setVisible(true);
+      overlay.setPosition(this.x, this.y + (cfg.offsetY || -2));
+      overlay.setDepth((this.depth || 0) + 4);
+      overlay.setScale((this.scaleX || 1) * (scaleBase + pulse * 0.03), (this.scaleY || 1) * ((scaleBase - 0.08) + pulse * 0.02));
+      overlay.setFlipX(!!this.flipX);
+      overlay.setTint(heavy ? (cfg.heavyTint || 0x8b5a2b) : (cfg.tint || 0xb88a54));
+      overlay.setAlpha(alphaBase + severity * 0.12 + pulse * 0.05);
+      overlay.setAngle(this.flipX ? -2 : 2);
+      this._mmaRingRustDays = days;
+
+      var now = this.scene && this.scene.time && typeof this.scene.time.now === 'number' ? this.scene.time.now : 0;
+      var cooldown = typeof cfg.labelCooldown === 'number' ? cfg.labelCooldown : 2400;
+      if (window.MMA && window.MMA.UI && typeof MMA.UI.showDamageText === 'function' && this.scene.player === this && (!this._mmaRingRustLabelAt || now - this._mmaRingRustLabelAt >= cooldown)) {
+        MMA.UI.showDamageText(this.scene, this.x, this.y - 84, heavy ? 'RING RUST +' : 'RING RUST', '#c79b63');
+        this._mmaRingRustLabelAt = now;
+      }
+    };
+
+    var originalDestroy = Phaser.Physics.Arcade.Sprite.prototype.destroy;
+    Phaser.Physics.Arcade.Sprite.prototype.destroy = function(fromScene) {
+      if (this._mmaRingRustOverlay) {
+        this._mmaRingRustOverlay.destroy();
+        this._mmaRingRustOverlay = null;
+      }
+      return originalDestroy.call(this, fromScene);
+    };
+
+    Phaser.Physics.Arcade.Sprite.prototype._mmaRingRustHookInstalled = true;
   },
   installEnemyFearTrembleHook: function() {
     if (Phaser.Physics.Arcade.Sprite.prototype._mmaEnemyFearTrembleHookInstalled) return;

@@ -47,7 +47,7 @@ var PauseScene = new Phaser.Class({
     this._setMobileControlsPointerEvents(false);
     var W = CONFIG.CANVAS_W;
     var H = CONFIG.CANVAS_H;
-    var isMobile = !window.matchMedia('(pointer: fine)').matches;
+    var isMobile = window.innerWidth <= 480 || !window.matchMedia('(pointer: fine)').matches;
 
     var PANEL_X  = 55;
     var PANEL_Y  = 35;
@@ -287,7 +287,7 @@ var PauseScene = new Phaser.Class({
     closeBtn.on('pointerdown', function(){ self.closePause(); });
 
     // ── Footer
-    this.add.text(W / 2, PANEL_Y + PANEL_H - 18, 'TAP CLOSE or press I / ESC to return', {
+    this.add.text(W / 2, PANEL_Y + PANEL_H - 18, 'Tap the button above or press I / ESC to return', {
       fontSize: '13px',
       color: '#666666',
       stroke: '#000000',
@@ -324,7 +324,12 @@ var PauseScene = new Phaser.Class({
     if (gameScene && gameScene.resumeFromPause) {
       gameScene.resumeFromPause();
     }
-    this.scene.stop();
+    if (gameScene && gameScene.scene) {
+      gameScene.scene.resume('GameScene');
+      gameScene.scene.stop('PauseScene');
+    } else {
+      this.scene.stop('PauseScene');
+    }
   },
 
   _showMovePicker: function(slotNum, slotX, slotY, unlockedSet, ALL_MOVES, slotGfx, nameText, loadout) {

@@ -1,31 +1,5 @@
 window.MMA = window.MMA || {};
 window.MMA.Zones = {
-  // --- New Feature: Ring Out KO Detection ---
-  // In championship arena rooms (zone 4), if an enemy is pushed beyond the ring
-  // boundaries (col < 0 or col > 15), they are considered knocked out of the ring.
-  // This method can be called by combat logic after applying knockback forces.
-  // Returns true if a ring out occurred and sets a registry flag for UI/score.
-  checkRingOut: function(scene, enemy) {
-    if (!scene || !enemy) return false;
-    // Only apply in arena-style zones where ring out is enabled.
-    var room = this.getRoom(scene.currentRoomId);
-    if (!room || !room.ringOutEnabled) return false;
-    // Enemy position in tile coordinates (assuming enemy.x/y are world pixels).
-    var DT = CONFIG.DISPLAY_TILE;
-    var col = Math.floor(enemy.x / DT);
-    // Ring boundaries are at columns 0 and 15 (walls). Outside means col < 0 or >15.
-    if (col < 0 || col > 15) {
-      // Mark the enemy as ring out KO.
-      enemy.setActive(false).setVisible(false);
-      // Store a flag for the current room so UI can display a message.
-      scene.registry.set('ringOutOccurred', true);
-      scene.registry.set('ringOutTargetId', enemy.id || null);
-      return true;
-    }
-    return false;
-  },
-
-  // Existing content continues below
 
   ZONE1_ROOMS: {
     // Room1: 4-way navigation hub
@@ -166,6 +140,17 @@ window.MMA.Zones = {
       footprintGraveyard:true,
       footprintGraveyardLabel:'Championship Footprint Graveyard',
       footprintGraveyardArenaId:'zone3_championship',
+      // Arena Investment System: allow players to invest between fights to upgrade
+      // crowd capacity, lighting, pyrotechnics, and corner support. Zones only
+      // exposes data; player/progression systems own gold spend + persistence.
+      arenaInvestment:true,
+      arenaInvestmentLabel:'Championship Arena Investments',
+      arenaInvestmentOptions:[
+        { id:'crowdCapacity', label:'Upgrade Crowd Capacity', maxLevel:5, hypeBonusPerLevel:0.04 },
+        { id:'lighting', label:'Upgrade Arena Lighting', maxLevel:5, accuracyBonusPerLevel:0.02 },
+        { id:'pyrotechnics', label:'Add Entrance Pyrotechnics', maxLevel:3, finisherDamageBonusPerLevel:0.04 },
+        { id:'cornerCrew', label:'Hire Elite Corner Crew', maxLevel:3, cornerAdviceEffectivenessPerLevel:0.06 }
+      ],
       doors:{down:{col:7,row:11},up:{col:7,row:0}},connections:{down:'oct3',up:'survival1'},
       spawnPositions:[{col:7,row:6}],enemyPool:['mmaChamp'],name:'Championship Ring',narratorStyle:'arenaTitle',
       // Signature Room Theme: gold spotlight with slow-falling confetti
@@ -290,6 +275,17 @@ window.MMA.Zones = {
       footprintGraveyard:true,
       footprintGraveyardLabel:"Dojo Footprint Graveyard",
       footprintGraveyardArenaId:'zone4_dojo',
+      // Arena Investment System: the Dojo offers long-term upgrades between
+      // endless runs. Investments mirror championship arena categories but
+      // can be tuned separately if needed.
+      arenaInvestment:true,
+      arenaInvestmentLabel:"Dojo Investment Board",
+      arenaInvestmentOptions:[
+        { id:'crowdCapacity', label:'Invite More Spectators', maxLevel:5, hypeBonusPerLevel:0.03 },
+        { id:'lighting', label:'Refine Dojo Lighting', maxLevel:4, accuracyBonusPerLevel:0.02 },
+        { id:'pyrotechnics', label:'Add Entrance Ritual Effects', maxLevel:2, finisherDamageBonusPerLevel:0.05 },
+        { id:'cornerCrew', label:'Train Elite Dojo Cornermen', maxLevel:3, cornerAdviceEffectivenessPerLevel:0.05 }
+      ],
       doors:{down:{col:7,row:11},up:{col:7,row:0}},
       connections:{down:'oct4',up:'homeArena1'},
       spawnPositions:[{col:7,row:5}],
@@ -337,8 +333,19 @@ window.MMA.Zones = {
       footprintGraveyard:true,
       footprintGraveyardLabel:'Home Arena Footprint Graveyard',
       footprintGraveyardArenaId:'zone4_homeArena',
-      doors:{down:{col:7,row:11}},
-      connections:{down:'dojo1'},
+      // Arena Investment System: home arena upgrades persist alongside
+      // Signature Home Arena customization. Zones only defines upgrade
+      // metadata; player/progression systems own gold spend and save data.
+      arenaInvestment:true,
+      arenaInvestmentLabel:'Home Arena Investments',
+      arenaInvestmentOptions:[
+        { id:'crowdCapacity', label:'Expand Home Crowd Capacity', maxLevel:5, hypeBonusPerLevel:0.05 },
+        { id:'lighting', label:'Install Premier Lighting Rig', maxLevel:5, accuracyBonusPerLevel:0.025 },
+        { id:'pyrotechnics', label:'Upgrade Entrance Pyrotechnics', maxLevel:3, finisherDamageBonusPerLevel:0.05 },
+        { id:'cornerCrew', label:'Hire Legendary Corner Crew', maxLevel:4, cornerAdviceEffectivenessPerLevel:0.06 }
+      ],
+      doors:{down:{col:7,row:11},right:{col:15,row:5}},
+      connections:{down:'dojo1',right:'legacyHall1'},
       spawnPositions:[{col:7,row:5}],
       enemyPool:['mmaChamp'],
       name:'Signature Home Arena',
@@ -369,6 +376,36 @@ window.MMA.Zones = {
         ambientParticles:['confettiGold','dustMotes'],
         intensity:1.0
       }
+    },
+    // Championship Legacy Hall: non-combat trophy room that showcases
+    // defeated boss portraits and lifetime title stats. Zones only
+    // defines metadata here – UI layers own rendering and layout.
+    legacyHall1:{
+      id:'legacyHall1',
+      zone:4,
+      weatherOptions:['clear'],
+      weightClass:'standard',
+      cornerPressure:false,
+      crowdSize:150,
+      baseHype:0.3,
+      maxHype:0.6,
+      crowdLabel:'Museum Crowd',
+      doors:{left:{col:0,row:5}},
+      connections:{left:'homeArena1'},
+      spawnPositions:[{col:7,row:6}],
+      enemyPool:[],
+      name:'Championship Legacy Hall',
+      narratorStyle:null,
+      legacyHall:true,
+      legacyHallLabel:'Championship Legacy Hall',
+      // Lightweight descriptors so UI can look up portrait textures
+      // and stat labels without hardcoding boss ids here.
+      legacyHallBossPortraitKeys:['boss_zone1','boss_zone2','boss_zone3','boss_zone4'],
+      legacyHallStatKeys:[
+        { id:'totalKOs', label:'Total KOs' },
+        { id:'fastestKOTime', label:'Fastest KO Time' },
+        { id:'damageTakenVsBosses', label:'Damage Taken vs Bosses' }
+      ]
     }
   },
   getRoom: function(roomId){ return this.ZONE1_ROOMS[roomId] || this.ZONE2_ROOMS[roomId] || this.ZONE3_ROOMS[roomId] || this.ZONE4_ROOMS[roomId]; },
@@ -943,6 +980,21 @@ window.MMA.Zones = {
       crowdSizeScale: Math.min(3, 0.001 * (crowd.crowdSize || 0) + 0.25)
     };
   },
+  // Arena Investment System helpers
+  // Metadata-only implementation of the backlog's "Arena Investment System".
+  // Certain championship-style arenas can expose long-term upgrade options
+  // (crowd capacity, lighting, pyrotechnics, corner crew). Zones only
+  // defines the menu and tuning; player/progression systems own currency
+  // spend, save/load, and actual stat application.
+  getArenaInvestmentConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.arenaInvestment) return null;
+    return {
+      active:true,
+      label:room.arenaInvestmentLabel || (room.name + ' Investments'),
+      options:(room.arenaInvestmentOptions || []).slice()
+    };
+  },
   // Tournament Entry Drill helpers
   // Lightweight, metadata-driven implementation of the backlog's
   // "Tournament Entry Drill" feature. Certain tournament-style rooms
@@ -988,6 +1040,22 @@ window.MMA.Zones = {
       baseBuffMultiplier:baseBuff,
       themeOptions:(room.homeArenaThemeOptions || []).slice(),
       featureOptions:(room.homeArenaFeatureOptions || []).slice()
+    };
+  },
+  // Championship Legacy Hall helpers
+  // Metadata-only implementation of the backlog's "Championship Legacy Hall"
+  // feature. Rooms can opt in via legacyHall:true and expose lightweight
+  // portrait/stat descriptors so UI layers can render trophies and career
+  // stats without hardcoding boss ids in multiple places.
+  getChampionshipLegacyHallConfig: function(roomId) {
+    var room = this.getRoom(roomId);
+    if (!room || !room.legacyHall) return null;
+    return {
+      active:true,
+      roomId:room.id,
+      label:room.legacyHallLabel || room.name || 'Championship Legacy Hall',
+      bossPortraitKeys:(room.legacyHallBossPortraitKeys || []).slice(),
+      statKeys:(room.legacyHallStatKeys || []).slice()
     };
   },
   // Rival Crossroads helpers
@@ -1401,6 +1469,45 @@ window.MMA.Zones = {
         // Preserve balance so donations feel persistent within the broader arena run.
         scene.registry.set('crowdFundingOptions', []);
       }
+      // Arena Investment System metadata: championship-style arenas that
+      // support long-term upgrades between runs. Zones only surfaces the
+      // menu; player/combat/progression systems own currency spend and
+      // stat math.
+      var investCfg = this.getArenaInvestmentConfig(room.id);
+      if (investCfg && investCfg.active) {
+        scene.registry.set('arenaInvestmentActive', true);
+        scene.registry.set('arenaInvestmentLabel', investCfg.label);
+        scene.registry.set('arenaInvestmentOptions', investCfg.options);
+        // Investment levels themselves are tracked elsewhere (save data),
+        // but we prime a lightweight hook so UI can surface an upgrade
+        // panel when entering eligible arenas.
+        scene.time.delayedCall(2350, function(){
+          scene.registry.set('gameMessage', investCfg.label + ': invest between fights to upgrade your home turf.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('arenaInvestmentActive', false);
+        scene.registry.set('arenaInvestmentLabel', '');
+        scene.registry.set('arenaInvestmentOptions', []);
+      }
+      // Championship Legacy Hall metadata: non-combat trophy rooms that
+      // surface defeated boss portraits and career stats via registry.
+      var legacyCfg = this.getChampionshipLegacyHallConfig(room.id);
+      if (legacyCfg && legacyCfg.active) {
+        scene.registry.set('legacyHallActive', true);
+        scene.registry.set('legacyHallLabel', legacyCfg.label);
+        scene.registry.set('legacyHallBossPortraitKeys', legacyCfg.bossPortraitKeys);
+        scene.registry.set('legacyHallStatKeys', legacyCfg.statKeys);
+        scene.time.delayedCall(2400, function(){
+          scene.registry.set('gameMessage', legacyCfg.label + ': relive your title fights and study your career stats.');
+          scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
+        });
+      } else {
+        scene.registry.set('legacyHallActive', false);
+        scene.registry.set('legacyHallLabel', '');
+        scene.registry.set('legacyHallBossPortraitKeys', []);
+        scene.registry.set('legacyHallStatKeys', []);
+      }
       // Rival Crossroads metadata: mid-zone decision rooms that let players
       // pick between different encounter/boss archetype paths. Implementation
       // is intentionally metadata-only here so that combat/player systems can
@@ -1633,6 +1740,9 @@ window.MMA.Zones = {
       // Combat systems should call MMA.Zones.checkRingOut(scene, enemy)
       // after applying knockback to see if a ring out occurred.
       if (room.ringOutEnabled) {
+        var W = (scene && scene.scale && scene.scale.width) ? scene.scale.width : (16 * DT);
+        var H = (scene && scene.scale && scene.scale.height) ? scene.scale.height : (12 * DT);
+        MMA.Zones.setRingBounds(50, 50, W - 100, H - 100); // Set ring boundary
         scene.registry.set('ringOutActive', true);
         scene.registry.set('ringOutLabel', room.ringOutLabel || 'Ring Out KO');
         scene.time.delayedCall(2400, function(){
@@ -1640,6 +1750,7 @@ window.MMA.Zones = {
           scene.time.delayedCall(2600, function(){ scene.registry.set('gameMessage', ''); });
         });
       } else {
+        MMA.Zones.RING_BOUNDS = null;
         scene.registry.set('ringOutActive', false);
         scene.registry.set('ringOutLabel', '');
       }
@@ -1857,6 +1968,11 @@ window.MMA.Zones = {
       scene.player.setPosition(spawnX, spawnY).setActive(true).setVisible(true);
       if (scene.player.body) scene.player.body.enable = true;
       self.buildRoom(scene, newRoomId);
+      // Zone ambient audio
+      if (window.MMA && MMA.Audio && typeof MMA.Audio.playAmbient === 'function') {
+        var zoneNum = scene.currentZone || scene.registry.get('currentZone') || 1;
+        MMA.Audio.playAmbient(scene, zoneNum);
+      }
       // Bring player above floor/wall tiles (depth 0) so it doesn't get buried
       scene.player.setDepth(5);
       if (scene.playerHpGfx) scene.playerHpGfx.setDepth(6);
@@ -1886,4 +2002,260 @@ window.MMA.Zones = {
       scene.time.delayedCall(1500, function(){ scene.registry.set('gameMessage', ''); });
     });
   }
+};
+
+// Ring Out KO system
+MMA.Zones.RING_BOUNDS = null; // Set per room
+
+MMA.Zones.setRingBounds = function(x, y, w, h) {
+  MMA.Zones.RING_BOUNDS = { x: x, y: y, w: w, h: h };
+};
+
+MMA.Zones.checkRingOut = function(scene, enemy) {
+  var bounds = MMA.Zones.RING_BOUNDS;
+  if (!bounds || !enemy || !enemy.active) return false;
+  var outX = enemy.x < bounds.x || enemy.x > bounds.x + bounds.w;
+  var outY = enemy.y < bounds.y || enemy.y > bounds.y + bounds.h;
+  if ((outX || outY) && enemy.stats && enemy.stats.hp > 0) {
+    enemy.stats.hp = 0;
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, 'RING OUT!!', '#FFD700');
+    }
+    if (scene && scene.cameras) scene.cameras.main.flash(300, 255, 200, 50);
+    // Award double XP
+    if (window.MMA && MMA.Player && typeof MMA.Player.awardXP === 'function') {
+      MMA.Player.awardXP(scene, 30);
+    }
+    return true;
+  }
+  return false;
+};
+// === CLINIC / MEDICAL BAY ===
+// Between-zone healing room type
+MMA.Zones.CLINIC_ROOM = {
+  id: 'clinic',
+  type: 'clinic',
+  label: 'Medical Bay',
+  description: 'Recover HP and repair gear before the next zone.',
+  spawnChance: 0.25 // 25% chance to appear between zones
+};
+
+MMA.Zones.spawnClinicIfNeeded = function(scene) {
+  if (!scene) return false;
+  var playerHp = scene.player && scene.player.stats ? scene.player.stats.hp : 100;
+  var maxHp = scene.player && scene.player.stats ? scene.player.stats.maxHp || 100 : 100;
+  var ratio = playerHp / maxHp;
+  // Higher chance if player is low HP
+  var chance = ratio < 0.4 ? 0.5 : MMA.Zones.CLINIC_ROOM.spawnChance;
+  return Math.random() < chance;
+};
+
+MMA.Zones.applyClinicHeal = function(scene) {
+  var p = scene && scene.player;
+  if (!p || !p.stats) return;
+  var heal = Math.round((p.stats.maxHp || 100) * 0.4); // Heal 40% max HP
+  p.stats.hp = Math.min(p.stats.maxHp || 100, (p.stats.hp || 0) + heal);
+  // Repair gear
+  if (window.MMA && MMA.Player && typeof MMA.Player.repairGear === 'function') {
+    MMA.Player.repairGear(scene);
+  }
+  // Restore some stamina
+  p.stats.stamina = Math.min(p.stats.maxStamina || 100, (p.stats.stamina || 0) + 30);
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, p.x, p.y - 30, '+' + heal + ' HP (Clinic)', '#00ff88');
+  }
+  // Achievement toast
+  if (window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+    MMA.UI.queueAchievementToast(scene, 'Medical Bay visited', '🏥');
+  }
+};
+
+// === ZONE AMBIENT WILDLIFE ===
+// Flavor ambient creatures (birds, rats, etc.) per zone
+MMA.Zones.WILDLIFE = {
+  1: { label: 'street pigeons', icon: '🐦', interval: 8000 },
+  2: { label: 'rats', icon: '🐀', interval: 6000 },
+  3: { label: 'seagulls', icon: '🦅', interval: 10000 },
+  4: { label: 'crowd noise', icon: '👥', interval: 5000 }
+};
+
+MMA.Zones.startWildlifeAmbience = function(scene, zoneNum) {
+  if (!scene || scene._wildlifeTimer) return;
+  var w = MMA.Zones.WILDLIFE[zoneNum];
+  if (!w) return;
+  scene._wildlifeTimer = scene.time.addEvent({
+    delay: w.interval,
+    callback: function() {
+      if (!scene || !scene.player || scene.gameOver) return;
+      if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        var p = scene.player;
+        var offsetX = (Math.random() * 100) - 50;
+        MMA.UI.showDamageText(scene, p.x + offsetX, p.y - 60, w.icon, '#ffffff');
+      }
+    },
+    repeat: -1
+  });
+};
+
+MMA.Zones.stopWildlifeAmbience = function(scene) {
+  if (scene && scene._wildlifeTimer) {
+    scene._wildlifeTimer.remove();
+    scene._wildlifeTimer = null;
+  }
+};
+// === WEATHER HAZARD ROOM SPAWNING ===
+MMA.Zones.WEATHER_HAZARD_CHANCE = 0.20; // 20% chance of hazard room
+
+MMA.Zones.rollWeatherHazard = MMA.Zones.rollWeatherHazard || function(zoneNum) {
+  if (Math.random() > MMA.Zones.WEATHER_HAZARD_CHANCE) return null;
+  // Zone 1: rain, Zone 2: heat, Zone 3: ice, Zone 4: all possible
+  var pools = {
+    1: ['rain'],
+    2: ['heat', 'rain'],
+    3: ['ice', 'rain'],
+    4: ['ice', 'heat', 'rain']
+  };
+  var pool = pools[zoneNum] || ['rain'];
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
+MMA.Zones.applyRoomWeather = MMA.Zones.applyRoomWeather || function(scene, weatherType) {
+  if (!scene) return;
+  scene._roomWeather = weatherType;
+  // Apply combat hazard
+  if (window.MMA && MMA.Combat && typeof MMA.Combat.applyWeatherHazard === 'function') {
+    MMA.Combat.applyWeatherHazard(scene, weatherType);
+  }
+  // Show HUD banner
+  if (window.MMA && MMA.UI && typeof MMA.UI.showWeatherHazardBanner === 'function') {
+    MMA.UI.showWeatherHazardBanner(scene, weatherType);
+  }
+  // Start VFX
+  if (window.MMA && MMA.VFX && typeof MMA.VFX.startWeatherHazardVFX === 'function') {
+    MMA.VFX.startWeatherHazardVFX(scene, weatherType);
+  }
+};
+
+MMA.Zones.clearRoomWeather = MMA.Zones.clearRoomWeather || function(scene) {
+  if (!scene) return;
+  scene._roomWeather = null;
+  if (window.MMA && MMA.VFX && typeof MMA.VFX.stopWeatherHazardVFX === 'function') {
+    MMA.VFX.stopWeatherHazardVFX(scene);
+  }
+  var banner = document.getElementById('weather-hazard-banner');
+  if (banner) banner.remove();
+};
+
+// === SIGNATURE HOME ARENA ===
+// After winning championship (zone 4 boss), unlock a home arena bonus room
+MMA.Zones.HOME_ARENA_BONUS = {
+  hpBonus: 0.15,       // +15% max HP in home arena
+  goldBonus: 1.25,     // +25% gold in home arena
+  label: '🏠 HOME ARENA',
+  unlockKey: 'mma_home_arena'
+};
+
+MMA.Zones.unlockHomeArena = MMA.Zones.unlockHomeArena || function(scene) {
+  try {
+    localStorage.setItem(MMA.Zones.HOME_ARENA_BONUS.unlockKey, '1');
+    if (window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+      MMA.UI.queueAchievementToast(scene, '🏠 HOME ARENA UNLOCKED!', '🏆');
+    }
+  } catch(e) {}
+};
+
+MMA.Zones.isHomeArenaUnlocked = MMA.Zones.isHomeArenaUnlocked || function() {
+  try { return !!localStorage.getItem(MMA.Zones.HOME_ARENA_BONUS.unlockKey); } catch(e) { return false; }
+};
+
+MMA.Zones.applyHomeArenaBonus = MMA.Zones.applyHomeArenaBonus || function(scene) {
+  if (!MMA.Zones.isHomeArenaUnlocked()) return;
+  var p = scene && scene.player;
+  if (!p || !p.stats) return;
+  p.stats.maxHp = Math.round((p.stats.maxHp || 100) * (1 + MMA.Zones.HOME_ARENA_BONUS.hpBonus));
+  p.stats.hp = Math.min(p.stats.hp || 100, p.stats.maxHp);
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, p.x, p.y - 40, '🏠 HOME BOOST +15% HP', '#FFD700');
+  }
+};
+// === ARENA REGIONAL RULES ===
+// Each zone has unique ruleset affecting combat mechanics
+MMA.Zones.ARENA_RULES = MMA.Zones.ARENA_RULES || {
+  1: { id: 'street',         label: 'STREET RULES',     noDisqualification: true,  sandMoveMult: 1.0,  roundJudging: false, desc: 'No rules — anything goes' },
+  2: { id: 'underground',    label: 'UNDERGROUND RULES', noDisqualification: true,  sandMoveMult: 1.0,  roundJudging: false, desc: 'Underground — fear the environment' },
+  3: { id: 'beach',          label: 'BEACH RULES',       noDisqualification: false, sandMoveMult: 0.85, roundJudging: false, desc: 'Sand slows movement -15%' },
+  4: { id: 'championship',   label: 'CHAMPIONSHIP RULES',noDisqualification: false, sandMoveMult: 1.0,  roundJudging: true,  desc: '3-round judging active' }
+};
+
+MMA.Zones.getArenaRules = MMA.Zones.getArenaRules || function(zone) {
+  return MMA.Zones.ARENA_RULES[zone] || MMA.Zones.ARENA_RULES[1];
+};
+
+MMA.Zones.getArenaSpeedMult = MMA.Zones.getArenaSpeedMult || function(zone) {
+  return (MMA.Zones.getArenaRules(zone) || {}).sandMoveMult || 1.0;
+};
+
+MMA.Zones.showArenaRulesBanner = MMA.Zones.showArenaRulesBanner || function(scene, zone) {
+  var rules = MMA.Zones.getArenaRules(zone);
+  if (!rules) return;
+  var existing = document.getElementById('arena-rules-banner');
+  if (existing) existing.remove();
+  var banner = document.createElement('div');
+  banner.id = 'arena-rules-banner';
+  banner.style.cssText = 'position:absolute;top:40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#ffcc00;font-family:monospace;font-size:11px;padding:5px 14px;border-radius:4px;border:1px solid #ffcc00;z-index:150;pointer-events:none;text-align:center;';
+  banner.innerHTML = '<strong>' + rules.label + '</strong><br><span style="color:#aaa;">' + rules.desc + '</span>';
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(banner);
+  setTimeout(function() { var el = document.getElementById('arena-rules-banner'); if (el) el.remove(); }, 3500);
+};
+
+// === ARENA ECHO CHAMBER ===
+// Arena acoustics: high ceilings = long echo that masks footsteps but alerts enemies
+MMA.Zones.ECHO_PROFILES = MMA.Zones.ECHO_PROFILES || {
+  1: { type: 'concrete', label: 'Sharp Echo',   enemyAlertRange: 1.15, stealthMult: 0.90 },
+  2: { type: 'brick',    label: 'Heavy Echo',   enemyAlertRange: 1.20, stealthMult: 0.85 },
+  3: { type: 'open',     label: 'Open Air',     enemyAlertRange: 0.90, stealthMult: 1.10 },
+  4: { type: 'arena',    label: 'Arena Roar',   enemyAlertRange: 1.10, stealthMult: 0.95 }
+};
+
+MMA.Zones.getEchoProfile = MMA.Zones.getEchoProfile || function(zone) {
+  return MMA.Zones.ECHO_PROFILES[zone] || MMA.Zones.ECHO_PROFILES[1];
+};
+
+MMA.Zones.getEnemyAlertRangeMult = MMA.Zones.getEnemyAlertRangeMult || function(zone) {
+  return (MMA.Zones.getEchoProfile(zone) || {}).enemyAlertRange || 1.0;
+};
+
+// === WEATHERED ARENA HISTORY ===
+// Persistent arena wear accumulates across sessions — veteran arenas grant +5% intimidation
+MMA.Zones.ARENA_HISTORY_KEY = 'mma_arena_history';
+
+MMA.Zones.recordArenaFight = MMA.Zones.recordArenaFight || function(zone) {
+  try {
+    var data = JSON.parse(localStorage.getItem(MMA.Zones.ARENA_HISTORY_KEY) || '{}');
+    data[zone] = (data[zone] || 0) + 1;
+    localStorage.setItem(MMA.Zones.ARENA_HISTORY_KEY, JSON.stringify(data));
+  } catch(e) {}
+};
+
+MMA.Zones.getArenaFightCount = MMA.Zones.getArenaFightCount || function(zone) {
+  try {
+    var data = JSON.parse(localStorage.getItem(MMA.Zones.ARENA_HISTORY_KEY) || '{}');
+    return data[zone] || 0;
+  } catch(e) { return 0; }
+};
+
+MMA.Zones.getVeteranIntimidationBonus = MMA.Zones.getVeteranIntimidationBonus || function(zone) {
+  var fights = MMA.Zones.getArenaFightCount(zone);
+  if (fights >= 10) return 1.05; // +5% intimidation (damage) in well-worn arenas
+  if (fights >= 5)  return 1.02;
+  return 1.0;
+};
+
+MMA.Zones.getArenaWearLabel = MMA.Zones.getArenaWearLabel || function(zone) {
+  var fights = MMA.Zones.getArenaFightCount(zone);
+  if (fights >= 20) return '🩸 Battle-Scarred';
+  if (fights >= 10) return '💪 Veteran Arena';
+  if (fights >= 5)  return '⚔️ Worn Arena';
+  return '✨ Fresh Arena';
 };

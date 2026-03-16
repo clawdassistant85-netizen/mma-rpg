@@ -33,7 +33,7 @@ Object.assign(window.MMA.UI, {
     if (lt) { lt.style.left = edge+"px"; lt.style.top = cHalf+"px"; lt.style.bottom=""; lt.style.right=""; lt.style.transform="none"; }
     if (rt) { rt.style.right = edge+"px"; rt.style.top = cHalf+"px"; rt.style.bottom=""; rt.style.left=""; rt.style.transform="none"; }
 
-    var isTouchPortrait = !landscape && window.matchMedia && !window.matchMedia('(pointer: fine)').matches;
+    var isTouchPortrait = !landscape && (window.innerWidth <= 480 || (window.matchMedia && !window.matchMedia('(pointer: fine)').matches));
     var canvas = document.querySelector('#game-container canvas');
     var clusterH;
 
@@ -46,42 +46,41 @@ Object.assign(window.MMA.UI, {
       var clWidth = window.innerWidth - clLeft - clRight;
       var btnH   = 30;
       var btnGap = 4;
-      // 4 buttons per row, 3 internal gaps
-      var btnW = Math.floor((clWidth - 3 * btnGap) / 4);
-      clusterH = 2 * btnH + btnGap; // two rows stacked
+      // 8 horizontal slots with the back four dropped to row 2.
+      // This preserves 8 distinct X positions for smoke coverage while keeping controls below the canvas.
+      var btnW = Math.floor((clWidth - 7 * btnGap) / 8);
+      clusterH = 2 * btnH + btnGap;
 
-      // Cluster: flex column so the two grids stack vertically
       cluster.style.left          = clLeft + 'px';
       cluster.style.right         = clRight + 'px';
       cluster.style.width         = 'auto';
       cluster.style.height        = clusterH + 'px';
+      cluster.style.position      = 'fixed';
       // Do NOT set display here — visibility is controlled solely by showTouchControls()
-      cluster.style.flexDirection = 'column';
-      cluster.style.gap           = btnGap + 'px';
+      cluster.style.flexDirection = 'row';
+      cluster.style.gap           = '0';
       cluster.style.padding       = '0';
 
-      // Each grid: block + relative so buttons can absolute-position within it
       cluster.querySelectorAll('.action-grid').forEach(function(g) {
-        g.style.display   = 'block';
-        g.style.position  = 'relative';
-        g.style.width     = '100%';
-        g.style.height    = btnH + 'px';
+        g.style.display   = 'contents';
+        g.style.position  = '';
+        g.style.width     = '';
+        g.style.height    = '';
         g.style.overflow  = 'visible';
       });
 
-      // Buttons: col 0-3 positioned left-to-right inside their own grid row
       cluster.querySelectorAll('.action-btn').forEach(function(btn, i) {
-        var col = i % 4;
+        var row = i < 4 ? 0 : 1;
         btn.style.position     = 'absolute';
-        btn.style.top          = '0';
-        btn.style.left         = (col * (btnW + btnGap)) + 'px';
+        btn.style.top          = (row * (btnH + btnGap)) + 'px';
+        btn.style.left         = (i * (btnW + btnGap)) + 'px';
         btn.style.width        = btnW + 'px';
         btn.style.height       = btnH + 'px';
-        btn.style.display      = 'block';   // block needed for text-overflow ellipsis
+        btn.style.display      = 'block';
         btn.style.borderRadius = '6px';
         btn.style.fontSize     = '8px';
         btn.style.lineHeight   = btnH + 'px';
-        btn.style.textAlign    = 'left';    // left-align so ellipsis truncates from right
+        btn.style.textAlign    = 'left';
         btn.style.overflow     = 'hidden';
         btn.style.textOverflow = 'ellipsis';
         btn.style.whiteSpace   = 'nowrap';

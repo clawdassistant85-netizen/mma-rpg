@@ -124,6 +124,8 @@ Object.assign(window.MMA.UI, {
     con.setAlpha(0);
     con.setScale(0.9);
     scene.tweens.add({ targets: con, alpha: 1, scaleX: 1, scaleY: 1, duration: 200, ease: 'Back.easeOut' });
+    MMA.UI.showEquityInSettings();
+    MMA.UI.showDiaryInSettings();
     return con;
   },
   _createSlider: function(scene, container, x, y, initialValue, onChange) {

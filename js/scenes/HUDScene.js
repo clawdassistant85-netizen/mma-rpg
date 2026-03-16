@@ -39,8 +39,24 @@ var HUDScene = new Phaser.Class({
     this.msgText = this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H/2, '', {
       fontSize:'32px', color:'#ffffff', stroke:'#000000', strokeThickness:4
     }).setOrigin(0.5).setDepth(20);
+
+    if (window.MMA && MMA.UI) {
+      if (typeof MMA.UI.initVarietyMeterDOM === 'function') MMA.UI.initVarietyMeterDOM();
+      if (typeof MMA.UI.initPressureMeterDOM === 'function') MMA.UI.initPressureMeterDOM();
+    }
   },
   update: function() {
+    var scene = this;
+
+    // Update variety and pressure meters
+    if (!this._meterUpdateTick || scene.time.now - this._meterUpdateTick > 200) {
+      this._meterUpdateTick = scene.time.now;
+      if (window.MMA && MMA.UI) {
+        if (typeof MMA.UI.updateVarietyMeter === 'function') MMA.UI.updateVarietyMeter();
+        if (typeof MMA.UI.updatePressureMeter === 'function') MMA.UI.updatePressureMeter();
+      }
+    }
+
     var stats = this.registry.get('playerStats');
     if (stats) {
       this.hpBar.width  = Math.max(0, (stats.hp  / stats.maxHp)  * 200);

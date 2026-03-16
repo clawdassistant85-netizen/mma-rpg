@@ -75,6 +75,9 @@ Object.assign(window.MMA.UI, {
     
     var container = this.comboCounter.container;
     var text = this.comboCounter.text;
+    if (!container || !text || !scene) return;
+    // Guard: Phaser text object may be destroyed after room transition
+    if (!text.active || !text.scene) return;
     
     // Update text
     text.setText(count > 0 ? count.toString() : '0');
@@ -141,6 +144,8 @@ Object.assign(window.MMA.UI, {
     label: null
   },
   showHypeMeter: function(scene) {
+    if (typeof this.initHypeMeterDOM === 'function') this.initHypeMeterDOM();
+    if (typeof this.renderHypeMeter === 'function') this.renderHypeMeter();
     if (this.hypeMeter.container) return this.hypeMeter.container;
     if (!scene || !scene.cameras || !scene.cameras.main) return null;
     var rightX = scene.cameras.main.width - 30;
@@ -211,6 +216,10 @@ Object.assign(window.MMA.UI, {
     bar.fillRect(-10, 0, 20, -barHeight);
   },
   addHype: function(scene, amount) {
+    if (typeof amount !== 'number') {
+      amount = typeof scene === 'number' ? scene : 0;
+      scene = null;
+    }
     // Update Phaser meter
     var newValue = this.hypeMeter.value + amount;
     this.updateHypeMeter(scene, newValue, this.hypeMeter.maxValue);
@@ -280,3 +289,274 @@ Object.assign(window.MMA.UI, {
     this.focusMeter.value = 0;
   }
 });
+
+MMA.UI.initHypeMeterDOM = function() {
+  if (document.getElementById('hype-meter')) return;
+  var container = document.getElementById('game-container') || document.body;
+  var meter = document.createElement('div');
+  meter.id = 'hype-meter';
+  meter.style.cssText = 'position:absolute;bottom:52px;left:50%;transform:translateX(-50%);width:120px;height:8px;background:#222;border-radius:4px;z-index:50;overflow:hidden;';
+  var fill = document.createElement('div');
+  fill.id = 'hype-meter-fill';
+  fill.style.cssText = 'height:100%;width:0%;background:#888;border-radius:4px;transition:width 0.3s,background 0.3s;';
+  meter.appendChild(fill);
+  var label = document.createElement('div');
+  label.id = 'hype-meter-label';
+  label.style.cssText = 'text-align:center;font-size:7px;color:#888;margin-top:1px;font-family:Arial;';
+  label.textContent = '🎤 COLD';
+  meter.appendChild(label);
+  container.appendChild(meter);
+};
+
+MMA.UI.initVarietyMeterDOM = function() {
+  if (document.getElementById('variety-meter')) return;
+  var container = document.getElementById('game-container') || document.body;
+  var meter = document.createElement('div');
+  meter.id = 'variety-meter';
+  meter.style.cssText = 'position:absolute;bottom:62px;left:4px;width:60px;z-index:50;';
+  var label = document.createElement('div');
+  label.style.cssText = 'font-size:6px;color:#888;font-family:Arial;text-align:center;margin-bottom:1px;';
+  label.textContent = 'VARIETY';
+  var barBg = document.createElement('div');
+  barBg.style.cssText = 'height:4px;background:#222;border-radius:2px;overflow:hidden;';
+  var barFill = document.createElement('div');
+  barFill.id = 'variety-meter-fill';
+  barFill.style.cssText = 'height:100%;width:0%;background:#00ffcc;border-radius:2px;transition:width 0.2s;';
+  barBg.appendChild(barFill);
+  meter.appendChild(label);
+  meter.appendChild(barBg);
+  container.appendChild(meter);
+};
+
+MMA.UI.updateVarietyMeter = function() {
+  var fill = _getEl('variety-meter-fill');
+  if (!fill) return;
+  var bonus = window.MMA && MMA.Combat && typeof MMA.Combat.getVarietyBonus === 'function' ? MMA.Combat.getVarietyBonus() : 0;
+  var pct = Math.max(0, Math.min(1, bonus / 0.4));
+  fill.style.width = (pct * 100).toFixed(0) + '%';
+  // Color shifts from cyan to gold as it fills
+  if (pct > 0.7) fill.style.background = '#FFD700';
+  else if (pct > 0.4) fill.style.background = '#ffaa00';
+  else fill.style.background = '#00ffcc';
+};
+
+MMA.UI.initPressureMeterDOM = function() {
+  if (document.getElementById('pressure-meter')) return;
+  var container = document.getElementById('game-container') || document.body;
+  var meter = document.createElement('div');
+  meter.id = 'pressure-meter';
+  meter.style.cssText = 'position:absolute;bottom:70px;left:4px;width:60px;z-index:50;';
+  var label = document.createElement('div');
+  label.id = 'pressure-meter-label';
+  label.style.cssText = 'font-size:6px;color:#ff4400;font-family:Arial;text-align:center;margin-bottom:1px;';
+  label.textContent = 'PRESSURE';
+  var barBg = document.createElement('div');
+  barBg.style.cssText = 'height:4px;background:#222;border-radius:2px;overflow:hidden;';
+  var barFill = document.createElement('div');
+  barFill.id = 'pressure-meter-fill';
+  barFill.style.cssText = 'height:100%;width:0%;background:#ff4400;border-radius:2px;transition:width 0.15s;';
+  barBg.appendChild(barFill);
+  meter.appendChild(label);
+  meter.appendChild(barBg);
+  container.appendChild(meter);
+};
+
+MMA.UI.updatePressureMeter = function() {
+  var fill = _getEl('pressure-meter-fill');
+  if (!fill) return;
+  var level = window.MMA && MMA.Combat ? (MMA.Combat._pressureLevel || 0) : 0;
+  fill.style.width = level + '%';
+  var label = _getEl('pressure-meter-label');
+  if (label) label.textContent = level >= 100 ? '💥 PRESSURE!' : 'PRESSURE';
+};
+
+MMA.UI.checkTechniqueMutation = function(scene, moveKey) {
+  if (!scene || !scene.player || !scene.player.moveMastery) return null;
+  var mastery = scene.player.moveMastery[moveKey];
+  var uses = mastery ? (typeof mastery === 'object' ? mastery.uses || 0 : mastery) : 0;
+
+  if (!scene.player._mutations) scene.player._mutations = {};
+  if (scene.player._mutations[moveKey]) return scene.player._mutations[moveKey]; // already mutated
+
+  if (uses >= 15) {
+    var bonusTypes = ['stun', 'range', 'stamina', 'damage'];
+    var bonus = bonusTypes[Math.floor(Math.random() * bonusTypes.length)];
+    scene.player._mutations[moveKey] = bonus;
+
+    var labels = { stun: '+stun chance', range: '+range', stamina: '-stamina cost', damage: '+5% dmg' };
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 30,
+        moveKey.toUpperCase() + ' MUTATED: ' + (labels[bonus] || bonus), '#cc88ff');
+    }
+    // Save mutation
+    try {
+      var saved = JSON.parse(localStorage.getItem('mma_mutations') || '{}');
+      saved[moveKey] = bonus;
+      localStorage.setItem('mma_mutations', JSON.stringify(saved));
+    } catch(e) {}
+    return bonus;
+  }
+  return null;
+};
+// === WEATHER HUD INDICATOR ===
+// Shows current session weather condition in top corner
+
+// DOM element cache for hot update paths
+var _domCache = {};
+function _getEl(id) {
+  if (!_domCache[id] || !_domCache[id].parentNode) {
+    _domCache[id] = document.getElementById(id);
+  }
+  return _domCache[id];
+}
+window.MMA.UIMeter = window.MMA.UIMeter || {};
+MMA.UIMeter._clearDOMCache = function() { _domCache = {}; };
+
+MMA.UIMeter = window.MMA.UIMeter || {};
+
+MMA.UIMeter.initWeatherHUD = MMA.UIMeter.initWeatherHUD || function() {
+  var el = document.getElementById('weather-hud');
+  if (el) return;
+  el = document.createElement('div');
+  el.id = 'weather-hud';
+  el.style.cssText = 'position:absolute;top:8px;right:8px;font-size:9px;color:#FFD700;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:4px;z-index:60;pointer-events:none;';
+  var label = (window.MMA && MMA.CombatMoves && typeof MMA.CombatMoves.getWeatherLabel === 'function')
+    ? MMA.CombatMoves.getWeatherLabel() : '';
+  el.textContent = label;
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(el);
+};
+
+// === JUDGE SCORE METER ===
+// Thin bar at top showing crowd judge scoring (0-100)
+MMA.UIMeter.initJudgeMeter = MMA.UIMeter.initJudgeMeter || function() {
+  var el = _getEl('judge-meter');
+  if (el) return;
+  el = document.createElement('div');
+  el.id = 'judge-meter';
+  el.style.cssText = 'position:absolute;top:0;left:0;width:0%;height:3px;background:linear-gradient(90deg,#FFD700,#ff8800);z-index:70;pointer-events:none;transition:width 0.3s;';
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(el);
+};
+
+MMA.UIMeter.updateJudgeMeter = MMA.UIMeter.updateJudgeMeter || function() {
+  var el = _getEl('judge-meter');
+  if (!el) return;
+  var score = (window.MMA && MMA.Combat && MMA.Combat._judgeScore) ? MMA.Combat._judgeScore : 0;
+  el.style.width = Math.min(100, score) + '%';
+  // Color shifts green at high scores
+  if (score >= 70) {
+    el.style.background = 'linear-gradient(90deg,#00ff88,#FFD700)';
+  } else {
+    el.style.background = 'linear-gradient(90deg,#FFD700,#ff8800)';
+  }
+};
+
+// === GEAR DURABILITY BAR ===
+// Small bar under HP showing gear durability
+MMA.UIMeter.initGearDurabilityBar = MMA.UIMeter.initGearDurabilityBar || function() {
+  var el = document.getElementById('gear-dur-bar');
+  if (el) return;
+  var wrap = document.createElement('div');
+  wrap.id = 'gear-dur-wrap';
+  wrap.style.cssText = 'position:absolute;bottom:52px;left:8px;width:80px;z-index:60;pointer-events:none;';
+  var label = document.createElement('div');
+  label.style.cssText = 'font-size:7px;color:#888;margin-bottom:1px;';
+  label.textContent = 'GEAR';
+  var bar = document.createElement('div');
+  bar.id = 'gear-dur-bar';
+  bar.style.cssText = 'height:3px;width:100%;background:#444;border-radius:2px;overflow:hidden;';
+  var fill = document.createElement('div');
+  fill.id = 'gear-dur-fill';
+  fill.style.cssText = 'height:100%;width:100%;background:#aaaaaa;transition:width 0.3s,background 0.3s;';
+  bar.appendChild(fill);
+  wrap.appendChild(label);
+  wrap.appendChild(bar);
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(wrap);
+};
+
+MMA.UIMeter.updateGearDurabilityBar = MMA.UIMeter.updateGearDurabilityBar || function(scene) {
+  var fill = _getEl('gear-dur-fill');
+  if (!fill) return;
+  var p = scene && scene.player;
+  var dur = (p && p.stats && p.stats._gearDurability !== undefined) ? p.stats._gearDurability : 100;
+  fill.style.width = dur + '%';
+  if (dur <= 20) fill.style.background = '#ff2200';
+  else if (dur <= 50) fill.style.background = '#ff8800';
+  else fill.style.background = '#aaaaaa';
+};
+// === CORNER DOMINATION HUD ===
+MMA.UIMeter.initCornerDomHUD = MMA.UIMeter.initCornerDomHUD || function() {
+  var el = document.getElementById('corner-dom-hud');
+  if (el) return;
+  el = document.createElement('div');
+  el.id = 'corner-dom-hud';
+  el.style.cssText = 'position:absolute;bottom:62px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:bold;color:#ff8800;background:rgba(0,0,0,0.6);padding:2px 8px;border-radius:4px;z-index:60;pointer-events:none;opacity:0;transition:opacity 0.25s;';
+  el.textContent = '📐 CORNER +15%';
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(el);
+};
+
+MMA.UIMeter.updateCornerDomHUD = MMA.UIMeter.updateCornerDomHUD || function(scene) {
+  var el = document.getElementById('corner-dom-hud');
+  if (!el) return;
+  var enemies = scene && scene.enemies || [];
+  var cornered = enemies.some(function(e) { return e && e.active && e._cornerDominating; });
+  el.style.opacity = cornered ? '1' : '0';
+};
+
+// === CONDITIONING FATIGUE INDICATOR ===
+// Shows fatigue level next to move buttons if severely tired
+MMA.UIMeter.updateFatigueIndicators = MMA.UIMeter.updateFatigueIndicators || function() {
+  var moves = ['jab','cross','hook','uppercut','lowKick','headKick','clinchKnee','takedown','clinch','submission','groundPound'];
+  moves.forEach(function(move) {
+    var btn = document.querySelector('[data-move="' + move + '"]');
+    if (!btn) return;
+    var label = (window.MMA && MMA.Combat && typeof MMA.Combat.getConditioningLabel === 'function')
+      ? MMA.Combat.getConditioningLabel(move) : null;
+    // Add/remove fatigue class
+    if (label) {
+      btn.style.opacity = label === 'EXHAUSTED' ? '0.45' : label === 'FATIGUED' ? '0.65' : '0.85';
+      btn.title = label;
+    } else {
+      btn.style.opacity = '';
+      btn.title = '';
+    }
+  });
+};
+
+// === FIGHT NIGHT STAR RATING ===
+// 1-5 stars based on combo variety, judge score, speed
+MMA.UIMeter.calcFightStarRating = MMA.UIMeter.calcFightStarRating || function(scene) {
+  var score = 0;
+  // Judge score contribution (max 50pts)
+  var judgeScore = (window.MMA && MMA.Combat && MMA.Combat._judgeScore) ? MMA.Combat._judgeScore : 0;
+  score += Math.round(judgeScore * 0.5);
+  // Combo variety (max 30pts) — unique moves used
+  var fatigue = (window.MMA && MMA.Combat && MMA.Combat._moveFatigue) ? MMA.Combat._moveFatigue : {};
+  var uniqueMoves = Object.keys(fatigue).length;
+  score += Math.min(30, uniqueMoves * 4);
+  // Hype meter (max 20pts)
+  var hype = (window.MMA && MMA.UI && MMA.UI._hypeMeter) ? MMA.UI._hypeMeter : 0;
+  score += Math.round(hype * 0.2);
+  // Convert to stars
+  if (score >= 85) return 5;
+  if (score >= 65) return 4;
+  if (score >= 45) return 3;
+  if (score >= 25) return 2;
+  return 1;
+};
+
+MMA.UIMeter.showFightStarRating = MMA.UIMeter.showFightStarRating || function(scene) {
+  var stars = MMA.UIMeter.calcFightStarRating(scene);
+  var el = document.getElementById('fight-star-rating');
+  if (el) el.remove();
+  el = document.createElement('div');
+  el.id = 'fight-star-rating';
+  el.style.cssText = 'position:absolute;top:28%;left:50%;transform:translateX(-50%);font-size:20px;z-index:160;pointer-events:none;';
+  el.textContent = '⭐'.repeat(stars) + '☆'.repeat(5 - stars);
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(el);
+  scene.time.delayedCall(3000, function() { if (el.parentNode) el.remove(); });
+};

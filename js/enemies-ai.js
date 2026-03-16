@@ -346,7 +346,7 @@ Object.assign(window.MMA.Enemies, {
       enemy._recentDamage = Math.min(enemy._recentDamage, 50);
     }
 
-    return adaptiveDef * styleCounterDef * vengeanceDef * territoryDef * predatorDef * comboMemoryDef * weightAdvDef;
+    return adaptiveDef * styleCounterDef * vengeanceDef * territoryDef * predatorDef * comboMemoryDef * weightAdvDef * (enemy._packDefenseMult || 1);
   },
 
 
@@ -1287,6 +1287,19 @@ Object.assign(window.MMA.Enemies, {
   },
 
 
+  showWeightLabel: function(scene, enemy) {
+    if (!enemy || !enemy.type) return;
+    var wc = (enemy.type.weightClass || 'medium').toUpperCase();
+    var colors = { LIGHT: '#00ffcc', MEDIUM: '#ffffff', HEAVY: '#ff8800' };
+    var color = colors[wc] || '#ffffff';
+    if (!scene || !scene.add) return;
+    if (enemy._weightLabel && enemy._weightLabel.active) enemy._weightLabel.destroy();
+    enemy._weightLabel = scene.add.text(enemy.x, enemy.y - (enemy.displayHeight || 24) - 4, wc, {
+      fontSize: '7px', fontFamily: 'Arial', color: color, stroke: '#000', strokeThickness: 2
+    }).setOrigin(0.5, 1).setDepth(25);
+  },
+
+
   updateEnemies: function(scene, delta) {
     // Pack behavior: enemies gain speed bonus when near allies
     var PACK_RADIUS = 100; // pixels
@@ -1346,6 +1359,35 @@ Object.assign(window.MMA.Enemies, {
       }
     });
 
+    // Feint Master + Tag Team coordination hooks
+    if (runThrottled) {
+      var aliveEnemies = (scene.enemies || []).filter(function(e) {
+        return e && e.active && e.state !== 'dead' && e.stats && e.stats.hp > 0;
+      });
+
+      aliveEnemies.forEach(function(enemy) {
+        var behaviorType = (enemy.type && enemy.type.behaviorType) || enemy.behaviorType || '';
+        var attackPattern = (enemy.type && enemy.type.attackPattern) || enemy.attackPattern || '';
+        var isFeintType = behaviorType === 'feint';
+        var hasFeintPattern = (typeof attackPattern === 'string' && attackPattern.indexOf('feint') !== -1) ||
+          (Array.isArray(attackPattern) && attackPattern.indexOf('feint') !== -1);
+        if (isFeintType || hasFeintPattern) {
+          MMA.Enemies.executeFeint(scene, enemy);
+        }
+      });
+
+      if (aliveEnemies.length >= 2) {
+        var tagEnemies = aliveEnemies.filter(function(enemy) {
+          var attackPattern = (enemy.type && enemy.type.attackPattern) || enemy.attackPattern || '';
+          return (typeof attackPattern === 'string' && attackPattern.indexOf('tag') !== -1) ||
+            (Array.isArray(attackPattern) && attackPattern.indexOf('tag') !== -1);
+        });
+        if (tagEnemies.length >= 2) {
+          MMA.Enemies.updateTagTeam(scene, tagEnemies);
+        }
+      }
+    }
+
     // --- Attack token coordination ---
     var now = Date.now();
     // Validate existing token and clear if dead or expired
@@ -1394,6 +1436,57 @@ Object.assign(window.MMA.Enemies, {
 
       var targetPlayer = self.getTargetPlayer(scene, e);
       if (!targetPlayer) return;
+
+      // Spawn/init hook: ensure weight label exists for newly spawned enemies.
+      if (!e._weightLabel || !e._weightLabel.active) {
+        self.showWeightLabel(scene, e);
+      }
+
+      // Bully AI: chase at low player HP, flee at low own HP
+      var playerHpRatio = scene.player && scene.player.stats ?
+        (scene.player.stats.hp / (scene.player.stats.maxHp || 100)) : 1;
+      var selfHpRatio = e.stats ?
+        (e.stats.hp / (e.type && e.type.stats ? e.type.stats.maxHp || e.type.stats.hp : (e.stats.maxHp || 100))) : 1;
+
+      if (selfHpRatio < 0.2 && !e._fleeing) {
+        // Flee behavior
+        e._fleeing = true;
+        e._bullying = false;
+      } else if (playerHpRatio < 0.3 && selfHpRatio > 0.5 && !e._fleeing) {
+        // Bully — pursue harder
+        e._bullying = true;
+      }
+      if (e._fleeing && selfHpRatio >= 0.2) e._fleeing = false;
+
+      // Apply flee: move away from player
+      if (e._fleeing && scene.player) {
+        var fdx = e.x - scene.player.x;
+        var fdy = e.y - scene.player.y;
+        var fdist = Math.sqrt(fdx*fdx + fdy*fdy) || 1;
+        if (fdist < 200) {
+          var fspd = (e.type && e.type.stats && e.type.stats.speed) ? e.type.stats.speed * 0.8 : ((e.type && e.type.speed) ? e.type.speed * 0.8 : 60);
+          e.setVelocity((fdx/fdist) * fspd, (fdy/fdist) * fspd);
+        }
+      }
+
+      // Critical health distress cue
+      var maxHp = e.type && e.type.stats ? e.type.stats.maxHp || e.type.stats.hp || 100 : (e.stats && e.stats.maxHp ? e.stats.maxHp : 100);
+      var hpRatio = e.stats ? (e.stats.hp / maxHp) : 1;
+      if (hpRatio < 0.2 && !e._distressTintCycle) {
+        e._distressTintCycle = true;
+        (function flashDistress(enemyRef, maxHpRef) {
+          if (!enemyRef.active || !enemyRef.setTint) return;
+          var hp2 = enemyRef.stats ? enemyRef.stats.hp : 0;
+          if (hp2 <= 0) return;
+          var ratio2 = enemyRef.stats ? (enemyRef.stats.hp / maxHpRef) : 1;
+          if (ratio2 >= 0.2) { enemyRef._distressTintCycle = false; return; }
+          enemyRef.setTint(0xff4444);
+          scene.time.delayedCall(150, function() {
+            if (enemyRef.active) { enemyRef.clearTint(); }
+            scene.time.delayedCall(150, function() { flashDistress(enemyRef, maxHpRef); });
+          });
+        })(e, maxHp);
+      }
       
       // Update HP bar position and width
       if (e._hpBarBg) {
@@ -1444,6 +1537,10 @@ Object.assign(window.MMA.Enemies, {
             e._hpDamageTrail.setAlpha(0);
           }
         }
+      }
+
+      if (e._weightLabel && e._weightLabel.active) {
+        e._weightLabel.setPosition(e.x, e.y - (e.displayHeight || 24) - 4);
       }
 
       // Update Role Icon position each frame
@@ -1810,6 +1907,9 @@ Object.assign(window.MMA.Enemies, {
       }
 
       e.type.speed = Math.min(e.baseSpeed + bonus, maxSpeed);
+      if (e._packRush) {
+        e.type.speed = Math.min(e.type.speed * 2, maxSpeed * 2);
+      }
 
       if (self.coordination.updateEnemy(e, targetPlayer, scene, delta)) {
         if (e.attackCooldown > 0) e.attackCooldown -= delta;
@@ -1821,6 +1921,65 @@ Object.assign(window.MMA.Enemies, {
     });
   }
 });
+
+MMA.Enemies.executeFeint = function(scene, enemy) {
+  if (!enemy || !enemy.active) return;
+  if (enemy._feintCooldown && scene.time.now < enemy._feintCooldown) return;
+  enemy._feintCooldown = scene.time.now + 4000;
+  enemy._feinting = true;
+
+  // Visual tell — brief orange tint
+  if (enemy.setTint) enemy.setTint(0xff8800);
+  scene.time.delayedCall(200, function() {
+    if (enemy.active && enemy.clearTint) enemy.clearTint();
+  });
+
+  // Fake attack visual
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, 'FEINT!', '#ff8800');
+  }
+
+  // Real attack 300ms later
+  scene.time.delayedCall(300, function() {
+    enemy._feinting = false;
+    if (!enemy.active || !scene.player) return;
+    var dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, scene.player.x, scene.player.y);
+    if (dist < 100) {
+      var dmg = enemy.stats ? Math.round((enemy.stats.attackDamage || 10) * 1.3) : 13;
+      if (window.MMA && MMA.Enemies && typeof MMA.Enemies.damagePlayer === 'function') {
+        MMA.Enemies.damagePlayer(enemy, scene, dmg);
+      }
+    }
+  });
+};
+
+MMA.Enemies.updateTagTeam = function(scene, enemies) {
+  if (!enemies || enemies.length < 2) return;
+  var activeAttacker = enemies.find(function(e) { return e._tagAttacking; });
+  if (!activeAttacker) {
+    // Pick the healthiest to attack
+    var best = enemies.reduce(function(a, b) {
+      return (a.stats ? a.stats.hp : 0) > (b.stats ? b.stats.hp : 0) ? a : b;
+    });
+    best._tagAttacking = true;
+    enemies.forEach(function(e) {
+      if (e !== best) {
+        e._tagAttacking = false;
+        e._tagResting = true;
+        // Recovering enemy slowly retreats
+        if (e.body && scene.player) {
+          var dx = e.x - scene.player.x, dy = e.y - scene.player.y;
+          var d = Math.sqrt(dx*dx+dy*dy) || 1;
+          if (d < 200) e.setVelocity((dx/d)*30, (dy/d)*30);
+        }
+      }
+    });
+    // Auto-switch after 3s
+    scene.time.delayedCall(3000, function() {
+      enemies.forEach(function(e) { e._tagAttacking = false; e._tagResting = false; });
+    });
+  }
+};
 
 
 window.MMA.Enemies.AI = {
@@ -2744,151 +2903,6 @@ window.MMA.Enemies.AI = {
     if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
   },
 
-  // Drunk Monk AI: unpredictable attack patterns - swings wildly, trips randomly, occasionally lands devastating accidental hits
-  // Unsettling RNG element that keeps players on toes
-  drunkMonk: function(enemy, player, scene, dt) {
-    var dx = player.x - enemy.x, dy = player.y - enemy.y, dist = Math.sqrt(dx*dx + dy*dy) || 1;
-    var speedMod = (enemy.moveSpeedMod || 1) * (enemy.shakenMoveMult || 1);
-    var attackMod = (enemy.attackSpeedMod || 1) * (enemy.shakenAttackMult || 1);
-    var vulnMult = window.MMA.Enemies.getInjuryDamageMultiplier(enemy);
-    var vengeanceMult = window.MMA.Enemies.getVengeanceDamageMult(enemy);
-
-    // Initialize drunk state
-    if (enemy._drunkState === undefined) enemy._drunkState = 'wander'; // 'wander', 'windup', 'swing', 'trip', 'recovery'
-    if (enemy._drunkTimer === undefined) enemy._drunkTimer = 0;
-    if (enemy._drunkWobble === undefined) enemy._drunkWobble = 0;
-
-    // Wobble effect: random slight position jitter
-    enemy._drunkWobble += (Math.random() - 0.5) * 0.8;
-    enemy._drunkWobble *= 0.9; // decay
-    enemy.x += enemy._drunkWobble;
-
-    // Handle trip state (stumbles randomly)
-    if (enemy._drunkState === 'trip') {
-      enemy.setVelocity(0, 0);
-      enemy._drunkTimer -= dt;
-      if (enemy._drunkTimer <= 0) {
-        enemy._drunkState = 'recovery';
-        enemy._drunkTimer = 400;
-        // Trip recovery has a chance to do an accidental wild swing
-        if (Math.random() < 0.35) {
-          enemy._drunkState = 'accidentalSwing';
-          enemy._drunkTimer = 150;
-        }
-      }
-      return;
-    }
-
-    // Accidental devastating hit (the drunk lands a lucky shot)
-    if (enemy._drunkState === 'accidentalSwing') {
-      enemy.setVelocity(0, 0);
-      enemy._drunkTimer -= dt;
-      if (enemy._drunkTimer <= 0 && (enemy.hasAttackToken || enemy.isBoss)) {
-        // BIG damage! Lucky hit
-        var luckyMult = 1.8 + Math.random() * 0.7; // 1.8x to 2.5x damage
-        var dmg = Math.round(enemy.type.attackDamage * luckyMult * vulnMult * vengeanceMult * (window.MMA.Enemies.getPackDamageMultiplier ? window.MMA.Enemies.getPackDamageMultiplier(enemy, scene) : 1) * (window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(enemy, scene) : 1));
-        window.MMA.Enemies.damagePlayer(enemy, scene, dmg);
-        if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
-          MMA.UI.showDamageText(scene, player.x, player.y - 40, 'LUCKY SHOT!', '#ffa500');
-          MMA.UI.showDamageText(scene, player.x, player.y - 25, '-' + dmg + '!', '#ff0000');
-        }
-        enemy._drunkState = 'wander';
-        enemy._drunkTimer = 800 + Math.random() * 600;
-      }
-      return;
-    }
-
-    // Recovery after swing
-    if (enemy._drunkState === 'recovery') {
-      enemy.setVelocity(0, 0);
-      enemy._drunkTimer -= dt;
-      if (enemy._drunkTimer <= 0) {
-        enemy._drunkState = 'wander';
-        enemy._drunkTimer = 500 + Math.random() * 800;
-      }
-      return;
-    }
-
-    // Windup for a wild swing
-    if (enemy._drunkState === 'windup') {
-      enemy.setVelocity(0, 0);
-      enemy._drunkTimer -= dt;
-      if (enemy._drunkTimer <= 0) {
-        enemy._drunkState = 'swing';
-        enemy._drunkTimer = 180;
-      }
-      return;
-    }
-
-    // The actual swing attack
-    if (enemy._drunkState === 'swing') {
-      enemy.setVelocity(0, 0);
-      enemy._drunkTimer -= dt;
-      if (enemy._drunkTimer <= 0) {
-        var isEliteBreaker = window.MMA.Enemies.canEliteBreakCoordination(enemy);
-        if ((enemy.hasAttackToken || enemy.isBoss || isEliteBreaker)) {
-          // Normal swing damage with slight bonus
-          var dmg = Math.round(enemy.type.attackDamage * 1.15 * vulnMult * vengeanceMult * (window.MMA.Enemies.getPackDamageMultiplier ? window.MMA.Enemies.getPackDamageMultiplier(enemy, scene) : 1) * (window.MMA.Enemies.getTerritoryAttackMultiplier ? window.MMA.Enemies.getTerritoryAttackMultiplier(enemy, scene) : 1));
-          // Apply elite coordination break damage penalty
-          if (isEliteBreaker) {
-            dmg = Math.round(dmg * window.MMA.Enemies.ELITE_COORDINATION_BREAK.DAMAGE_MULT);
-            window.MMA.Enemies.recordEliteStrike(enemy, scene, true);
-          }
-          window.MMA.Enemies.damagePlayer(enemy, scene, dmg);
-        }
-        if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
-          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, 'WILD SWING!', '#8866aa');
-        }
-        // Random trip after swing (drunk being clumsy)
-        if (Math.random() < 0.25) {
-          enemy._drunkState = 'trip';
-          enemy._drunkTimer = 600;
-        } else {
-          enemy._drunkState = 'wander';
-          enemy._drunkTimer = 600 + Math.random() * 700;
-        }
-      }
-      return;
-    }
-
-    // Wander state: unpredictable movement
-    if (enemy._drunkState === 'wander') {
-      enemy._drunkTimer -= dt;
-
-      // Occasionally do random things
-      if (enemy._drunkTimer <= 0) {
-        var roll = Math.random();
-        if (roll < 0.15) {
-          // Trip!
-          enemy._drunkState = 'trip';
-          enemy._drunkTimer = 500 + Math.random() * 400;
-          if (typeof MMA !== 'undefined' && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
-            MMA.UI.showDamageText(scene, enemy.x, enemy.y - 35, 'TRIPPED!', '#aaaaaa');
-          }
-        } else if (roll < 0.45) {
-          // Wind up a swing
-          enemy._drunkState = 'windup';
-          enemy._drunkTimer = 250 + Math.random() * 150;
-        } else {
-          // Just wander around unpredictably
-          enemy._drunkState = 'wander';
-          enemy._drunkTimer = 400 + Math.random() * 600;
-        }
-      }
-
-      // Move unpredictably - add noise to direction
-      if (dist < enemy.type.chaseRange) {
-        var noise = (Math.random() - 0.5) * 0.6;
-        var angle = Math.atan2(dy, dx) + noise;
-        var spd = enemy.type.speed * 0.6 * speedMod;
-        enemy.setVelocity(Math.cos(angle) * spd, Math.sin(angle) * spd);
-      } else {
-        enemy.setVelocity(0, 0);
-      }
-    }
-
-    if (enemy.attackCooldown > 0) enemy.attackCooldown -= dt;
-  },
 
   // Temperamental Enforcer AI: heavy hitter that gets faster when allies die, but becomes less accurate
   enforcer: function(enemy, player, scene, dt) {
@@ -3519,6 +3533,9 @@ window.MMA.Enemies.spawnShadow = function(scene, playerStyle) {
     };
     if (!scene.enemies) scene.enemies = [];
     scene.enemies.push(shadow);
+    if (window.MMA && MMA.Enemies && MMA.Enemies.showWeightLabel) {
+      MMA.Enemies.showWeightLabel(scene, shadow);
+    }
     MMA.UI.showMessage(scene, shadow.getDialogue());
     return shadow;
 };
@@ -3528,3 +3545,248 @@ window.ENEMY_AI = window.ENEMY_AI || window.MMA.Enemies.AI;
 // ENSEMBLE CAST: Recurring Enemy Character Roster
 // Distinct enemy characters with backstory, unique voice lines
 // ============================================================
+// === OPPONENT RESPECT MATRIX ===
+// Enemies adjust aggression based on how the player beat their type before
+MMA.EnemiesAI = window.MMA.EnemiesAI || {};
+
+MMA.EnemiesAI.getEnemyRespect = MMA.EnemiesAI.getEnemyRespect || function(enemyType) {
+  try {
+    var rep = JSON.parse(localStorage.getItem('mma_enemy_respect') || '{}');
+    return rep[enemyType] || 0;
+  } catch(e) { return 0; }
+};
+
+MMA.EnemiesAI.addEnemyRespect = MMA.EnemiesAI.addEnemyRespect || function(enemyType, amount) {
+  try {
+    var rep = JSON.parse(localStorage.getItem('mma_enemy_respect') || '{}');
+    rep[enemyType] = Math.min(100, (rep[enemyType] || 0) + (amount || 10));
+    localStorage.setItem('mma_enemy_respect', JSON.stringify(rep));
+  } catch(e) {}
+};
+
+MMA.EnemiesAI.getRespectBehavior = MMA.EnemiesAI.getRespectBehavior || function(enemy) {
+  if (!enemy || !enemy.type) return { aggressionMult: 1.0, guardMult: 1.0 };
+  var respect = MMA.EnemiesAI.getEnemyRespect(enemy.type);
+  if (respect >= 75) return { aggressionMult: 0.7, guardMult: 1.4, label: 'CAUTIOUS' };
+  if (respect >= 50) return { aggressionMult: 0.85, guardMult: 1.2, label: 'WARY' };
+  if (respect >= 25) return { aggressionMult: 1.0, guardMult: 1.1 };
+  return { aggressionMult: 1.2, guardMult: 0.9, label: 'AGGRESSIVE' }; // disrespects you
+};
+
+// === RING CORNER ESCAPE ===
+// Enemy AI: when cornered, attempt break-out dash
+MMA.EnemiesAI.checkCornerEscape = MMA.EnemiesAI.checkCornerEscape || function(scene, enemy) {
+  if (!scene || !enemy || !scene.player) return;
+  var CANVAS_W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var CANVAS_H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 700;
+  var MARGIN = 60;
+  var inCorner = (
+    (enemy.x < MARGIN || enemy.x > CANVAS_W - MARGIN) &&
+    (enemy.y < MARGIN + 80 || enemy.y > CANVAS_H - MARGIN)
+  );
+  if (!inCorner) return;
+  if (enemy._cornerEscapeCooldown && Date.now() < enemy._cornerEscapeCooldown) return;
+  // Dash toward center
+  var cx = CANVAS_W / 2;
+  var cy = CANVAS_H / 2;
+  var angle = Math.atan2(cy - enemy.y, cx - enemy.x);
+  var speed = (enemy.stats && enemy.stats.speed) ? enemy.stats.speed * 2.5 : 150;
+  if (enemy.body) {
+    enemy.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+  }
+  enemy._cornerEscapeCooldown = Date.now() + 3000;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, 'CORNER ESCAPE!', '#ff8800');
+  }
+};
+
+// === PACK HUNTER AI ===
+// When 3+ enemies alive, they coordinate: one distracts while others flank
+MMA.EnemiesAI.updatePackHunter = MMA.EnemiesAI.updatePackHunter || function(scene, enemies) {
+  if (!scene || !enemies || enemies.length < 3) return;
+  var alive = enemies.filter(function(e) { return e && e.active && e.hp > 0; });
+  if (alive.length < 3) return;
+  // Assign roles cyclically
+  alive.forEach(function(e, i) {
+    if (i === 0) {
+      e._packRole = 'distract'; // charge player directly
+    } else {
+      e._packRole = 'flank'; // approach from angle
+      e._flankAngleOffset = (i % 2 === 0 ? 1 : -1) * (Math.PI / 3);
+    }
+  });
+};
+
+MMA.EnemiesAI.getPackHunterVelocity = MMA.EnemiesAI.getPackHunterVelocity || function(scene, enemy) {
+  if (!scene || !enemy || !scene.player) return null;
+  if (!enemy._packRole) return null;
+  var p = scene.player;
+  var baseAngle = Math.atan2(p.y - enemy.y, p.x - enemy.x);
+  var angle = enemy._packRole === 'flank'
+    ? baseAngle + (enemy._flankAngleOffset || 0)
+    : baseAngle;
+  var speed = (enemy.stats && enemy.stats.speed) ? enemy.stats.speed : 80;
+  return { vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed };
+};
+// === TOURNAMENT AI ===
+// Tournament Pro uses all moves and parries frequently
+MMA.EnemiesAI.updateTournamentAI = MMA.EnemiesAI.updateTournamentAI || function(scene, enemy) {
+  if (!scene || !enemy || !scene.player) return;
+  var p = scene.player;
+  var dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, p.x, p.y);
+  // Parry attempt every 3s
+  if (!enemy._tournParryCooldown || Date.now() > enemy._tournParryCooldown) {
+    if (Math.random() < 0.15 && window.MMA && MMA.EnemiesCombat && typeof MMA.EnemiesCombat.startEnemyParry === 'function') {
+      MMA.EnemiesCombat.startEnemyParry(scene, enemy);
+      enemy._tournParryCooldown = Date.now() + 3000;
+    }
+  }
+  // Close distance steadily
+  if (dist > 60) {
+    var angle = Math.atan2(p.y - enemy.y, p.x - enemy.x);
+    var speed = (enemy.stats && enemy.stats.speed) ? enemy.stats.speed : 100;
+    if (enemy.body) enemy.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+  } else {
+    if (enemy.body) enemy.body.setVelocity(0, 0);
+  }
+};
+
+// === RIVALRY AI ===
+// Picks moves that counter player's dominant style
+MMA.EnemiesAI.updateRivalryAI = MMA.EnemiesAI.updateRivalryAI || function(scene, enemy) {
+  if (!scene || !enemy || !scene.player) return;
+  var p = scene.player;
+  // Determine player dominant style
+  var dna = p._styleDNACounts || {};
+  var max = 0; var dominant = 'strike';
+  Object.keys(dna).forEach(function(k) { if ((dna[k]||0) > max) { max = dna[k]; dominant = k; } });
+  // Set enemy style to counter
+  var counter = { strike: 'grapple', grapple: 'kick', kick: 'strike', special: 'strike' };
+  enemy._rivalryCounter = counter[dominant] || 'strike';
+  // Move toward player
+  var dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, p.x, p.y);
+  if (dist > 55) {
+    var angle = Math.atan2(p.y - enemy.y, p.x - enemy.x);
+    var speed = (enemy.stats && enemy.stats.speed) ? enemy.stats.speed : 95;
+    if (enemy.body) enemy.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+  } else {
+    if (enemy.body) enemy.body.setVelocity(0, 0);
+  }
+  // Gain respect bonus if counter style
+  if (window.MMA && MMA.EnemiesAI && typeof MMA.EnemiesAI.addEnemyRespect === 'function') {
+    if (!enemy._rivalRespectAdded) {
+      enemy._rivalRespectAdded = true;
+      MMA.EnemiesAI.addEnemyRespect('rivalryFighter', 5);
+    }
+  }
+};
+
+// === WEATHER AI ===
+// Weather Guard stays at distance and harasses
+MMA.EnemiesAI.updateWeatherAI = MMA.EnemiesAI.updateWeatherAI || function(scene, enemy) {
+  if (!scene || !enemy || !scene.player) return;
+  var p = scene.player;
+  var dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, p.x, p.y);
+  var CANVAS_W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var CANVAS_H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 700;
+  // Keep medium distance (80-120px)
+  var speed = (enemy.stats && enemy.stats.speed) ? enemy.stats.speed : 85;
+  if (dist < 80) {
+    // Back away
+    var angle = Math.atan2(enemy.y - p.y, enemy.x - p.x);
+    if (enemy.body) enemy.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+  } else if (dist > 120) {
+    var angle2 = Math.atan2(p.y - enemy.y, p.x - enemy.x);
+    if (enemy.body) enemy.body.setVelocity(Math.cos(angle2) * (speed * 0.7), Math.sin(angle2) * (speed * 0.7));
+  } else {
+    if (enemy.body) enemy.body.setVelocity(0, 0);
+  }
+};
+
+// === ENEMIES-AI PERFORMANCE PATCH ===
+// Wraps updateEnemies with a phased scheduler:
+// - Frame phase: main per-enemy loop only (every frame)
+// - 100ms phase: tactical checks (taunt, tag-team, token rebalance)
+// - Caches targetPlayer + squared distance per tick to avoid redundant calls
+(function() {
+  if (!window.MMA || !MMA.Enemies || typeof MMA.Enemies.updateEnemies !== 'function') return;
+  if (MMA.Enemies._phasedSchedulerInstalled) return;
+  MMA.Enemies._phasedSchedulerInstalled = true;
+
+  var _origUpdate = MMA.Enemies.updateEnemies;
+  var _lastTacticalMs = 0;
+  var TACTICAL_INTERVAL = 100; // ms
+
+  MMA.Enemies.updateEnemies = function(scene, delta) {
+    if (!scene) return;
+
+    // Build per-tick cache: targetPlayer + squared distance for each enemy
+    var enemies = scene.enemyGroup ? scene.enemyGroup.getChildren() : [];
+    var now = (scene.time && scene.time.now) || Date.now();
+
+    // Cache target + dist² on each enemy object (cheap read, avoids repeated calls)
+    var targetPlayer = (window.MMA && MMA.Enemies && typeof MMA.Enemies.getTargetPlayer === 'function')
+      ? MMA.Enemies.getTargetPlayer(scene)
+      : (scene.player2 && scene.player2.active ? scene.player2 : scene.player);
+
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (!e || !e.active) continue;
+      e._cachedTarget = targetPlayer;
+      if (targetPlayer) {
+        var dx = targetPlayer.x - e.x;
+        var dy = targetPlayer.y - e.y;
+        e._cachedDistSq = dx * dx + dy * dy;
+        e._cachedDist = Math.sqrt(e._cachedDistSq);
+      }
+    }
+
+    // Always run the full update (it gates internally via runThrottled/attackCooldown)
+    _origUpdate.call(this, scene, delta);
+
+    // Tactical phase — only every 100ms
+    if (now - _lastTacticalMs >= TACTICAL_INTERVAL) {
+      _lastTacticalMs = now;
+      MMA.Enemies._runTacticalPhase(scene, enemies, targetPlayer);
+    }
+  };
+
+  // Tactical phase: token rebalance, gang-up coordination, tag-team check
+  MMA.Enemies._runTacticalPhase = function(scene, enemies, targetPlayer) {
+    if (!enemies || !enemies.length) return;
+
+    var alive = [];
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (e && e.active && e.stats && e.stats.hp > 0) alive.push(e);
+    }
+    if (!alive.length) return;
+
+    // Rebalance attack tokens: only 1 enemy should have token at a time
+    var tokenHolder = null;
+    for (var i = 0; i < alive.length; i++) {
+      if (alive[i].hasAttackToken) {
+        if (tokenHolder) {
+          alive[i].hasAttackToken = false; // strip duplicate tokens
+        } else {
+          tokenHolder = alive[i];
+        }
+      }
+    }
+    // If nobody has token, assign to closest
+    if (!tokenHolder && targetPlayer) {
+      var closest = null, closestDist = Infinity;
+      for (var i = 0; i < alive.length; i++) {
+        var d = alive[i]._cachedDistSq || Infinity;
+        if (d < closestDist) { closestDist = d; closest = alive[i]; }
+      }
+      if (closest) closest.hasAttackToken = true;
+    }
+
+    // Gang-up: if 3+ alive enemies, apply gang-up flag once here (not per frame)
+    var gangUp = alive.length >= 3;
+    for (var i = 0; i < alive.length; i++) {
+      alive[i]._gangUpActive = gangUp;
+    }
+  };
+})();

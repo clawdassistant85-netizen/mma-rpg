@@ -1,4 +1,15 @@
 window.MMA = window.MMA || {};
+
+var _vfxDomCache = {};
+function _vfxGetEl(id) {
+  if (!_vfxDomCache[id] || !_vfxDomCache[id].parentNode) {
+    _vfxDomCache[id] = document.getElementById(id);
+  }
+  return _vfxDomCache[id];
+}
+window.MMA.VFX = window.MMA.VFX || {};
+MMA.VFX._clearDOMCache = function() { _vfxDomCache = {}; };
+
 window.MMA.VFX = {
   _removeTrackedObject: function(scene, obj) {
     if (!scene || !scene._mmaVfxObjects || !obj) return;
@@ -823,3 +834,764 @@ window.MMA.VFX.comboDisplay = {
 
   retryPatches(15);
 })();
+
+window.MMA.VFX.showComboLetter = function(scene, comboCount) {
+  if (!scene || !scene.add || !scene.tweens) return null;
+  var word = null;
+  if (comboCount >= 20) word = 'LEGEND';
+  else if (comboCount === 15) word = 'MONSTER';
+  else if (comboCount === 10) word = 'BEAST';
+  else if (comboCount === 5) word = 'NICE';
+  if (!word) return null;
+
+  var colors = { NICE:'#ffffff', BEAST:'#ffaa00', MONSTER:'#ff4400', LEGEND:'#FFD700' };
+  var W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 400;
+  var txt = this._track(scene, scene.add.text(W / 2, H / 2 - 60, word, {
+    fontSize: '36px',
+    fontFamily: 'Arial Black',
+    color: colors[word] || '#ffffff',
+    stroke: '#000000',
+    strokeThickness: 6
+  }));
+
+  txt.setOrigin(0.5).setDepth(290).setScrollFactor(0).setScale(0.3).setAlpha(0.9);
+
+  scene.tweens.add({
+    targets: txt,
+    scaleX: 1.4,
+    scaleY: 1.4,
+    alpha: 0,
+    ease: 'Power2',
+    duration: 800,
+    onComplete: function() {
+      if (txt.active) txt.destroy();
+    }
+  });
+
+  if (word === 'LEGEND' && scene.cameras && scene.cameras.main) {
+    scene.cameras.main.shake(300, 0.015);
+  }
+  return txt;
+};
+
+window.MMA.VFX.updateLastChancePulse = function(scene) {
+  if (!scene || !scene.player || !scene.player.stats) return;
+  var ratio = scene.player.stats.hp / (scene.player.stats.maxHp || 100);
+  var W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 400;
+
+  if (ratio > 0.1) {
+    if (scene._lastChancePulseTween) {
+      scene._lastChancePulseTween.stop();
+      scene._lastChancePulseTween = null;
+    }
+    if (scene._lastChanceOverlay && scene._lastChanceOverlay.active) {
+      scene._lastChanceOverlay.destroy();
+      scene._lastChanceOverlay = null;
+    }
+    return;
+  }
+
+  if (!scene._lastChanceOverlay || !scene._lastChanceOverlay.active) {
+    scene._lastChanceOverlay = this._track(scene, scene.add.rectangle(W / 2, H / 2, W, H, 0xff0000, 0)
+      .setDepth(280)
+      .setScrollFactor(0));
+    var ov = scene._lastChanceOverlay;
+    scene._lastChancePulseTween = scene.tweens.add({
+      targets: ov,
+      alpha: 0.18,
+      duration: 400,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.InOut'
+    });
+  } else {
+    scene._lastChanceOverlay.setPosition(W / 2, H / 2);
+    scene._lastChanceOverlay.setSize(W, H);
+  }
+};
+
+window.MMA.VFX.updateDesaturateEffect = function(scene) {
+  if (!scene || !scene.player || !scene.player.stats) return;
+  var ratio = scene.player.stats.hp / (scene.player.stats.maxHp || 100);
+  var W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 400;
+
+  if (ratio >= 0.5) {
+    if (scene._desatOverlay && scene._desatOverlay.active) scene._desatOverlay.setAlpha(0);
+    return;
+  }
+
+  var intensity = Math.min(1.0, (0.5 - ratio) / 0.5);
+  var alpha = intensity * 0.45;
+
+  if (!scene._desatOverlay || !scene._desatOverlay.active) {
+    scene._desatOverlay = this._track(scene, scene.add.rectangle(W / 2, H / 2, W, H, 0x888888, 0)
+      .setDepth(270)
+      .setScrollFactor(0)
+      .setBlendMode('MULTIPLY'));
+  }
+  scene._desatOverlay.setPosition(W / 2, H / 2);
+  scene._desatOverlay.setSize(W, H);
+  scene._desatOverlay.setAlpha(alpha);
+};
+
+window.MMA.VFX.updateEnemyHpTrail = function() {
+  if (typeof document === 'undefined') return;
+  var bar = document.getElementById('boss-hp-fill') || document.querySelector('.enemy-hp-fill');
+  if (!bar || !bar.parentNode) return;
+
+  var ghost = document.getElementById('boss-hp-ghost');
+  if (!ghost) {
+    ghost = document.createElement('div');
+    ghost.id = 'boss-hp-ghost';
+    ghost.style.cssText = 'position:absolute;top:0;left:0;height:100%;background:rgba(255,80,80,0.5);transition:width 0.8s ease;pointer-events:none;z-index:1;border-radius:inherit;';
+    bar.parentNode.style.position = 'relative';
+    ghost.style.width = bar.style.width || '100%';
+    bar.parentNode.insertBefore(ghost, bar);
+  }
+
+  var currentW = parseFloat(bar.style.width);
+  if (isNaN(currentW)) currentW = 0;
+  var ghostW = parseFloat(ghost.style.width);
+  if (isNaN(ghostW)) ghostW = currentW;
+
+  if (currentW < ghostW) {
+    ghost.style.width = ghostW + '%';
+    window.setTimeout(function() {
+      ghost.style.width = currentW + '%';
+    }, 200);
+  } else if (currentW > ghostW) {
+    ghost.style.width = currentW + '%';
+  }
+};
+
+(function() {
+  var VFX = window.MMA && window.MMA.VFX;
+  if (!VFX || !window.MMA || !MMA.UI || MMA.UI._mmaComboLetterPatched) return;
+
+  var originalIncrementCombo = MMA.UI.incrementCombo;
+  if (typeof originalIncrementCombo !== 'function') return;
+
+  function getActiveGameScene() {
+    if (!window.phaserGame || !window.phaserGame.scene || typeof window.phaserGame.scene.getScene !== 'function') return null;
+    try {
+      return window.phaserGame.scene.getScene('GameScene');
+    } catch (err) {
+      return null;
+    }
+  }
+
+  MMA.UI.incrementCombo = function() {
+    var result = originalIncrementCombo.apply(this, arguments);
+    var comboCount = this && this.fightStats ? this.fightStats.currentCombo || 0 : 0;
+    var scene = getActiveGameScene();
+    if (scene) VFX.showComboLetter(scene, comboCount);
+    return result;
+  };
+
+  MMA.UI._mmaComboLetterPatched = true;
+})();
+
+MMA.VFX.showCrowdRipple = function(scene, intensity) {
+  var el = document.getElementById('crowd-ripple');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'crowd-ripple';
+    el.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:15;overflow:hidden;';
+    var gc = document.getElementById('game-container') || document.body;
+    gc.appendChild(el);
+  }
+  el.innerHTML = '';
+  var rings = Math.min(3, Math.floor((intensity || 1) / 5));
+  for (var i = 0; i < rings; i++) {
+    var ring = document.createElement('div');
+    var delay = i * 200;
+    ring.style.cssText = 'position:absolute;top:50%;left:50%;width:40px;height:40px;border:2px solid rgba(255,215,0,0.4);border-radius:50%;transform:translate(-50%,-50%);animation:rippleOut 1s ' + delay + 'ms ease-out forwards;';
+    el.appendChild(ring);
+  }
+  // Inject keyframe if needed
+  if (!document.getElementById('ripple-style')) {
+    var s = document.createElement('style');
+    s.id = 'ripple-style';
+    s.textContent = '@keyframes rippleOut{to{width:300px;height:300px;opacity:0;}}';
+    document.head.appendChild(s);
+  }
+  setTimeout(function() { if(el.parentNode) el.innerHTML = ''; }, 1500);
+};
+
+MMA.VFX.showImpactReplay = function(scene, enemy) {
+  if (!scene || !enemy) return;
+  if (scene._impactReplayActive) return;
+  scene._impactReplayActive = true;
+
+  // Slow time
+  scene.time.timeScale = 0.2;
+  if (scene.physics) scene.physics.world.timeScale = 5;
+
+  // Afterimage of enemy
+  if (scene.add && enemy.x && enemy.y) {
+    var ghost = scene.add.rectangle(enemy.x, enemy.y, enemy.displayWidth || 24, enemy.displayHeight || 36, enemy.type && enemy.type.color ? enemy.type.color : 0xff2200, 0.5).setDepth(199).setScrollFactor(0);
+    scene.tweens.add({ targets: ghost, alpha: 0, duration: 400, onComplete: function() { if(ghost.active) ghost.destroy(); } });
+  }
+
+  scene.time.delayedCall(400, function() {
+    scene.time.timeScale = 1;
+    if (scene.physics) scene.physics.world.timeScale = 1;
+    scene._impactReplayActive = false;
+  });
+};
+
+MMA.VFX.updateExertionEffect = function(scene) {
+  if (!scene || !scene.player || !scene.player.stats) return;
+  var ratio = scene.player.stats.stamina / (scene.player.stats.maxStamina || 100);
+  if (ratio > 0.2) {
+    if (scene._exertionOverlay && scene._exertionOverlay.active) {
+      scene._exertionOverlay.setAlpha(0);
+    }
+    return;
+  }
+  var W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 400;
+  if (!scene._exertionOverlay || !scene._exertionOverlay.active) {
+    scene._exertionOverlay = scene.add.rectangle(W/2, H/2, W, H, 0x000033, 0)
+      .setDepth(265).setScrollFactor(0);
+  }
+  var intensity = (0.2 - ratio) / 0.2; // 0→1 as stamina drops 20%→0
+  scene._exertionOverlay.setAlpha(intensity * 0.25);
+};
+
+MMA.VFX.showSweatShower = function(scene, x, y, damage) {
+  if (!scene || !scene.add || damage < 15) return;
+  var count = Math.min(8, Math.floor(damage / 5));
+  for (var i = 0; i < count; i++) {
+    (function() {
+      var drop = scene.add.circle(
+        x + (Math.random()*16 - 8), y,
+        1 + Math.random() * 2,
+        0xaaddff, 0.8
+      ).setDepth(205);
+      var vx = (Math.random() - 0.5) * 60;
+      var vy = -30 - Math.random() * 40;
+      scene.tweens.add({
+        targets: drop,
+        x: drop.x + vx * 0.5,
+        y: drop.y + 30,
+        alpha: 0, scaleX: 0.3, scaleY: 0.3,
+        duration: 400 + Math.random() * 200,
+        ease: 'Power2',
+        onComplete: function() { if(drop.active) drop.destroy(); }
+      });
+    })();
+  }
+};
+
+MMA.VFX.showKnockdownDust = function(scene, x, y) {
+  if (!scene || !scene.add) return;
+  for (var i = 0; i < 6; i++) {
+    (function() {
+      var size = 6 + Math.random() * 10;
+      var dust = scene.add.circle(
+        x + (Math.random()*30-15),
+        y + 10,
+        size, 0xbbaa88, 0.5 + Math.random() * 0.3
+      ).setDepth(198);
+      scene.tweens.add({
+        targets: dust,
+        x: dust.x + (Math.random()*40-20),
+        y: dust.y - 15 - Math.random()*15,
+        alpha: 0, scaleX: 2, scaleY: 2,
+        duration: 500 + Math.random()*300,
+        onComplete: function() { if(dust.active) dust.destroy(); }
+      });
+    })();
+  }
+};
+
+// Feature 1: Combo Fever Dream
+MMA.VFX.startFeverDream = function(scene) {
+  if (!scene || scene._feverDreamActive) return;
+  scene._feverDreamActive = true;
+  scene._feverCharge = 0;
+  if (scene.time) scene.time.timeScale = 0.9;
+  if (scene.physics) scene.physics.world.timeScale = 1.11;
+  var W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 400;
+  if (!scene._feverOverlay) {
+    scene._feverOverlay = scene.add.rectangle(W/2, H/2, W, H, 0xff8800, 0).setDepth(260).setScrollFactor(0);
+  }
+  scene.tweens.add({ targets: scene._feverOverlay, alpha: 0.12, duration: 300, yoyo: true, repeat: -1 });
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    var p = scene.player;
+    if (p) MMA.UI.showDamageText(scene, p.x, p.y - 40, '🔥 FEVER DREAM!', '#ff8800');
+  }
+};
+MMA.VFX.addFeverCharge = function(scene, dmg) {
+  if (!scene || !scene._feverDreamActive) return;
+  scene._feverCharge = (scene._feverCharge || 0) + (dmg || 0);
+};
+MMA.VFX.endFeverDream = function(scene, target) {
+  if (!scene || !scene._feverDreamActive) return;
+  scene._feverDreamActive = false;
+  if (scene.time) scene.time.timeScale = 1;
+  if (scene.physics) scene.physics.world.timeScale = 1;
+  if (scene._feverOverlay && scene._feverOverlay.active) {
+    scene.tweens.killTweensOf(scene._feverOverlay);
+    scene.tweens.add({ targets: scene._feverOverlay, alpha: 0, duration: 300 });
+  }
+  var explosion = Math.round((scene._feverCharge || 0) * 0.20);
+  scene._feverCharge = 0;
+  if (explosion > 0 && target && target.stats) {
+    target.stats.hp = Math.max(0, target.stats.hp - explosion);
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, target.x, target.y - 30, 'FEVER BURST! -' + explosion, '#ff8800');
+    }
+    if (scene.cameras) scene.cameras.main.flash(300, 255, 120, 0);
+  }
+};
+
+// Feature 2: Fight Photographer Moment
+MMA.VFX.triggerPhotographerMoment = function(scene, label) {
+  if (!scene || scene._photoActive) return;
+  scene._photoActive = true;
+  var W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 400;
+  if (scene.time) scene.time.timeScale = 0.05;
+  if (scene.cameras) scene.cameras.main.flash(200, 255, 255, 255, false);
+  var txt = scene.add.text(W/2, H/2 - 20, '📸 ' + (label || 'MOMENT!'), {
+    fontSize: '14px', fontFamily: 'Arial Black', color: '#ffffff', stroke: '#000', strokeThickness: 3
+  }).setOrigin(0.5).setDepth(300).setScrollFactor(0);
+  scene.time.delayedCall(800, function() {
+    scene._photoActive = false;
+    if (scene.time) scene.time.timeScale = 1;
+    scene.tweens.add({ targets: txt, alpha: 0, duration: 400, onComplete: function() { if(txt.active) txt.destroy(); } });
+    try {
+      var gallery = JSON.parse(localStorage.getItem('mma_fight_gallery') || '[]');
+      gallery.push({ label: label, ts: Date.now(), zone: scene.currentZone || 1 });
+      if (gallery.length > 20) gallery = gallery.slice(-20);
+      localStorage.setItem('mma_fight_gallery', JSON.stringify(gallery));
+    } catch(e) {}
+  });
+};
+// === COMBO FEVER DREAM ===
+MMA.VFX.startFeverDream = MMA.VFX.startFeverDream || function(scene) {
+  if (!scene || scene._feverDreamActive) return;
+  scene._feverDreamActive = true;
+  scene._feverCharge = 0;
+  if (scene.time) scene.time.timeScale = 0.9;
+  if (scene.physics) scene.physics.world.timeScale = 1.11;
+  var W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 400;
+  if (!scene._feverOverlay) {
+    scene._feverOverlay = scene.add.rectangle(W/2, H/2, W, H, 0xff8800, 0).setDepth(260).setScrollFactor(0);
+  }
+  scene.tweens.add({ targets: scene._feverOverlay, alpha: 0.12, duration: 300, yoyo: true, repeat: -1 });
+  var p = scene.player;
+  if (p && window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, p.x, p.y - 40, '🔥 FEVER DREAM!', '#ff8800');
+  }
+};
+MMA.VFX.addFeverCharge = MMA.VFX.addFeverCharge || function(scene, dmg) {
+  if (!scene || !scene._feverDreamActive) return;
+  scene._feverCharge = (scene._feverCharge || 0) + (dmg || 0);
+};
+MMA.VFX.endFeverDream = MMA.VFX.endFeverDream || function(scene, target) {
+  if (!scene || !scene._feverDreamActive) return;
+  scene._feverDreamActive = false;
+  if (scene.time) scene.time.timeScale = 1;
+  if (scene.physics) scene.physics.world.timeScale = 1;
+  if (scene._feverOverlay && scene._feverOverlay.active) {
+    scene.tweens.killTweensOf(scene._feverOverlay);
+    scene.tweens.add({ targets: scene._feverOverlay, alpha: 0, duration: 300 });
+  }
+  var explosion = Math.round((scene._feverCharge || 0) * 0.20);
+  scene._feverCharge = 0;
+  if (explosion > 0 && target && target.stats) {
+    target.stats.hp = Math.max(0, target.stats.hp - explosion);
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, target.x, target.y - 30, 'FEVER BURST! -' + explosion, '#ff8800');
+    }
+    if (scene.cameras) scene.cameras.main.flash(300, 255, 120, 0);
+  }
+};
+
+// === FIGHT PHOTOGRAPHER MOMENT ===
+MMA.VFX.triggerPhotographerMoment = MMA.VFX.triggerPhotographerMoment || function(scene, label) {
+  if (!scene || scene._photoActive) return;
+  scene._photoActive = true;
+  var W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 400;
+  if (scene.time) scene.time.timeScale = 0.05;
+  if (scene.cameras) scene.cameras.main.flash(200, 255, 255, 255, false);
+  var txt = scene.add.text(W/2, H/2 - 20, '📸 ' + (label || 'MOMENT!'), {
+    fontSize: '14px', fontFamily: 'Arial Black', color: '#ffffff', stroke: '#000', strokeThickness: 3
+  }).setOrigin(0.5).setDepth(300).setScrollFactor(0);
+  scene.time.delayedCall(800, function() {
+    scene._photoActive = false;
+    if (scene.time) scene.time.timeScale = 1;
+    scene.tweens.add({ targets: txt, alpha: 0, duration: 400, onComplete: function() { if(txt.active) txt.destroy(); } });
+    try {
+      var gallery = JSON.parse(localStorage.getItem('mma_fight_gallery') || '[]');
+      gallery.push({ label: label, ts: Date.now(), zone: scene.currentZone || 1 });
+      if (gallery.length > 20) gallery = gallery.slice(-20);
+      localStorage.setItem('mma_fight_gallery', JSON.stringify(gallery));
+    } catch(e) {}
+  });
+};
+// === CINEMATIC HIT DIRECTOR ===
+// On big hits, briefly frame-freeze + zoom toward impact point
+MMA.VFX = window.MMA.VFX || {};
+
+MMA.VFX.cinematicHit = MMA.VFX.cinematicHit || function(scene, x, y) {
+  if (!scene || scene._cinematicActive) return;
+  scene._cinematicActive = true;
+  // Brief camera zoom
+  var cam = scene.cameras && scene.cameras.main;
+  if (cam) {
+    cam.zoomTo(1.15, 80);
+    scene.time.delayedCall(180, function() {
+      cam.zoomTo(1.0, 120);
+    });
+  }
+  // Flash white ring at impact
+  if (scene.add && scene.add.circle) {
+    var ring = scene.add.circle(x, y, 20, 0xffffff, 0.8).setDepth(300);
+    scene.tweens.add({
+      targets: ring, scaleX: 4, scaleY: 4, alpha: 0,
+      duration: 220,
+      onComplete: function() { if (ring.active) ring.destroy(); }
+    });
+  }
+  scene.time.delayedCall(300, function() { scene._cinematicActive = false; });
+};
+
+// === CORNER DESPERATION FLASH ===
+// Player near ring edge at low HP: screen edge pulses red urgently
+MMA.VFX.updateCornerDesperation = MMA.VFX.updateCornerDesperation || function(scene) {
+  if (!scene || !scene.player) return;
+  var p = scene.player;
+  if (!p.stats) return;
+  var hpRatio = p.stats.hp / (p.stats.maxHp || 100);
+  var CANVAS_W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var CANVAS_H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 700;
+  var MARGIN = 80;
+  var nearEdge = (p.x < MARGIN || p.x > CANVAS_W - MARGIN || p.y < MARGIN + 80 || p.y > CANVAS_H - MARGIN);
+  var desperate = hpRatio < 0.25 && nearEdge;
+  var el = _vfxGetEl('corner-desperation-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'corner-desperation-overlay';
+    el.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:40;border:0px solid #ff0000;transition:border-width 0.1s,opacity 0.1s;opacity:0;';
+    var gc = _vfxGetEl('game-container') || document.body;
+    gc.appendChild(el);
+  }
+  if (desperate) {
+    var pulse = Math.sin(Date.now() / 150) * 0.5 + 0.5;
+    el.style.opacity = (0.4 + pulse * 0.4).toFixed(2);
+    el.style.borderWidth = (6 + pulse * 6).toFixed(0) + 'px';
+  } else {
+    el.style.opacity = '0';
+    el.style.borderWidth = '0px';
+  }
+};
+
+// === VICTORY FIREWORKS ===
+// On zone clear, burst of colorful particles from top of screen
+MMA.VFX.showVictoryFireworks = MMA.VFX.showVictoryFireworks || function(scene) {
+  if (!scene || !scene.add) return;
+  var CANVAS_W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var colors = [0xff0000, 0x00ff88, 0xFFD700, 0x00aaff, 0xff00ff];
+  for (var burst = 0; burst < 5; burst++) {
+    (function(b) {
+      scene.time.delayedCall(b * 180, function() {
+        var bx = 80 + Math.random() * (CANVAS_W - 160);
+        for (var i = 0; i < 10; i++) {
+          var angle = (i / 10) * Math.PI * 2;
+          var speed = 80 + Math.random() * 80;
+          var dot = scene.add.circle(bx, 60, 4, colors[b % colors.length], 1).setDepth(250);
+          scene.tweens.add({
+            targets: dot,
+            x: bx + Math.cos(angle) * speed,
+            y: 60 + Math.sin(angle) * speed,
+            alpha: 0, duration: 700 + Math.random() * 300,
+            onComplete: function() { if (dot.active) dot.destroy(); }
+          });
+        }
+      });
+    })(burst);
+  }
+};
+// === PARRY FLASH VFX ===
+MMA.VFX.showParryFlash = MMA.VFX.showParryFlash || function(scene, x, y) {
+  if (!scene || !scene.add) return;
+  var ring = scene.add.circle(x, y, 30, 0xffffff, 0.9).setDepth(300);
+  scene.tweens.add({
+    targets: ring, scaleX: 3, scaleY: 3, alpha: 0, duration: 200,
+    onComplete: function() { if (ring.active) ring.destroy(); }
+  });
+};
+
+// === BERSERKER AURA VFX ===
+// Pulsing red glow around berserker enemy
+MMA.VFX.updateBerserkerAura = MMA.VFX.updateBerserkerAura || function(scene, enemy) {
+  if (!scene || !enemy || !enemy.active) return;
+  if (!enemy._berserker) {
+    if (enemy._berserkerAura) { enemy._berserkerAura.destroy(); enemy._berserkerAura = null; }
+    return;
+  }
+  if (!enemy._berserkerAura && scene.add) {
+    var aura = scene.add.circle(enemy.x, enemy.y, 28, 0xff0000, 0.0).setDepth(enemy.depth - 1);
+    enemy._berserkerAura = aura;
+  }
+  if (enemy._berserkerAura) {
+    enemy._berserkerAura.setPosition(enemy.x, enemy.y);
+    var pulse = Math.sin(Date.now() / 120) * 0.2 + 0.25;
+    enemy._berserkerAura.setAlpha(pulse);
+  }
+};
+
+// === REVENGE CHARGE GLOW ===
+MMA.VFX.showRevengeCharge = MMA.VFX.showRevengeCharge || function(scene, enemy) {
+  if (!scene || !enemy || !scene.add) return;
+  var glow = scene.add.circle(enemy.x, enemy.y, 20, 0xff4400, 0.7).setDepth(enemy.depth + 1);
+  scene.tweens.add({
+    targets: glow, scaleX: 2.5, scaleY: 2.5, alpha: 0, duration: 400,
+    onComplete: function() { if (glow.active) glow.destroy(); }
+  });
+};
+
+// === GUARD BREAK EXPLOSION ===
+MMA.VFX.showGuardBreak = MMA.VFX.showGuardBreak || function(scene, x, y) {
+  if (!scene || !scene.add) return;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, x, y - 20, '💥 GUARD BROKEN!', '#FFD700');
+  }
+  for (var i = 0; i < 6; i++) {
+    var angle = (i / 6) * Math.PI * 2;
+    var shard = scene.add.rectangle(x, y, 8, 3, 0xFFD700, 1).setDepth(280);
+    scene.tweens.add({
+      targets: shard,
+      x: x + Math.cos(angle) * 40,
+      y: y + Math.sin(angle) * 40,
+      alpha: 0, angle: 180,
+      duration: 350,
+      onComplete: function() { if (shard.active) shard.destroy(); }
+    });
+  }
+};
+
+// === MOMENTUM TRAIL ===
+// Player on fire gets a brief trail of golden particles
+MMA.VFX.showMomentumTrail = MMA.VFX.showMomentumTrail || function(scene, player) {
+  if (!scene || !player || !scene.add) return;
+  var dot = scene.add.circle(player.x, player.y, 5, 0xFFD700, 0.7).setDepth(180);
+  scene.tweens.add({
+    targets: dot, alpha: 0, scaleX: 0.3, scaleY: 0.3,
+    duration: 300,
+    onComplete: function() { if (dot.active) dot.destroy(); }
+  });
+};
+// === CORNER DOMINATION VFX ===
+// Red glow on walls when enemy is cornered
+MMA.VFX.updateCornerDomVFX = MMA.VFX.updateCornerDomVFX || function(scene) {
+  if (!scene) return;
+  var enemies = scene.enemies || [];
+  var cornered = enemies.some(function(e) { return e && e.active && e._cornerDominating; });
+  var el = _vfxGetEl('corner-dom-wall-glow');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'corner-dom-wall-glow';
+    el.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:35;border:0px solid #ff4400;transition:border-width 0.15s,opacity 0.15s;opacity:0;';
+    var gc = _vfxGetEl('game-container') || document.body;
+    gc.appendChild(el);
+  }
+  if (cornered) {
+    var pulse = Math.sin(Date.now() / 200) * 0.3 + 0.5;
+    el.style.opacity = pulse.toFixed(2);
+    el.style.borderWidth = '5px';
+  } else {
+    el.style.opacity = '0';
+    el.style.borderWidth = '0px';
+  }
+};
+
+// === CONDITIONING FATIGUE FLASH ===
+// When a move is exhausted, brief red flash on the button
+MMA.VFX.flashFatiguedMove = MMA.VFX.flashFatiguedMove || function(moveKey) {
+  var btn = document.querySelector('[data-move="' + moveKey + '"]');
+  if (!btn) return;
+  var orig = btn.style.background;
+  btn.style.background = 'rgba(255,0,0,0.5)';
+  setTimeout(function() { btn.style.background = orig; }, 200);
+};
+
+// === RIVALRY COUNTER FLASH ===
+// When rivalry counter style activates on enemy, show indicator
+MMA.VFX.showRivalryCounter = MMA.VFX.showRivalryCounter || function(scene, enemy) {
+  if (!scene || !enemy) return;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    var styleLabels = { strike: 'COUNTER: STRIKER', grapple: 'COUNTER: GRAPPLER', kick: 'COUNTER: KICKER' };
+    var label = styleLabels[enemy._rivalryCounter] || 'COUNTER STYLE';
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 35, label, '#ff0088');
+  }
+};
+
+// === TOURNAMENT ENTRY FLASH ===
+MMA.VFX.showTournamentEntry = MMA.VFX.showTournamentEntry || function(scene) {
+  if (!scene) return;
+  var el = document.getElementById('tournament-entry-flash');
+  if (el) el.remove();
+  el = document.createElement('div');
+  el.id = 'tournament-entry-flash';
+  el.style.cssText = 'position:absolute;inset:0;background:rgba(136,0,255,0.3);z-index:180;pointer-events:none;';
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(el);
+  scene.time.delayedCall(400, function() { if (el.parentNode) el.remove(); });
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    var cx = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W / 2 : 250;
+    MMA.UI.showDamageText(scene, cx, 120, '🏆 TOURNAMENT UNLOCKED', '#FFD700');
+  }
+};
+// === WEATHER HAZARD VFX ===
+// Persistent overlay effects for weather rooms
+MMA.VFX.startWeatherHazardVFX = MMA.VFX.startWeatherHazardVFX || function(scene, weatherType) {
+  if (!scene) return;
+  // Clear previous
+  MMA.VFX.stopWeatherHazardVFX(scene);
+  if (weatherType === 'rain') {
+    // Falling rain particles
+    scene._weatherTimer = scene.time.addEvent({
+      delay: 80,
+      callback: function() {
+        if (!scene || scene.gameOver) return;
+        var CANVAS_W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+        var x = Math.random() * CANVAS_W;
+        var drop = scene.add.rectangle(x, 0, 2, 12, 0x4488ff, 0.5).setDepth(50);
+        scene.tweens.add({
+          targets: drop, y: 700, alpha: 0, duration: 600 + Math.random() * 200,
+          onComplete: function() { if (drop.active) drop.destroy(); }
+        });
+      },
+      repeat: -1
+    });
+  } else if (weatherType === 'ice') {
+    // Blue frost tint on screen edges
+    var frost = document.getElementById('frost-overlay');
+    if (!frost) {
+      frost = document.createElement('div');
+      frost.id = 'frost-overlay';
+      frost.style.cssText = 'position:absolute;inset:0;background:radial-gradient(ellipse at center, transparent 60%, rgba(100,200,255,0.25) 100%);pointer-events:none;z-index:45;';
+      var gc = document.getElementById('game-container') || document.body;
+      gc.appendChild(frost);
+    }
+  } else if (weatherType === 'heat') {
+    // Heat shimmer — orange edge glow
+    var heat = document.getElementById('heat-overlay');
+    if (!heat) {
+      heat = document.createElement('div');
+      heat.id = 'heat-overlay';
+      heat.style.cssText = 'position:absolute;inset:0;background:radial-gradient(ellipse at center, transparent 55%, rgba(255,100,0,0.2) 100%);pointer-events:none;z-index:45;';
+      var gc2 = document.getElementById('game-container') || document.body;
+      gc2.appendChild(heat);
+    }
+  }
+};
+
+MMA.VFX.stopWeatherHazardVFX = MMA.VFX.stopWeatherHazardVFX || function(scene) {
+  if (scene && scene._weatherTimer) { scene._weatherTimer.remove(); scene._weatherTimer = null; }
+  ['frost-overlay','heat-overlay'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.remove();
+  });
+};
+
+// === BLOODLINE INHERITANCE FLASH ===
+MMA.VFX.showBloodlineFlash = MMA.VFX.showBloodlineFlash || function(scene, moveKey) {
+  if (!scene) return;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function' && scene.player) {
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 45, '🧬 ' + moveKey.toUpperCase(), '#cc00ff');
+  }
+};
+
+// === BET WIN/LOSE FLASH ===
+MMA.VFX.showBetResult = MMA.VFX.showBetResult || function(scene, won, amount) {
+  if (!scene || !scene.add) return;
+  var CANVAS_W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var color = won ? 0x00ff88 : 0xff2200;
+  var overlay = scene.add.rectangle(CANVAS_W/2, 350, CANVAS_W, 700, color, 0.2).setDepth(300);
+  scene.tweens.add({
+    targets: overlay, alpha: 0, duration: 600,
+    onComplete: function() { if (overlay.active) overlay.destroy(); }
+  });
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    var cx = CANVAS_W / 2;
+    MMA.UI.showDamageText(scene, cx, 200, won ? ('💰 BET WON +' + (amount*2) + 'g') : ('💸 BET LOST -' + amount + 'g'), won ? '#00ff88' : '#ff2200');
+  }
+};
+// === FEAR TELL VFX ===
+// Enemy flinch indicator after 3+ hits of same type
+MMA.VFX.showFearTell = MMA.VFX.showFearTell || function(scene, enemy) {
+  if (!scene || !enemy) return;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 35, '😨 FLINCH!', '#ff88aa');
+  }
+  // Brief red ring under enemy
+  if (!scene.add) return;
+  var ring = scene.add.graphics().setDepth(8);
+  ring.lineStyle(3, 0xff2244, 0.8);
+  ring.strokeCircle(enemy.x, enemy.y + 16, 22);
+  scene.tweens.add({
+    targets: ring, alpha: 0, duration: 500,
+    onComplete: function() { if (ring.active) ring.destroy(); }
+  });
+};
+
+// === MUTATION FLASH ===
+MMA.VFX.showMutationFlash = MMA.VFX.showMutationFlash || function(scene, mutType) {
+  if (!scene || !scene.add) return;
+  var colors = { power: 0xff4400, swift: 0x44aaff, drain: 0xaa00ff, ko: 0xff0000 };
+  var col = colors[mutType] || 0xffffff;
+  var CANVAS_W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var overlay = scene.add.rectangle(CANVAS_W/2, 350, CANVAS_W, 700, col, 0.18).setDepth(200);
+  scene.tweens.add({
+    targets: overlay, alpha: 0, duration: 400,
+    onComplete: function() { if (overlay.active) overlay.destroy(); }
+  });
+};
+
+// === RING POSITION INDICATOR ===
+// Brief HUD text showing current ring position bonus
+MMA.VFX.showRingPositionHint = MMA.VFX.showRingPositionHint || function(scene) {
+  if (!scene || !window.MMA || !MMA.Combat) return;
+  var pos = typeof MMA.Combat.getRingPosition === 'function' ? MMA.Combat.getRingPosition(scene) : 'center';
+  var info = (MMA.Combat.RING_POSITIONS || {})[pos];
+  if (!info || pos === 'center') return;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function' && scene.player) {
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 60, info.label + ' ' + info.desc, '#ffcc44');
+  }
+};
+
+// === WARMUP VULNERABILITY FLASH ===
+MMA.VFX.showWarmupHit = MMA.VFX.showWarmupHit || function(scene, enemy) {
+  if (!scene || !enemy) return;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 40, '⚡ COLD! +40%', '#ffee00');
+  }
+  if (scene.cameras) scene.cameras.main.flash(150, 255, 240, 100);
+};
+
+// === CREED BADGE ===
+// Persistent small badge showing player's creed in top HUD
+MMA.VFX.showCreedBadge = MMA.VFX.showCreedBadge || function() {
+  var existing = document.getElementById('creed-badge');
+  if (existing) return;
+  if (!window.MMA || !MMA.Player || typeof MMA.Player.getCreed !== 'function') return;
+  var creed = MMA.Player.getCreed();
+  var badge = document.createElement('div');
+  badge.id = 'creed-badge';
+  badge.textContent = creed.label;
+  badge.style.cssText = 'position:absolute;top:4px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);color:' + creed.color + ';font-family:monospace;font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ' + creed.color + ';z-index:200;pointer-events:none;letter-spacing:1px;';
+  var gc = document.getElementById('game-container') || document.body;
+  gc.appendChild(badge);
+};

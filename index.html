@@ -485,6 +485,70 @@
     #hype-meter.visible {
       opacity: 1;
     }
+    /* Fight Night Star Ratings - live entertainment score HUD */
+    #fight-night-stars {
+      position: fixed;
+      top: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+      min-width: 190px;
+      padding: 8px 12px;
+      background: rgba(6, 6, 8, 0.82);
+      border: 1px solid rgba(255, 212, 71, 0.28);
+      border-radius: 12px;
+      z-index: 34;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 200ms ease, transform 150ms ease, border-color 200ms ease;
+      text-align: center;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+    }
+    #fight-night-stars.visible {
+      opacity: 1;
+    }
+    #fight-night-stars .fns-header {
+      font-size: 9px;
+      letter-spacing: 1.6px;
+      color: #9e8f61;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+      font-weight: bold;
+    }
+    #fight-night-stars .fns-stars {
+      font-size: 20px;
+      line-height: 1;
+      color: #7d7d7d;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+      text-shadow: 0 0 10px rgba(255, 212, 71, 0.12);
+    }
+    #fight-night-stars .fns-label {
+      font-size: 12px;
+      color: #f4e7b0;
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    #fight-night-stars .fns-score,
+    #fight-night-stars .fns-reward {
+      font-size: 10px;
+      color: #9ea0a5;
+    }
+    #fight-night-stars.rating-3,
+    #fight-night-stars.rating-4,
+    #fight-night-stars.rating-5 {
+      border-color: rgba(255, 212, 71, 0.6);
+    }
+    #fight-night-stars.rating-4 .fns-stars,
+    #fight-night-stars.rating-5 .fns-stars {
+      color: #ffd447;
+    }
+    #fight-night-stars.rating-5 {
+      animation: mainEventPulse 700ms ease-in-out infinite;
+    }
+    @keyframes mainEventPulse {
+      0%, 100% { box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35); }
+      50% { box-shadow: 0 4px 24px rgba(255, 185, 32, 0.35); }
+    }
     #hype-meter .hype-bar-container {
       width: 80px;
       height: 12px;
@@ -574,10 +638,10 @@
         <div class="danger-label"></div>
       </div>
       <div id="stamina-break-overlay"></div>
-      <div id="weight-class-indicator" title="Weight class affects speed/power" style="display:none">
-        <span class="wc-icon">⚖️</span>
-        <span class="wc-name">Featherweight</span>
-        <span class="wc-bonus">+Speed</span>
+      <div id="weight-class-indicator" title="Current room weight class" style="display:none">
+        <span class="wc-icon">🥋</span>
+        <span class="wc-name">Open Weight Room</span>
+        <span class="wc-bonus">Waiting for room data</span>
       </div>
       <div id="fight-timer-display">
         <span class="timer-label">TIME</span>
@@ -589,6 +653,14 @@
           <div class="hype-bar-fill"></div>
         </div>
         <span class="hype-label">HYPE</span>
+      </div>
+      <!-- Fight Night Star Ratings - live entertainment score -->
+      <div id="fight-night-stars" title="Fight Night entertainment rating">
+        <div class="fns-header">Fight Night</div>
+        <div class="fns-stars">☆☆☆☆☆</div>
+        <div class="fns-label">Warming Up</div>
+        <div class="fns-score">Score 0</div>
+        <div class="fns-reward">Crowd noticed you</div>
       </div>
       <!-- Move Input Display - shows last 6 button inputs -->
       <div id="move-input-display">
@@ -629,27 +701,27 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-  <script src="js/config.js?v=74"></script>
-  <script src="js/sprites.js?v=74"></script>
-  <script src="js/combat-core.js?v=74"></script>
-  <script src="js/combat-moves.js?v=74"></script>
-  <script src="js/combat-ground.js?v=74"></script>
-  <script src="js/enemies-config.js?v=74"></script>
-  <script src="js/enemies-combat.js?v=74"></script>
-  <script src="js/enemies-core.js?v=74"></script>
-  <script src="js/enemies-ai.js?v=74"></script>
-  <script src="js/zones.js?v=74"></script>
-  <script src="js/player.js?v=74"></script>
-  <script src="js/items.js?v=74"></script>
-  <script src="js/outfits.js?v=74"></script>
-  <script src="js/vfx.js?v=74"></script>
-  <script src="js/ui.js?v=74"></script>
-  <script src="js/ui-core.js?v=74"></script>
-  <script src="js/ui-meters.js?v=74"></script>
-  <script src="js/ui-settings.js?v=74"></script>
+  <script src="js/config.js?v=75"></script>
+  <script src="js/sprites.js?v=75"></script>
+  <script src="js/combat-core.js?v=75"></script>
+  <script src="js/combat-moves.js?v=75"></script>
+  <script src="js/combat-ground.js?v=75"></script>
+  <script src="js/enemies-config.js?v=75"></script>
+  <script src="js/enemies-combat.js?v=75"></script>
+  <script src="js/enemies-core.js?v=75"></script>
+  <script src="js/enemies-ai.js?v=75"></script>
+  <script src="js/zones.js?v=75"></script>
+  <script src="js/player.js?v=75"></script>
+  <script src="js/items.js?v=75"></script>
+  <script src="js/outfits.js?v=75"></script>
+  <script src="js/vfx.js?v=75"></script>
+  <script src="js/ui.js?v=77"></script>
+  <script src="js/ui-core.js?v=78"></script>
+  <script src="js/ui-meters.js?v=75"></script>
+  <script src="js/ui-settings.js?v=75"></script>
 
-  <script src="js/ui-layout.js?v=74"></script>
-  <script src="js/progression.js?v=74"></script>
+  <script src="js/ui-layout.js?v=75"></script>
+  <script src="js/progression.js?v=75"></script>
   <script>
   // Prevent text selection and context menu on mobile (breaks gameplay)
   document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; });
@@ -749,6 +821,26 @@
         }
       }
     }
+    // V key = Technique Combo DNA toggle
+    if (e.key === 'v' || e.key === 'V') {
+      if (isGameActive && gameScene.player && !gameScene.paused && !gameScene.gameOver) {
+        if (gameScene.activeTechniqueComboDNA && gameScene.activeTechniqueComboDNA.close) {
+          gameScene.activeTechniqueComboDNA.close();
+        } else {
+          if (typeof window.MMA.UI.showTechniqueComboDNA === 'function') gameScene.activeTechniqueComboDNA = window.MMA.UI.showTechniqueComboDNA(gameScene);
+        }
+      }
+    }
+    // R key = Fight Night Star Ratings toggle
+    if (e.key === 'r' || e.key === 'R') {
+      if (isGameActive && gameScene.player && !gameScene.paused && !gameScene.gameOver) {
+        if (gameScene.activeFightNightRating && gameScene.activeFightNightRating.close) {
+          gameScene.activeFightNightRating.close();
+        } else {
+          if (typeof window.MMA.UI.showFightNightRating === 'function') gameScene.activeFightNightRating = window.MMA.UI.showFightNightRating(gameScene);
+        }
+      }
+    }
   });
   
   // Periodic stamina and health warning check (every 500ms when game is active)
@@ -760,9 +852,16 @@
       window.MMA.UI.checkStaminaWarning(gameScene, gameScene.player.stats.stamina, gameScene.player.stats.maxStamina);
       window.MMA.UI.updateHealthPulse(gameScene, gameScene.player.stats.hp, gameScene.player.stats.maxHp);
       if (window.MMA && MMA.VFX && typeof MMA.VFX.updateLowHpEffect === 'function') MMA.VFX.updateLowHpEffect(gameScene);
-      // updateWeightClassFromDOM removed — function never implemented, polling removed
+      if (typeof window.MMA.UI.updateWeightClassFromDOM === 'function') {
+        window.MMA.UI.updateWeightClassFromDOM(gameScene);
+      }
+      if (typeof window.MMA.UI.updateFightNightRating === 'function') {
+        window.MMA.UI.updateFightNightRating(gameScene);
+      }
       // Check for danger warnings (coordinated attacks, special moves)
       if (typeof window.MMA.UI.checkDangerWarnings === 'function') window.MMA.UI.checkDangerWarnings(gameScene);
+    } else if (window.MMA && window.MMA.UI && typeof window.MMA.UI.hideFightNightRating === 'function') {
+      window.MMA.UI.hideFightNightRating();
     }
   }, 500);
   
@@ -1090,6 +1189,12 @@
       try { _saved = JSON.parse(localStorage.getItem('mma_loadout')); } catch(e){}
       window.MMA_LOADOUT = _saved || {1:'hook',2:'jab',3:'cross',4:'lowKick',5:'takedown',6:'special',7:'headKick',8:'guillotine'};
     }
+    function ensureCooldownOverlay(btn) {
+      if (!btn || btn.querySelector('.cooldown-overlay')) return;
+      var overlay = document.createElement('div');
+      overlay.className = 'cooldown-overlay';
+      btn.appendChild(overlay);
+    }
     function applyLoadout() {
       if (!window.MMA_LOADOUT) return;
       Object.keys(window.MMA_LOADOUT).forEach(function(slot) {
@@ -1100,6 +1205,7 @@
         var label = moveKey.replace(/([A-Z])/g, ' $1').replace(/^./, function(s){return s.toUpperCase();});
         btn.textContent = label;
         btn.setAttribute('aria-label', 'Slot ' + slot + ': ' + label);
+        ensureCooldownOverlay(btn);
       });
     }
     applyLoadout();
@@ -1148,20 +1254,20 @@
   })();
 </script>
 
-<script src="js/sounds.js?v=74"></script>
-  <script src="js/saveSystem.js?v=74"></script>
-  <script src="js/narrator.js?v=74"></script>
-  <script src="js/scenes/TitleScene.js?v=74"></script>
-  <script src="js/scenes/BootScene.js?v=74"></script>
-  <script src="js/scenes/GameScene.js?v=74"></script>
-  <script src="js/scenes/HUDScene.js?v=74"></script>
-  <script src="js/scenes/PauseScene.js?v=74"></script>
-  <script src="js/scenes/OutfitScene.js?v=74"></script>
-  <script src="js/scenes/UnlockScene.js?v=74"></script>
-  <script src="js/scenes/VictoryScene.js?v=74"></script>
-  <script src="js/scenes/DefeatScene.js?v=74"></script>
-  <script src="js/network.js?v=74"></script>
-  <script src="js/scenes/LobbyScene.js?v=74"></script>
-  <script src="js/main.js?v=74"></script>
+<script src="js/sounds.js?v=75"></script>
+  <script src="js/saveSystem.js?v=75"></script>
+  <script src="js/narrator.js?v=75"></script>
+  <script src="js/scenes/TitleScene.js?v=75"></script>
+  <script src="js/scenes/BootScene.js?v=75"></script>
+  <script src="js/scenes/GameScene.js?v=75"></script>
+  <script src="js/scenes/HUDScene.js?v=75"></script>
+  <script src="js/scenes/PauseScene.js?v=76"></script>
+  <script src="js/scenes/OutfitScene.js?v=75"></script>
+  <script src="js/scenes/UnlockScene.js?v=75"></script>
+  <script src="js/scenes/VictoryScene.js?v=75"></script>
+  <script src="js/scenes/DefeatScene.js?v=75"></script>
+  <script src="js/network.js?v=75"></script>
+  <script src="js/scenes/LobbyScene.js?v=75"></script>
+  <script src="js/main.js?v=75"></script>
 </body>
 </html>

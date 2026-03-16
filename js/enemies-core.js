@@ -789,6 +789,52 @@ Object.assign(window.MMA.Enemies, {
     return e;
   },
 
+  // Feature 1: Style Translator functions
+  recordEnemyDefeat: function(enemyKey) {
+    try {
+      var counts = JSON.parse(localStorage.getItem('mma_enemy_defeats') || '{}');
+      counts[enemyKey] = (counts[enemyKey] || 0) + 1;
+      localStorage.setItem('mma_enemy_defeats', JSON.stringify(counts));
+      return counts[enemyKey];
+    } catch(e) { return 0; }
+  },
+
+  getTranslatorLevel: function(enemyKey) {
+    try {
+      var counts = JSON.parse(localStorage.getItem('mma_enemy_defeats') || '{}');
+      var n = counts[enemyKey] || 0;
+      if (n >= 15) return 3;
+      if (n >= 10) return 2;
+      if (n >= 5)  return 1;
+      return 0;
+    } catch(e) { return 0; }
+  },
+
+  getTranslatorWindowMs: function(enemyKey) {
+    var level = MMA.Enemies.getTranslatorLevel(enemyKey);
+    return level * 100;
+  },
+
+  // Feature 2: Fear Memory
+  recordEnemyKnockdown: function(enemyKey, moveKey) {
+    try {
+      var fears = JSON.parse(localStorage.getItem('mma_enemy_fears') || '{}');
+      if (!fears[enemyKey]) fears[enemyKey] = {};
+      fears[enemyKey][moveKey] = (fears[enemyKey][moveKey] || 0) + 1;
+      localStorage.setItem('mma_enemy_fears', JSON.stringify(fears));
+    } catch(e) {}
+  },
+
+  getFearMultiplier: function(enemyKey, moveKey) {
+    try {
+      var fears = JSON.parse(localStorage.getItem('mma_enemy_fears') || '{}');
+      var enemyFears = fears[enemyKey] || {};
+      var topFear = Object.keys(enemyFears).sort(function(a,b){ return enemyFears[b]-enemyFears[a]; })[0];
+      if (topFear && topFear === moveKey) return 1.10;
+      if (topFear && topFear !== moveKey) return 0.85;
+      return 1.0;
+    } catch(e) { return 1.0; }
+  },
 
   spawnForRoom: function(scene, roomId) {
     if (window.MMA && MMA.Network && typeof MMA.Network.isClient === 'function' && MMA.Network.isClient()) return;
@@ -1271,4 +1317,368 @@ window.MMA.Enemies.damagePlayer = function(attackerEnemy, scene, dmg) {
       window.MMA.Enemies.ENSEMBLE_CAST.speak(attackerEnemy, scene, category);
     }
   }
+};
+
+// Nemesis System
+MMA.Enemies.recordPlayerDeath = function(killerType) {
+  try {
+    var deaths = JSON.parse(localStorage.getItem('mma_deaths_by_type') || '{}');
+    deaths[killerType] = (deaths[killerType] || 0) + 1;
+    localStorage.setItem('mma_deaths_by_type', JSON.stringify(deaths));
+  } catch(e) {}
+};
+
+MMA.Enemies.getNemesisType = function() {
+  try {
+    var deaths = JSON.parse(localStorage.getItem('mma_deaths_by_type') || '{}');
+    var max = 0, nemesis = null;
+    Object.keys(deaths).forEach(function(type) {
+      if (deaths[type] > max) { max = deaths[type]; nemesis = type; }
+    });
+    return nemesis;
+  } catch(e) { return null; }
+};
+
+MMA.Enemies.applyNemesisTint = function(scene, enemy) {
+  var nemType = MMA.Enemies.getNemesisType();
+  if (!nemType || !enemy || !enemy.type) return;
+  if (enemy.type.key !== nemType && enemy.type.behaviorType !== nemType) return;
+  if (enemy._isNemesis) return;
+
+  enemy._isNemesis = true;
+  if (enemy.setTint) enemy.setTint(0x8800ff);
+
+  // Scale stats slightly
+  if (enemy.stats) {
+    enemy.stats.hp = Math.round((enemy.stats.hp || 50) * 1.15);
+    enemy.stats.maxHp = Math.round((enemy.stats.maxHp || 50) * 1.15);
+    enemy.stats.attackDamage = Math.round((enemy.stats.attackDamage || 10) * 1.1);
+  }
+
+  // Pulse tween
+  if (scene && scene.tweens) {
+    scene.tweens.add({ targets: enemy, alpha: 0.7, duration: 500, yoyo: true, repeat: -1 });
+  }
+
+  // Label
+  if (scene && scene.add) {
+    var label = scene.add.text(enemy.x, enemy.y - 30, '⚡ NEMESIS', {
+      fontSize: '8px', fontFamily: 'Arial Black', color: '#8800ff', stroke: '#000', strokeThickness: 2
+    }).setDepth(30).setOrigin(0.5);
+    enemy._nemesisLabel = label;
+  }
+};
+
+MMA.Enemies.updateDrunkMonk = function(scene, enemy) {
+  if (!enemy || !enemy.active || !enemy.type || enemy.type.key !== 'drunkMonk') return;
+  if (!enemy._drunkTimer || scene.time.now > enemy._drunkTimer) {
+    enemy._drunkTimer = scene.time.now + 1500 + Math.random() * 1000;
+    // Random stumble
+    var angle = Math.random() * Math.PI * 2;
+    var spd = 40 + Math.random() * 60;
+    if (enemy.body) {
+      enemy.setVelocity(Math.cos(angle) * spd, Math.sin(angle) * spd);
+    }
+    // Occasional wild hit chance (20%)
+    if (Math.random() < 0.2 && scene.player) {
+      var dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, scene.player.x, scene.player.y);
+      if (dist < 80) {
+        var dmg = 20 + Math.floor(Math.random() * 15); // wild 20-35 damage
+        if (window.MMA && MMA.Enemies && typeof MMA.Enemies.damagePlayer === 'function') {
+          MMA.Enemies.damagePlayer(enemy, scene, dmg);
+        }
+        if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+          MMA.UI.showDamageText(scene, enemy.x, enemy.y - 20, 'WILD HIT! -' + dmg, '#886644');
+        }
+      }
+    }
+  }
+};
+
+MMA.Enemies.getZoneSpawnPool = function(zoneNum) {
+  var pools = {
+    1: ['brawler', 'kickboxer', 'wrestler', 'drunkMonk'],
+    2: ['mmaVeteran', 'feintMaster', 'judoka', 'sumoWrestler', 'drunkMonk'],
+    3: ['capoeira', 'speedster', 'feintMaster', 'kickboxingChampion'],
+    4: ['mmaVeteran', 'kickboxingChampion', 'feintMaster', 'shadow']
+  };
+  return pools[zoneNum] || pools[1];
+};
+
+(function() {
+  var _spawnForRoomZonePool = MMA.Enemies.spawnForRoom;
+  if (typeof _spawnForRoomZonePool !== 'function') return;
+
+  MMA.Enemies.spawnForRoom = function(scene, roomId) {
+    if (scene && MMA && MMA.Zones && typeof MMA.Zones.getRoomEnemyPool === 'function') {
+      var _origGetRoomEnemyPool = MMA.Zones.getRoomEnemyPool;
+      try {
+        MMA.Zones.getRoomEnemyPool = function(targetRoomId) {
+          var basePool = (_origGetRoomEnemyPool.call(MMA.Zones, targetRoomId) || []).slice();
+          var zoneNum = (scene && scene.currentZone) || 1;
+          var zonePool = (MMA.Enemies.getZoneSpawnPool && MMA.Enemies.getZoneSpawnPool(zoneNum)) || [];
+          if (!zonePool.length) return basePool;
+
+          var allowed = {};
+          for (var i = 0; i < zonePool.length; i++) allowed[zonePool[i]] = true;
+
+          var filtered = [];
+          for (var j = 0; j < basePool.length; j++) {
+            if (allowed[basePool[j]]) filtered.push(basePool[j]);
+          }
+
+          return filtered.length ? filtered : basePool;
+        };
+
+        return _spawnForRoomZonePool.call(this, scene, roomId);
+      } finally {
+        MMA.Zones.getRoomEnemyPool = _origGetRoomEnemyPool;
+      }
+    }
+
+    return _spawnForRoomZonePool.call(this, scene, roomId);
+  };
+})();
+
+(function() {
+  var _origUpdateRoleIcons = MMA.Enemies.updateRoleIcons;
+  if (typeof _origUpdateRoleIcons !== 'function') return;
+
+  MMA.Enemies.updateRoleIcons = function(scene, delta) {
+    _origUpdateRoleIcons.call(this, scene, delta);
+    if (!scene || !scene.enemies || typeof this.updateDrunkMonk !== 'function') return;
+    scene.enemies.forEach(function(enemy) {
+      MMA.Enemies.updateDrunkMonk(scene, enemy);
+    });
+  };
+})();
+
+// === OPPONENT STYLE TRANSLATOR ===
+MMA.Enemies.recordEnemyDefeat = MMA.Enemies.recordEnemyDefeat || function(enemyKey) {
+  try {
+    var c = JSON.parse(localStorage.getItem('mma_enemy_defeats') || '{}');
+    c[enemyKey] = (c[enemyKey] || 0) + 1;
+    localStorage.setItem('mma_enemy_defeats', JSON.stringify(c));
+    return c[enemyKey];
+  } catch(e) { return 0; }
+};
+MMA.Enemies.getTranslatorLevel = MMA.Enemies.getTranslatorLevel || function(enemyKey) {
+  try {
+    var c = JSON.parse(localStorage.getItem('mma_enemy_defeats') || '{}');
+    var n = c[enemyKey] || 0;
+    if (n >= 15) return 3;
+    if (n >= 10) return 2;
+    if (n >= 5) return 1;
+    return 0;
+  } catch(e) { return 0; }
+};
+MMA.Enemies.getTranslatorWindowMs = MMA.Enemies.getTranslatorWindowMs || function(enemyKey) {
+  return MMA.Enemies.getTranslatorLevel(enemyKey) * 100;
+};
+
+// === OPPONENT FEAR MEMORY ===
+MMA.Enemies.recordEnemyKnockdown = MMA.Enemies.recordEnemyKnockdown || function(enemyKey, moveKey) {
+  try {
+    var fears = JSON.parse(localStorage.getItem('mma_enemy_fears') || '{}');
+    if (!fears[enemyKey]) fears[enemyKey] = {};
+    fears[enemyKey][moveKey] = (fears[enemyKey][moveKey] || 0) + 1;
+    localStorage.setItem('mma_enemy_fears', JSON.stringify(fears));
+  } catch(e) {}
+};
+MMA.Enemies.getFearMultiplier = MMA.Enemies.getFearMultiplier || function(enemyKey, moveKey) {
+  try {
+    var fears = JSON.parse(localStorage.getItem('mma_enemy_fears') || '{}');
+    var ef = fears[enemyKey] || {};
+    var top = Object.keys(ef).sort(function(a,b){ return ef[b]-ef[a]; })[0];
+    if (top && top === moveKey) return 1.10;
+    if (top && top !== moveKey) return 0.85;
+    return 1.0;
+  } catch(e) { return 1.0; }
+};
+
+// === ENEMY MUTATION CHAMBER ===
+MMA.Enemies.checkMutation = MMA.Enemies.checkMutation || function(enemyKey, scene) {
+  try {
+    var muts = JSON.parse(localStorage.getItem('mma_enemy_mutations') || '{}');
+    var zone = scene && scene.currentZone || 1;
+    if (muts[enemyKey] && muts[enemyKey].zone === zone) return false;
+    if (Math.random() < 0.1) {
+      if (!muts[enemyKey]) muts[enemyKey] = {};
+      muts[enemyKey].mutated = true;
+      muts[enemyKey].zone = zone + 1;
+      localStorage.setItem('mma_enemy_mutations', JSON.stringify(muts));
+      return true;
+    }
+  } catch(e) {}
+  return false;
+};
+MMA.Enemies.isMutated = MMA.Enemies.isMutated || function(enemyKey, scene) {
+  try {
+    var muts = JSON.parse(localStorage.getItem('mma_enemy_mutations') || '{}');
+    var m = muts[enemyKey];
+    return !!(m && m.mutated && m.zone === (scene && scene.currentZone || 1));
+  } catch(e) { return false; }
+};
+MMA.Enemies.applyMutationVisual = MMA.Enemies.applyMutationVisual || function(scene, enemy) {
+  if (!enemy || !enemy.type) return;
+  if (!MMA.Enemies.isMutated(enemy.type.key, scene)) return;
+  if (enemy._mutationApplied) return;
+  enemy._mutationApplied = true;
+  if (enemy.setScale) enemy.setScale(1.15);
+  if (enemy.setTint) enemy.setTint(0xdd44aa);
+  if (enemy.stats) {
+    enemy.stats.hp = Math.round((enemy.stats.hp || 50) * 1.3);
+    enemy.stats.maxHp = Math.round((enemy.stats.maxHp || 50) * 1.3);
+  }
+  if (enemy.type && enemy.type.stats) {
+    enemy.type.stats.xpReward = Math.round((enemy.type.stats.xpReward || 20) * 2);
+  }
+};
+// === SECRET TOURNAMENT UNLOCK ===
+// After defeating 3 bosses, unlock secret tournament entry flag
+MMA.EnemiesCore = window.MMA.EnemiesCore || {};
+
+MMA.EnemiesCore.checkTournamentUnlock = MMA.EnemiesCore.checkTournamentUnlock || function(scene) {
+  try {
+    var save = JSON.parse(localStorage.getItem('mma_rpg_save') || '{}');
+    var bosses = save.bossesDefeated || 0;
+    if (bosses >= 3 && !save.tournamentUnlocked) {
+      save.tournamentUnlocked = true;
+      localStorage.setItem('mma_rpg_save', JSON.stringify(save));
+      if (window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+        MMA.UI.queueAchievementToast(scene, '🏆 SECRET TOURNAMENT UNLOCKED', '🏆');
+      }
+      return true;
+    }
+    return false;
+  } catch(e) { return false; }
+};
+
+MMA.EnemiesCore.isTournamentUnlocked = MMA.EnemiesCore.isTournamentUnlocked || function() {
+  try {
+    var save = JSON.parse(localStorage.getItem('mma_rpg_save') || '{}');
+    return !!save.tournamentUnlocked;
+  } catch(e) { return false; }
+};
+
+// === ENEMY TAUNT SYSTEM ===
+// Enemies taunt player at health milestones; player gains rage bonus if taunted
+MMA.EnemiesCore.TAUNTS = {
+  default: ['Come on!', 'Is that all?', 'Too slow!', "You'll need more than that!"],
+  brawler: ['SMASH!', 'Feel the pain!', 'No mercy!'],
+  feintMaster: ['Predictable...', 'Fooled again!', 'Read your moves.'],
+  drunkMonk: ['Heh heh...', 'Spinning!', 'Woooo!']
+};
+
+MMA.EnemiesCore.tryEnemyTaunt = MMA.EnemiesCore.tryEnemyTaunt || function(scene, enemy) {
+  if (!enemy || !scene) return;
+  if (enemy._taunted) return;
+  var hp = enemy.hp || 0;
+  var maxHp = (enemy.stats && enemy.stats.maxHp) ? enemy.stats.maxHp : (enemy.maxHp || 100);
+  var ratio = hp / maxHp;
+  // Taunt at 75% HP
+  if (ratio <= 0.75 && !enemy._taunt75) {
+    enemy._taunt75 = true;
+    MMA.EnemiesCore._doTaunt(scene, enemy);
+  }
+};
+
+MMA.EnemiesCore._doTaunt = function(scene, enemy) {
+  var pool = MMA.EnemiesCore.TAUNTS[enemy.type] || MMA.EnemiesCore.TAUNTS.default;
+  var msg = pool[Math.floor(Math.random() * pool.length)];
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 35, msg, '#ff8800');
+  }
+  // Player gains +10% damage for 5s after being taunted (rage)
+  var p = scene.player;
+  if (p) {
+    p._rageBonusUntil = Date.now() + 5000;
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, p.x, p.y - 40, '😤 RAGE +10%', '#ff2200');
+    }
+  }
+};
+
+MMA.EnemiesCore.getRageBonus = MMA.EnemiesCore.getRageBonus || function(scene) {
+  var p = scene && scene.player;
+  if (p && p._rageBonusUntil && Date.now() < p._rageBonusUntil) return 1.10;
+  return 1.0;
+};
+
+// === ENEMY MUTATION CHAMBER ===
+// Defeated enemies evolve in next zone — track mutations per enemy type
+MMA.Enemies.MUTATION_CHAMBER_KEY = 'mma_enemy_mutation_chamber';
+
+MMA.Enemies.MUTATION_EVOLUTIONS = MMA.Enemies.MUTATION_EVOLUTIONS || {
+  brawler:    { evolvedType: 'brawlerElite',   hpMult: 1.25, dmgMult: 1.20, label: '💀 EVOLVED BRAWLER',   color: 0xff2200 },
+  boxer:      { evolvedType: 'boxerElite',     hpMult: 1.20, dmgMult: 1.15, label: '⚡ EVOLVED BOXER',     color: 0x4400ff },
+  wrestler:   { evolvedType: 'wrestlerElite',  hpMult: 1.30, dmgMult: 1.10, label: '🔒 EVOLVED WRESTLER',  color: 0x006600 },
+  kickboxer:  { evolvedType: 'kickboxerElite', hpMult: 1.20, dmgMult: 1.25, label: '🦵 EVOLVED KICKBOXER', color: 0xff6600 },
+  drunkMonk:  { evolvedType: 'drunkMonkElite', hpMult: 1.15, dmgMult: 1.30, label: '🌀 SOBER MONK',        color: 0xaa00ff },
+  trickster:  { evolvedType: 'tricksterElite', hpMult: 1.10, dmgMult: 1.20, label: '🃏 MASTER TRICKSTER',  color: 0x00ffcc }
+};
+
+MMA.Enemies.recordMutationCandidate = MMA.Enemies.recordMutationCandidate || function(aiPattern) {
+  try {
+    var data = JSON.parse(localStorage.getItem(MMA.Enemies.MUTATION_CHAMBER_KEY) || '{}');
+    data[aiPattern] = (data[aiPattern] || 0) + 1;
+    localStorage.setItem(MMA.Enemies.MUTATION_CHAMBER_KEY, JSON.stringify(data));
+  } catch(e) {}
+};
+
+MMA.Enemies.getMutatedEnemyMods = MMA.Enemies.getMutatedEnemyMods || function(aiPattern, zone) {
+  if (zone <= 1) return null; // No mutations in zone 1
+  try {
+    var data = JSON.parse(localStorage.getItem(MMA.Enemies.MUTATION_CHAMBER_KEY) || '{}');
+    var kills = data[aiPattern] || 0;
+    if (kills < 3) return null; // Need 3+ kills to trigger mutation
+    var evo = MMA.Enemies.MUTATION_EVOLUTIONS[aiPattern];
+    if (!evo) return null;
+    return evo;
+  } catch(e) { return null; }
+};
+
+MMA.Enemies.applyMutationToEnemy = MMA.Enemies.applyMutationToEnemy || function(enemy, scene) {
+  if (!enemy || !enemy.type) return false;
+  var aiPattern = enemy.type.aiPattern || enemy.type.key;
+  var zone = (scene && scene.currentZone) || 1;
+  var evo = MMA.Enemies.getMutatedEnemyMods(aiPattern, zone);
+  if (!evo) return false;
+
+  // Apply mutation mods
+  if (enemy.stats) {
+    enemy.stats.hp = Math.round((enemy.stats.hp || 100) * evo.hpMult);
+    enemy.stats.maxHp = Math.round((enemy.stats.maxHp || 100) * evo.hpMult);
+  }
+  if (enemy.type) {
+    enemy.type.attackDamage = Math.round((enemy.type.attackDamage || 10) * evo.dmgMult);
+  }
+  enemy._isMutated = true;
+  enemy._mutationColor = evo.color;
+
+  // Visual indicator
+  if (scene && scene.add && enemy.sprite) {
+    enemy.sprite.setTint(evo.color);
+  }
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 40, evo.label, '#' + evo.color.toString(16).padStart(6,'0'));
+  }
+  return true;
+};
+
+// === ENEMY MOVE HISTORY TRACKING ===
+// Track player's most-used moves for faction counter-intelligence
+MMA.Enemies.recordPlayerMoveHistory = MMA.Enemies.recordPlayerMoveHistory || function(moveKey) {
+  try {
+    var hist = JSON.parse(localStorage.getItem('mma_move_history') || '{}');
+    hist[moveKey] = (hist[moveKey] || 0) + 1;
+    localStorage.setItem('mma_move_history', JSON.stringify(hist));
+  } catch(e) {}
+};
+
+MMA.Enemies.getPlayerTopMoves = MMA.Enemies.getPlayerTopMoves || function(n) {
+  try {
+    var hist = JSON.parse(localStorage.getItem('mma_move_history') || '{}');
+    return Object.keys(hist).sort(function(a,b){ return (hist[b]||0)-(hist[a]||0); }).slice(0, n || 3);
+  } catch(e) { return []; }
 };

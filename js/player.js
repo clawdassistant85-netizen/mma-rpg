@@ -201,6 +201,26 @@ window.MMA.Player = {
     }
     var reducedDamage = Math.max(1, Math.round(damage - (scene.player.defenseBonus || 0)));
     scene.player.stats.hp -= reducedDamage;
+    // Decrease durability of equipped gear on damage
+    if (scene.player && scene.player.equipmentDurability) {
+      for (var gearKey in scene.player.equipmentDurability) {
+        if (!scene.player.equipmentDurability.hasOwnProperty(gearKey)) continue;
+        var dur = scene.player.equipmentDurability[gearKey];
+        if (dur > 0) {
+          scene.player.equipmentDurability[gearKey] = Math.max(0, dur - 1);
+          if (scene.player.equipmentDurability[gearKey] === 0) {
+            // Gear broken effect: reduce related stats by 20%
+            // Simple implementation: reduce attack and defense bonuses
+            if (scene.player.attackBonus) scene.player.attackBonus *= 0.8;
+            if (scene.player.defenseBonus) scene.player.defenseBonus *= 0.8;
+            // Show warning
+            if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+              MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, gearKey + ' broken!', '#ff4444');
+            }
+          }
+        }
+      }
+    }
     // Track damage taken in fight stats
     MMA.UI.recordHitTaken(reducedDamage);
     MMA.UI.resetCombo();
@@ -438,4 +458,512 @@ window.MMA.Player = {
   getLoadout: function(scene) {
     return scene.player.moveLoadout ? scene.player.moveLoadout.slice() : ['jab', 'cross', 'takedown', 'hook'];
   }
+};
+
+// Pre-Fight Ritual System
+MMA.Player.RITUAL_TYPES = {
+  shadowBox: { label: '🥊 Shadow Box', effect: 'attackSpeed', value: 0.05, duration: 10000 },
+  ropeJump: { label: '🪢 Rope Jump', effect: 'staminaRegen', value: 0.10, duration: 15000 },
+  meditate: { label: '🧘 Meditate', effect: 'focusGain', value: 0.10, duration: 12000 },
+};
+
+MMA.Player.applyRitual = function(scene, ritualKey) {
+  var ritual = MMA.Player.RITUAL_TYPES[ritualKey];
+  if (!ritual || !scene || !scene.player) return;
+
+  scene.player._activeRitual = ritualKey;
+  scene.player._ritualUntil = scene.time.now + ritual.duration;
+  scene.player._ritualEffect = ritual.effect;
+  scene.player._ritualValue = ritual.value;
+
+  // Mastery tracking
+  try {
+    var ritualCounts = JSON.parse(localStorage.getItem('mma_ritual_counts') || '{}');
+    ritualCounts[ritualKey] = (ritualCounts[ritualKey] || 0) + 1;
+    // Check for mastery bonus at 20 uses
+    if (ritualCounts[ritualKey] === 20) {
+      var bonusMap = { shadowBox: 'Warm-Up Expert', ropeJump: 'Cardio King', meditate: 'Mental Fortress' };
+      var bonusTitle = bonusMap[ritualKey];
+      if (bonusTitle && window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+        MMA.UI.queueAchievementToast(scene, bonusTitle + ' unlocked!', '🏆');
+      }
+    }
+    localStorage.setItem('mma_ritual_counts', JSON.stringify(ritualCounts));
+  } catch(e) {}
+
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 30, ritual.label, '#FFD700');
+  }
+};
+
+MMA.Player.getRitualBonus = function(scene, effectType) {
+  var p = scene && scene.player;
+  if (!p || !p._activeRitual || !p._ritualEffect) return 0;
+  if (scene.time.now > (p._ritualUntil || 0)) { p._activeRitual = null; return 0; }
+  if (p._ritualEffect !== effectType) return 0;
+  return p._ritualValue || 0;
+};
+
+// Blood Sweat Equity Tracker
+MMA.Player.getEquityStats = function() {
+  try {
+    return JSON.parse(localStorage.getItem('mma_equity') || '{"dealt":0,"taken":0}');
+  } catch(e) { return {dealt:0, taken:0}; }
+};
+
+MMA.Player.updateEquity = function(dealt, taken) {
+  try {
+    var eq = MMA.Player.getEquityStats();
+    eq.dealt += dealt || 0;
+    eq.taken += taken || 0;
+    localStorage.setItem('mma_equity', JSON.stringify(eq));
+    return MMA.Player.getEquityTier(eq);
+  } catch(e) { return 0; }
+};
+
+MMA.Player.getEquityTier = function(eq) {
+  if (!eq || !eq.taken || eq.taken === 0) return 0;
+  var ratio = eq.dealt / eq.taken;
+  if (ratio >= 5) return 3; // Gold: +15% movement speed at <25% HP
+  if (ratio >= 2) return 2; // Silver: +10% crit damage
+  if (ratio >= 1) return 1; // Bronze: +5% all damage
+  return 0;
+};
+
+MMA.Player.getEquityBonus = function(bonusType) {
+  var eq = MMA.Player.getEquityStats();
+  var tier = MMA.Player.getEquityTier(eq);
+  if (bonusType === 'damage' && tier >= 1) return 0.05;
+  if (bonusType === 'crit' && tier >= 2) return 0.10;
+  if (bonusType === 'speed' && tier >= 3) return 0.15;
+  return 0;
+};
+
+MMA.Player.getFightIQ = function(scene) {
+  try {
+    var saves = JSON.parse(localStorage.getItem('mma_rpg_save') || '{}');
+    return saves.bossesDefeated || 0;
+  } catch(e) { return 0; }
+};
+
+MMA.Player.getFightIQBonus = function(scene) {
+  var iq = MMA.Player.getFightIQ(scene);
+  if (iq >= 6) return { staminaReduction: 0.15, predictWindow: 20 }; // "flow state"
+  if (iq >= 3) return { predictWindow: 10 }; // anticipate attacks 10% faster
+  return {};
+};
+
+MMA.Player.recordBossDefeated = function(scene) {
+  try {
+    var saves = JSON.parse(localStorage.getItem('mma_rpg_save') || '{}');
+    saves.bossesDefeated = (saves.bossesDefeated || 0) + 1;
+    localStorage.setItem('mma_rpg_save', JSON.stringify(saves));
+    var iq = saves.bossesDefeated;
+    if (iq === 3 && window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+      MMA.UI.queueAchievementToast(scene, 'Fight IQ: Anticipation unlocked', '🧠');
+    }
+    if (iq === 6 && window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+      MMA.UI.queueAchievementToast(scene, 'Fight IQ: Flow State unlocked!', '🧠');
+    }
+  } catch(e) {}
+};
+
+MMA.Player.recordFinisher = function(moveKey) {
+  try {
+    var finishers = JSON.parse(localStorage.getItem('mma_finishers') || '{}');
+    finishers[moveKey] = (finishers[moveKey] || 0) + 1;
+    localStorage.setItem('mma_finishers', JSON.stringify(finishers));
+  } catch(e) {}
+};
+
+MMA.Player.getTopFinisher = function() {
+  try {
+    var finishers = JSON.parse(localStorage.getItem('mma_finishers') || '{}');
+    var top = null, max = 0;
+    Object.keys(finishers).forEach(function(k) {
+      if (finishers[k] > max) { max = finishers[k]; top = k; }
+    });
+    return top;
+  } catch(e) { return null; }
+};
+
+MMA.Player.getFinisherBonus = function(moveKey) {
+  var top = MMA.Player.getTopFinisher();
+  return (top && top === moveKey) ? 1.2 : 1.0;
+};
+// === TECHNIQUE RUST SYSTEM ===
+MMA.Player.recordMoveUsed = MMA.Player.recordMoveUsed || function(moveKey) {
+  try {
+    var rust = JSON.parse(localStorage.getItem('mma_technique_rust') || '{}');
+    if (!rust[moveKey]) rust[moveKey] = { uses: 0, lastRoom: 0 };
+    rust[moveKey].uses++;
+    rust[moveKey].lastRoom = parseInt(localStorage.getItem('mma_rooms_cleared') || '0');
+    localStorage.setItem('mma_technique_rust', JSON.stringify(rust));
+  } catch(e) {}
+};
+MMA.Player.getTechniqueRustMult = MMA.Player.getTechniqueRustMult || function(moveKey) {
+  try {
+    var rust = JSON.parse(localStorage.getItem('mma_technique_rust') || '{}');
+    var cur = parseInt(localStorage.getItem('mma_rooms_cleared') || '0');
+    var data = rust[moveKey];
+    if (!data) return 0.85;
+    var unused = cur - (data.lastRoom || 0);
+    if (unused <= 5) return 1.0;
+    if (unused <= 15) return 0.95;
+    if (unused <= 30) return 0.90;
+    return 0.85;
+  } catch(e) { return 1.0; }
+};
+MMA.Player.getRustLabel = MMA.Player.getRustLabel || function(moveKey) {
+  var m = MMA.Player.getTechniqueRustMult(moveKey);
+  if (m >= 1.0) return null;
+  if (m >= 0.95) return '~';
+  if (m >= 0.90) return 'RUSTY';
+  return 'VERY RUSTY';
+};
+
+// === WEATHERED GEAR DEGRADATION ===
+MMA.Player.degradeGear = MMA.Player.degradeGear || function(scene, damageTaken) {
+  var p = scene && scene.player;
+  if (!p || !p.stats) return;
+  if (!p.stats._gearDurability) p.stats._gearDurability = 100;
+  p.stats._gearDurability = Math.max(0, p.stats._gearDurability - Math.floor(damageTaken * 0.1));
+  if (p.stats._gearDurability === 0 && p.stats.armor > 0 && !p.stats._gearBroken) {
+    p.stats._gearBroken = true;
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, p.x, p.y - 30, 'GEAR BROKEN!', '#888888');
+    }
+  }
+};
+MMA.Player.repairGear = MMA.Player.repairGear || function(scene) {
+  var p = scene && scene.player;
+  if (!p || !p.stats) return;
+  p.stats._gearDurability = 100;
+  p.stats._gearBroken = false;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, p.x, p.y - 30, 'GEAR REPAIRED', '#00ff88');
+  }
+};
+MMA.Player.getGearArmorValue = MMA.Player.getGearArmorValue || function(scene) {
+  var p = scene && scene.player;
+  if (!p || !p.stats) return 0;
+  if (p.stats._gearBroken) return 0;
+  var dur = p.stats._gearDurability !== undefined ? p.stats._gearDurability : 100;
+  return Math.round((p.stats.armor || 0) * (dur / 100));
+};
+// === FIGHTING STYLE EVOLUTION ===
+// After 20 fights, player's dominant style grants passive bonus
+MMA.Player.checkStyleEvolution = MMA.Player.checkStyleEvolution || function(scene) {
+  var p = scene && scene.player;
+  if (!p || !p.stats) return;
+  try {
+    var fights = parseInt(localStorage.getItem('mma_total_fights') || '0');
+    if (fights < 20) return;
+    var dna = p._styleDNACounts || {};
+    var total = (dna.strike||0) + (dna.grapple||0) + (dna.kick||0) + (dna.special||0);
+    if (total < 10) return;
+    var dominant = 'balanced';
+    var max = 0;
+    Object.keys(dna).forEach(function(k) { if ((dna[k]||0) > max) { max = dna[k]; dominant = k; } });
+    var ratio = max / total;
+    if (ratio < 0.5) return; // Not dominant enough
+    if (p._styleEvolution === dominant) return; // Already evolved
+    p._styleEvolution = dominant;
+    var bonuses = {
+      strike:  { label: 'BOXER', crit: 0.10 },
+      grapple: { label: 'GRAPPLER', takedownMult: 1.20 },
+      kick:    { label: 'KICKER', kickMult: 1.20 },
+      special: { label: 'SPECIALIST', specialMult: 1.30 }
+    };
+    var b = bonuses[dominant];
+    if (b && window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+      MMA.UI.queueAchievementToast(scene, 'STYLE: ' + b.label, '🥊');
+    }
+  } catch(e) {}
+};
+
+MMA.Player.getStyleEvolutionBonus = MMA.Player.getStyleEvolutionBonus || function(scene, moveType) {
+  var p = scene && scene.player;
+  if (!p || !p._styleEvolution) return 1.0;
+  var bonuses = {
+    strike:  { strike: 1.10 },
+    grapple: { grapple: 1.20, takedown: 1.20 },
+    kick:    { kick: 1.20 },
+    special: { special: 1.30 }
+  };
+  var b = bonuses[p._styleEvolution];
+  return (b && b[moveType]) ? b[moveType] : 1.0;
+};
+
+// === MENTAL FORTITUDE ===
+// Losing streaks build mental toughness; after 3 losses, +15% dmg
+MMA.Player.recordLoss = MMA.Player.recordLoss || function() {
+  try {
+    var streak = parseInt(localStorage.getItem('mma_loss_streak') || '0') + 1;
+    localStorage.setItem('mma_loss_streak', streak);
+  } catch(e) {}
+};
+
+MMA.Player.recordWin = MMA.Player.recordWin || function() {
+  try {
+    localStorage.setItem('mma_loss_streak', '0');
+    var wins = parseInt(localStorage.getItem('mma_total_wins') || '0') + 1;
+    localStorage.setItem('mma_total_wins', wins);
+    var fights = parseInt(localStorage.getItem('mma_total_fights') || '0') + 1;
+    localStorage.setItem('mma_total_fights', fights);
+  } catch(e) {}
+};
+
+MMA.Player.getMentalFortitudeBonus = MMA.Player.getMentalFortitudeBonus || function() {
+  try {
+    var streak = parseInt(localStorage.getItem('mma_loss_streak') || '0');
+    if (streak >= 5) return 1.25;
+    if (streak >= 3) return 1.15;
+    if (streak >= 1) return 1.05;
+    return 1.0;
+  } catch(e) { return 1.0; }
+};
+
+MMA.Player.getMentalFortitudeLabel = MMA.Player.getMentalFortitudeLabel || function() {
+  try {
+    var streak = parseInt(localStorage.getItem('mma_loss_streak') || '0');
+    if (streak >= 5) return '💪 IRON WILL (+25%)';
+    if (streak >= 3) return '😤 DETERMINED (+15%)';
+    if (streak >= 1) return '👊 RESILIENT (+5%)';
+    return null;
+  } catch(e) { return null; }
+};
+
+// === SIGNATURE MOVE UNLOCK ===
+// After using same move 15+ times, it becomes a "signature" with +10% bonus
+MMA.Player.getSignatureMoves = MMA.Player.getSignatureMoves || function() {
+  try {
+    var rust = JSON.parse(localStorage.getItem('mma_technique_rust') || '{}');
+    var sigs = [];
+    Object.keys(rust).forEach(function(k) {
+      if ((rust[k].uses || 0) >= 15) sigs.push(k);
+    });
+    return sigs;
+  } catch(e) { return []; }
+};
+
+MMA.Player.isSignatureMove = MMA.Player.isSignatureMove || function(moveKey) {
+  return MMA.Player.getSignatureMoves().indexOf(moveKey) !== -1;
+};
+
+MMA.Player.getSignatureBonus = MMA.Player.getSignatureBonus || function(moveKey) {
+  return MMA.Player.isSignatureMove(moveKey) ? 1.10 : 1.0;
+};
+// === TOURNAMENT BRACKET TRACKER ===
+// Tracks a mini single-elimination bracket within a zone
+MMA.Player.initTournamentBracket = MMA.Player.initTournamentBracket || function(size) {
+  try {
+    var bracket = {
+      size: size || 4,
+      round: 1,
+      wins: 0,
+      losses: 0,
+      active: true,
+      startedAt: Date.now()
+    };
+    localStorage.setItem('mma_bracket', JSON.stringify(bracket));
+    return bracket;
+  } catch(e) { return null; }
+};
+
+MMA.Player.getBracket = MMA.Player.getBracket || function() {
+  try { return JSON.parse(localStorage.getItem('mma_bracket') || 'null'); } catch(e) { return null; }
+};
+
+MMA.Player.advanceBracket = MMA.Player.advanceBracket || function(scene, won) {
+  try {
+    var b = MMA.Player.getBracket();
+    if (!b || !b.active) return null;
+    if (won) {
+      b.wins++;
+      b.round++;
+      // Check if bracket complete
+      var rounds = Math.log2(b.size);
+      if (b.round > rounds) {
+        b.active = false;
+        b.champion = true;
+        if (window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+          MMA.UI.queueAchievementToast(scene, '🏆 TOURNAMENT CHAMPION!', '🏆');
+        }
+        // Unlock home arena
+        if (window.MMA && MMA.Zones && typeof MMA.Zones.unlockHomeArena === 'function') {
+          MMA.Zones.unlockHomeArena(scene);
+        }
+      }
+    } else {
+      b.losses++;
+      b.active = false;
+      if (window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+        MMA.UI.queueAchievementToast(scene, 'Eliminated in Round ' + b.round, '❌');
+      }
+    }
+    localStorage.setItem('mma_bracket', JSON.stringify(b));
+    return b;
+  } catch(e) { return null; }
+};
+
+MMA.Player.getBracketLabel = MMA.Player.getBracketLabel || function() {
+  try {
+    var b = MMA.Player.getBracket();
+    if (!b || !b.active) return null;
+    var rounds = Math.log2(b.size || 4);
+    var remaining = rounds - b.round + 1;
+    if (remaining <= 1) return 'FINAL MATCH';
+    if (remaining <= 2) return 'SEMI-FINAL';
+    return 'ROUND ' + b.round + ' of ' + rounds;
+  } catch(e) { return null; }
+};
+
+// === CHAMPIONSHIP PROGRESS ===
+MMA.Player.getChampionshipProgress = MMA.Player.getChampionshipProgress || function() {
+  try {
+    var save = JSON.parse(localStorage.getItem('mma_rpg_save') || '{}');
+    var bosses = save.bossesDefeated || 0;
+    return {
+      bosses: bosses,
+      champion: bosses >= 4,
+      label: bosses >= 4 ? '👑 CHAMPION' : ('Boss ' + bosses + '/4')
+    };
+  } catch(e) { return { bosses: 0, champion: false, label: 'Boss 0/4' }; }
+};
+// === FIGHTER'S CREED SYSTEM ===
+// Philosophy selected at game start affects playstyle bonuses
+MMA.Player.CREEDS = {
+  aggressive: {
+    label: 'THE AGGRESSOR',
+    desc: 'High risk, high reward. Attack bonuses, defense penalty.',
+    attackMult: 1.15,
+    defenseMult: 0.90,
+    staminaCostMult: 1.10,
+    color: '#ff4422'
+  },
+  technical: {
+    label: 'THE TECHNICIAN',
+    desc: 'Precise and efficient. Combo bonuses, stamina efficiency.',
+    attackMult: 1.05,
+    defenseMult: 1.05,
+    comboBonusMult: 1.20,
+    staminaCostMult: 0.90,
+    color: '#4488ff'
+  },
+  defensive: {
+    label: 'THE GUARDIAN',
+    desc: 'Turtle up and counter. Defense bonuses, attack penalty.',
+    attackMult: 0.90,
+    defenseMult: 1.20,
+    counterMult: 1.25,
+    staminaCostMult: 0.95,
+    color: '#44cc88'
+  },
+  balanced: {
+    label: 'THE HYBRID',
+    desc: 'No specialization. Slight bonus to all stats.',
+    attackMult: 1.05,
+    defenseMult: 1.05,
+    staminaCostMult: 1.00,
+    color: '#ffcc00'
+  }
+};
+
+MMA.Player.setCreed = MMA.Player.setCreed || function(creedKey) {
+  try {
+    localStorage.setItem('mma_creed_choice', creedKey);
+  } catch(e) {}
+};
+
+MMA.Player.getCreed = MMA.Player.getCreed || function() {
+  try {
+    var key = localStorage.getItem('mma_creed_choice') || 'balanced';
+    return MMA.Player.CREEDS[key] || MMA.Player.CREEDS.balanced;
+  } catch(e) { return MMA.Player.CREEDS.balanced; }
+};
+
+MMA.Player.getCreedKey = MMA.Player.getCreedKey || function() {
+  try { return localStorage.getItem('mma_creed_choice') || 'balanced'; } catch(e) { return 'balanced'; }
+};
+
+MMA.Player.getCreedAttackMult = MMA.Player.getCreedAttackMult || function() {
+  return MMA.Player.getCreed().attackMult || 1;
+};
+
+MMA.Player.getCreedDefenseMult = MMA.Player.getCreedDefenseMult || function() {
+  return MMA.Player.getCreed().defenseMult || 1;
+};
+
+MMA.Player.getCreedStaminaMult = MMA.Player.getCreedStaminaMult || function() {
+  return MMA.Player.getCreed().staminaCostMult || 1;
+};
+
+// Show creed selector overlay (called from LobbyScene on first run)
+MMA.Player.showCreedSelector = MMA.Player.showCreedSelector || function(onSelect) {
+  var existing = document.getElementById('creed-selector');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'creed-selector';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:monospace;';
+
+  var title = document.createElement('div');
+  title.textContent = 'CHOOSE YOUR CREED';
+  title.style.cssText = 'color:#fff;font-size:22px;font-weight:bold;margin-bottom:24px;letter-spacing:3px;';
+  overlay.appendChild(title);
+
+  var creeds = MMA.Player.CREEDS;
+  Object.keys(creeds).forEach(function(key) {
+    var c = creeds[key];
+    var btn = document.createElement('button');
+    btn.style.cssText = 'display:block;width:260px;margin:8px;padding:12px 16px;background:#111;border:2px solid ' + c.color + ';color:' + c.color + ';font-family:monospace;font-size:13px;cursor:pointer;border-radius:4px;text-align:left;';
+    btn.innerHTML = '<strong>' + c.label + '</strong><br><span style="color:#aaa;font-size:11px;">' + c.desc + '</span>';
+    btn.onclick = function() {
+      MMA.Player.setCreed(key);
+      overlay.remove();
+      if (typeof onSelect === 'function') onSelect(key);
+    };
+    overlay.appendChild(btn);
+  });
+
+  document.body.appendChild(overlay);
+};
+
+// === TECHNIQUE INHERITANCE ===
+// Defeating an enemy grants 8% chance to temporarily inherit one of their techniques
+MMA.Player.INHERITANCE_CHANCE = 0.08;
+MMA.Player._inheritedTech = null;
+MMA.Player._inheritedTechExpiry = 0;
+
+MMA.Player.tryInheritTechnique = MMA.Player.tryInheritTechnique || function(scene, enemyType) {
+  if (Math.random() > MMA.Player.INHERITANCE_CHANCE) return null;
+  if (!enemyType || !enemyType.aiPattern) return null;
+
+  // Map AI pattern to a move key
+  var techMap = {
+    'boxer': 'jab', 'kickboxer': 'headKick', 'wrestler': 'takedown',
+    'muayThai': 'lowKick', 'bjj': 'guillotine', 'brawler': 'hook',
+    'trickster': 'special', 'drunkMonk': 'bodyShot'
+  };
+  var moveKey = techMap[enemyType.aiPattern] || null;
+  if (!moveKey) return null;
+
+  MMA.Player._inheritedTech = moveKey;
+  MMA.Player._inheritedTechExpiry = Date.now() + 60000; // lasts 60s
+
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function' && scene && scene.player) {
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 50, '📖 INHERITED: ' + moveKey.toUpperCase(), '#cc88ff');
+  }
+  return moveKey;
+};
+
+MMA.Player.getInheritedTechBonus = MMA.Player.getInheritedTechBonus || function(moveKey) {
+  if (!MMA.Player._inheritedTech || Date.now() > MMA.Player._inheritedTechExpiry) return 1;
+  if (MMA.Player._inheritedTech === moveKey) return 1.10; // +10% damage
+  return 1;
+};
+
+MMA.Player.isInheritedTech = MMA.Player.isInheritedTech || function(moveKey) {
+  return MMA.Player._inheritedTech === moveKey && Date.now() < MMA.Player._inheritedTechExpiry;
 };

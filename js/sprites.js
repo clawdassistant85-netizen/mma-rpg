@@ -126,6 +126,22 @@ window.MMA.Sprites = {
     exhaustedTint: 0xffd3a6
   },
   EXERTION_TEXTURES: {},
+  BREATH_SIGNATURE_CONFIG: {
+    pulseSpeed: 0.008,
+    alpha: 0.74,
+    chargedAlpha: 0.9,
+    scale: 0.58,
+    chargedScale: 0.82,
+    movePulseMs: 240,
+    minSpeed: 18,
+    offsetY: -16,
+    styles: {
+      striker: { color: 0xf3f8ff, glow: 0xffffff, title: 'STRIKER BREATH' },
+      grappler: { color: 0x6fc7ff, glow: 0xdaf2ff, title: 'GRAPPLER BREATH' },
+      balanced: { color: 0xb77dff, glow: 0xf0d8ff, title: 'BALANCED BREATH' }
+    }
+  },
+  BREATH_SIGNATURE_TEXTURES: {},
   LAST_CHANCE_CONFIG: {
     healthThreshold: 0.1,
     pulseSpeed: 0.012,
@@ -178,6 +194,20 @@ window.MMA.Sprites = {
   },
   REACTION_FACE_TEXTURES: {},
   TATTOO_TEXTURES: {},
+  EMBLEM_TEXTURES: {},
+  EMBLEM_CONFIG: {
+    alpha: 0.82,
+    glowAlpha: 0.28,
+    pulseSpeed: 0.006,
+    offsetY: -2,
+    labelCooldown: 2200,
+    families: {
+      boxing: { color: 0xff5a5a, glow: 0xffc2c2, title: 'BOXING CREST' },
+      wrestling: { color: 0x5aa8ff, glow: 0xc7e2ff, title: 'WRESTLING CREST' },
+      martial: { color: 0xffd166, glow: 0xffefb3, title: 'MARTIAL CREST' },
+      hybrid: { color: 0xb678ff, glow: 0xe0c8ff, title: 'HYBRID CREST' }
+    }
+  },
   RESONANCE_CONFIG: {
     moveHistoryLimit: 8,
     dominantWindow: 4,
@@ -197,6 +227,34 @@ window.MMA.Sprites = {
     }
   },
   RESONANCE_TEXTURES: {},
+  MEMORY_KNOCKOUT_CONFIG: {
+    duration: 420,
+    riseDistance: 22,
+    startScale: 0.92,
+    endScale: 1.08,
+    alpha: 0.72,
+    labelCooldown: 900,
+    palette: {
+      grunt: 0xa0a7b8,
+      elite: 0xb678ff,
+      boss: 0xffd166,
+      rival: 0x8a5cff
+    }
+  },
+  MEMORY_KNOCKOUT_TEXTURES: {},
+  RING_RUST_CONFIG: {
+    minDays: 3,
+    pulseSpeed: 0.0048,
+    alpha: 0.26,
+    heavyAlpha: 0.38,
+    scale: 1.12,
+    heavyScale: 1.18,
+    offsetY: -2,
+    tint: 0xb88a54,
+    heavyTint: 0x8b5a2b,
+    labelCooldown: 2400
+  },
+  RING_RUST_TEXTURES: {},
   VISUAL_ROLE_ALIASES: {
     trainer: 'npc_trainer',
     coach: 'npc_coach',
@@ -566,6 +624,49 @@ window.MMA.Sprites = {
       textureTattoo(set.special, { type: 'special', color: (palette && palette.special) || 0xf7dc6f, alpha: 0.9 });
       window.MMA.Sprites.TATTOO_TEXTURES[baseKey] = set;
     }
+    function textureEmblem(key, config) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var color = (config && config.color) || 0xffffff;
+      var glow = (config && config.glow) || color;
+      var type = (config && config.type) || 'hybrid';
+      g.fillStyle(0x000000, 0); g.fillRect(0, 0, 28, 28);
+      g.fillStyle(glow, 0.2); g.fillCircle(14, 14, 12);
+      g.lineStyle(2, color, 0.95);
+      if (type === 'boxing') {
+        g.strokeCircle(14, 14, 7);
+        g.lineBetween(8, 14, 20, 14);
+        g.lineBetween(14, 8, 14, 20);
+        g.strokeEllipse(14, 14, 18, 18);
+      } else if (type === 'wrestling') {
+        g.strokeCircle(9, 14, 4);
+        g.strokeCircle(19, 14, 4);
+        g.lineBetween(13, 14, 15, 14);
+        g.lineBetween(10, 19, 18, 23);
+      } else if (type === 'martial') {
+        g.strokeTriangle(14, 5, 22, 19, 6, 19);
+        g.lineBetween(14, 8, 14, 21);
+        g.lineBetween(9, 15, 19, 15);
+      } else {
+        g.strokeCircle(14, 14, 8);
+        g.strokeTriangle(14, 5, 21, 18, 7, 18);
+        g.lineBetween(8, 21, 20, 7);
+      }
+      g.generateTexture(key, 28, 28); g.destroy();
+    }
+    function textureEmblemSet(baseKey) {
+      var families = (window.MMA.Sprites.EMBLEM_CONFIG && window.MMA.Sprites.EMBLEM_CONFIG.families) || {};
+      var set = {
+        boxing: baseKey + '_emblem_boxing',
+        wrestling: baseKey + '_emblem_wrestling',
+        martial: baseKey + '_emblem_martial',
+        hybrid: baseKey + '_emblem_hybrid'
+      };
+      textureEmblem(set.boxing, { type: 'boxing', color: (families.boxing && families.boxing.color) || 0xff5a5a, glow: (families.boxing && families.boxing.glow) || 0xffc2c2 });
+      textureEmblem(set.wrestling, { type: 'wrestling', color: (families.wrestling && families.wrestling.color) || 0x5aa8ff, glow: (families.wrestling && families.wrestling.glow) || 0xc7e2ff });
+      textureEmblem(set.martial, { type: 'martial', color: (families.martial && families.martial.color) || 0xffd166, glow: (families.martial && families.martial.glow) || 0xffefb3 });
+      textureEmblem(set.hybrid, { type: 'hybrid', color: (families.hybrid && families.hybrid.color) || 0xb678ff, glow: (families.hybrid && families.hybrid.glow) || 0xe0c8ff });
+      window.MMA.Sprites.EMBLEM_TEXTURES[baseKey] = set;
+    }
     function textureResonance(key, color, alphaScale, variant) {
       var g = self.make.graphics({ x:0, y:0, add:false });
       var outerAlpha = typeof alphaScale === 'number' ? alphaScale : 0.18;
@@ -593,6 +694,42 @@ window.MMA.Sprites = {
         g.lineStyle(1, 0xffffff, 0.24); g.strokeEllipse(24, 36, 32, 46);
       }
       g.generateTexture(key, 48, 72); g.destroy();
+    }
+    function textureMemoryKnockout(key, color, variant) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var frameColor = color || 0xa0a7b8;
+      var mode = variant || 'grunt';
+      g.fillStyle(0x0f1220, 0.76); g.fillRoundedRect(0, 0, 52, 68, 8);
+      g.lineStyle(2, frameColor, 0.88); g.strokeRoundedRect(2, 2, 48, 64, 7);
+      g.fillStyle(frameColor, 0.14); g.fillEllipse(26, 28, 30, 36);
+      g.fillStyle(frameColor, 0.3); g.fillCircle(26, 18, 7);
+      g.fillRoundedRect(17, 25, 18, 20, 5);
+      g.fillRect(20, 44, 5, 13); g.fillRect(27, 44, 5, 13);
+      g.fillRoundedRect(11, 28, 10, 7, 4); g.fillRoundedRect(31, 24, 10, 7, 4);
+      g.lineStyle(2, frameColor, 0.72); g.strokeEllipse(26, 32, 32, 44);
+      g.lineStyle(1, 0xffffff, 0.22); g.strokeEllipse(26, 32, 24, 34);
+      if (mode === 'elite') {
+        g.lineStyle(2, frameColor, 0.78); g.strokeTriangle(26, 8, 35, 22, 17, 22);
+      } else if (mode === 'boss') {
+        g.fillStyle(frameColor, 0.92); g.fillTriangle(21, 10, 24, 16, 18, 16); g.fillTriangle(31, 10, 34, 16, 28, 16); g.fillRect(21, 15, 12, 3);
+      } else if (mode === 'rival') {
+        g.lineStyle(2, frameColor, 0.84); g.beginPath(); g.moveTo(14, 12); g.lineTo(20, 18); g.lineTo(26, 12); g.lineTo(32, 18); g.lineTo(38, 12); g.strokePath();
+      }
+      g.generateTexture(key, 52, 68); g.destroy();
+    }
+    function textureRingRust(key, opts) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var tint = (opts && opts.tint) || 0xb88a54;
+      var alpha = (opts && typeof opts.alpha === 'number') ? opts.alpha : 0.26;
+      var heavy = !!(opts && opts.heavy);
+      g.fillStyle(0x000000, 0); g.fillRect(0, 0, 52, 76);
+      g.fillStyle(tint, alpha * 0.26); g.fillEllipse(26, 38, 34, 50);
+      g.fillStyle(tint, alpha * 0.48); g.fillCircle(16, 18, heavy ? 4 : 3); g.fillCircle(36, 22, heavy ? 5 : 4); g.fillCircle(13, 42, heavy ? 4 : 3); g.fillCircle(38, 46, heavy ? 5 : 4); g.fillCircle(24, 60, heavy ? 4 : 3);
+      g.fillStyle(0x5f3b1e, alpha * 0.42); g.fillEllipse(26, 38, 20, 30);
+      g.lineStyle(2, tint, alpha * 0.72); g.strokeEllipse(26, 38, 30, 44);
+      g.lineStyle(1, 0xe9c38b, alpha * 0.54); g.beginPath(); g.moveTo(12, 26); g.lineTo(18, 34); g.lineTo(12, 44); g.strokePath();
+      g.beginPath(); g.moveTo(40, 24); g.lineTo(33, 35); g.lineTo(39, 48); g.strokePath();
+      g.generateTexture(key, 52, 76); g.destroy();
     }
     function texturePickup(key) {
       var g = self.make.graphics({ x:0, y:0, add:false });
@@ -658,6 +795,29 @@ window.MMA.Sprites = {
       g.fillStyle(0xffffff, alpha * 0.35); g.fillCircle(10, 10, 2); g.fillCircle(15, 12, 2);
       g.lineStyle(1, 0xffffff, alpha * 0.18); g.strokeEllipse(12, 13, 16, 12);
       g.generateTexture(key, 24, 24); g.destroy();
+    }
+    function textureBreathSignature(key, opts) {
+      var g = self.make.graphics({ x:0, y:0, add:false });
+      var color = (opts && opts.color) || 0xe7f8ff;
+      var glow = (opts && opts.glow) || 0xffffff;
+      var alpha = (opts && typeof opts.alpha === 'number') ? opts.alpha : 0.8;
+      var style = (opts && opts.style) || 'balanced';
+      g.fillStyle(color, alpha * 0.18); g.fillEllipse(18, 18, 24, 18);
+      if (style === 'striker') {
+        g.fillStyle(color, alpha * 0.62); g.fillTriangle(18, 6, 10, 22, 17, 19);
+        g.fillTriangle(18, 6, 26, 22, 19, 19);
+        g.fillStyle(glow, alpha * 0.34); g.fillEllipse(18, 18, 10, 8);
+      } else if (style === 'grappler') {
+        g.fillStyle(color, alpha * 0.48); g.fillCircle(14, 18, 6); g.fillCircle(22, 18, 6);
+        g.fillStyle(color, alpha * 0.36); g.fillCircle(18, 11, 5); g.fillCircle(18, 25, 5);
+        g.lineStyle(2, glow, alpha * 0.28); g.strokeEllipse(18, 18, 18, 18);
+      } else {
+        g.fillStyle(color, alpha * 0.5); g.fillCircle(13, 18, 6); g.fillCircle(23, 18, 6); g.fillCircle(18, 11, 5);
+        g.fillStyle(glow, alpha * 0.26); g.fillEllipse(18, 18, 12, 10);
+        g.lineStyle(1, glow, alpha * 0.24); g.strokeEllipse(18, 18, 20, 16);
+      }
+      g.fillStyle(glow, alpha * 0.22); g.fillCircle(12, 13, 2); g.fillCircle(24, 15, 2);
+      g.generateTexture(key, 36, 36); g.destroy();
     }
     function textureStumbleSpark(key, opts) {
       var g = self.make.graphics({ x:0, y:0, add:false });
@@ -912,6 +1072,7 @@ window.MMA.Sprites = {
     // Re-enable when animation system consumes _windup/_hit/_death keys
 
     textureTattooSet('player', { strike: 0xff6b6b, grapple: 0x5dade2, special: 0xf7dc6f });
+    textureEmblemSet('player');
 
     // --- OPTIONAL TEXTURES (portraits, reactions, auras) ---
     // Skipped during makeEssential() for fast mobile boot. Generated lazily via makeOptional().
@@ -1311,6 +1472,29 @@ window.MMA.Sprites = {
         default: { core: 'resonance_hybrid', ring: 'resonance_hybrid_ring', flare: 'resonance_hybrid_flare' }
       };
     });
+    addOptionalTask(function() {
+      var memoryCfg = window.MMA.Sprites.MEMORY_KNOCKOUT_CONFIG || {};
+      var memoryPalette = memoryCfg.palette || {};
+      textureMemoryKnockout('memory_knockout_grunt', memoryPalette.grunt || 0xa0a7b8, 'grunt');
+      textureMemoryKnockout('memory_knockout_elite', memoryPalette.elite || 0xb678ff, 'elite');
+      textureMemoryKnockout('memory_knockout_boss', memoryPalette.boss || 0xffd166, 'boss');
+      textureMemoryKnockout('memory_knockout_rival', memoryPalette.rival || 0x8a5cff, 'rival');
+      window.MMA.Sprites.MEMORY_KNOCKOUT_TEXTURES = {
+        grunt: 'memory_knockout_grunt',
+        elite: 'memory_knockout_elite',
+        boss: 'memory_knockout_boss',
+        rival: 'memory_knockout_rival'
+      };
+    });
+    addOptionalTask(function() {
+      var ringRustCfg = window.MMA.Sprites.RING_RUST_CONFIG || {};
+      textureRingRust('ring_rust_overlay', { tint: ringRustCfg.tint || 0xb88a54, alpha: ringRustCfg.alpha || 0.26, heavy: false });
+      textureRingRust('ring_rust_overlay_heavy', { tint: ringRustCfg.heavyTint || 0x8b5a2b, alpha: ringRustCfg.heavyAlpha || 0.38, heavy: true });
+      window.MMA.Sprites.RING_RUST_TEXTURES = {
+        light: 'ring_rust_overlay',
+        heavy: 'ring_rust_overlay_heavy'
+      };
+    });
     texturePickup('item_pickup');
     texturePickup('pickup_health');
     textureSweatParticle('impact_sweat', { fill: 0x9fd4ff, highlight: 0xffffff, alpha: 0.92 });
@@ -1323,6 +1507,11 @@ window.MMA.Sprites = {
     textureFootprint('footwork_print_right', { color: 0xbab2a4, alpha: 0.36 });
     textureBreathPuff('exertion_breath_heavy', { color: 0xe7f8ff, alpha: 0.88 });
     textureBreathPuff('exertion_breath_recovery', { color: 0xa8f0ff, alpha: 0.8 });
+    var breathSignatureCfg = window.MMA.Sprites.BREATH_SIGNATURE_CONFIG || {};
+    var breathStyles = breathSignatureCfg.styles || {};
+    textureBreathSignature('breath_signature_striker', { style: 'striker', color: (breathStyles.striker && breathStyles.striker.color) || 0xf3f8ff, glow: (breathStyles.striker && breathStyles.striker.glow) || 0xffffff, alpha: breathSignatureCfg.alpha || 0.74 });
+    textureBreathSignature('breath_signature_grappler', { style: 'grappler', color: (breathStyles.grappler && breathStyles.grappler.color) || 0x6fc7ff, glow: (breathStyles.grappler && breathStyles.grappler.glow) || 0xdaf2ff, alpha: breathSignatureCfg.alpha || 0.74 });
+    textureBreathSignature('breath_signature_balanced', { style: 'balanced', color: (breathStyles.balanced && breathStyles.balanced.color) || 0xb77dff, glow: (breathStyles.balanced && breathStyles.balanced.glow) || 0xf0d8ff, alpha: breathSignatureCfg.alpha || 0.74 });
     textureStumbleSpark('exertion_stumble', { color: 0xffd3a6, alpha: 0.96 });
     var attackReadCfg = window.MMA.Sprites.ATTACK_READ_CONFIG || {};
     var attackReadColors = attackReadCfg.colors || {};
@@ -1350,6 +1539,12 @@ window.MMA.Sprites = {
       heavyBreath: 'exertion_breath_heavy',
       recoveryBreath: 'exertion_breath_recovery',
       stumble: 'exertion_stumble'
+    };
+    window.MMA.Sprites.BREATH_SIGNATURE_TEXTURES = {
+      striker: 'breath_signature_striker',
+      grappler: 'breath_signature_grappler',
+      balanced: 'breath_signature_balanced',
+      default: 'breath_signature_balanced'
     };
     window.MMA.Sprites.ATTACK_READ_TEXTURES = {
       jab: 'attack_read_jab',
@@ -1873,4 +2068,307 @@ window.MMA.Sprites = {
 
     return created;
   }
+};
+
+MMA.Sprites.showComboFireTrail = function(scene, x, y, comboCount) {
+  if (!scene || !scene.add || comboCount < 10) return;
+  var colors = [0xff4400, 0xff8800, 0xffcc00];
+  var count = Math.min(5, Math.floor(comboCount / 5));
+  for (var i = 0; i < count; i++) {
+    (function(idx) {
+      var particle = scene.add.circle(
+        x + (Math.random()*20 - 10),
+        y + (Math.random()*20 - 10),
+        3 + Math.random()*3,
+        colors[Math.floor(Math.random()*colors.length)],
+        0.9
+      ).setDepth(200);
+      scene.tweens.add({
+        targets: particle,
+        x: particle.x + (Math.random()*30 - 15),
+        y: particle.y - 20 - Math.random()*20,
+        alpha: 0, scaleX: 0.2, scaleY: 0.2,
+        duration: 300 + Math.random()*200,
+        delay: idx * 50,
+        onComplete: function() { if(particle.active) particle.destroy(); }
+      });
+    })(i);
+  }
+};
+
+MMA.Sprites.applyBossAura = function(scene, enemy) {
+  if (!enemy || !enemy.type || !enemy.type.isBoss) return;
+  if (enemy._auraApplied) return;
+  enemy._auraApplied = true;
+
+  var auraColors = {
+    zone1: 0x4444ff,
+    zone2: 0xff2200,
+    zone3: 0x00cc88,
+    zone4: 0xFFD700
+  };
+  var zone = scene && scene.currentZone ? scene.currentZone : 1;
+  var color = auraColors['zone' + zone] || 0xFFD700;
+
+  var aura = scene.add.circle(enemy.x, enemy.y, (enemy.displayWidth || 24) * 0.8, color, 0.25).setDepth(enemy.depth - 1);
+  enemy._auraSprite = aura;
+
+  scene.tweens.add({ targets: aura, alpha: 0.08, duration: 500, yoyo: true, repeat: -1 });
+};
+
+MMA.Sprites.updateBossAura = function(enemy) {
+  if (!enemy || !enemy._auraSprite || !enemy._auraSprite.active) return;
+  enemy._auraSprite.setPosition(enemy.x, enemy.y);
+  // Pulse faster at low HP
+  var hp = enemy.stats ? enemy.stats.hp : 100;
+  var maxHp = enemy.type && enemy.type.stats ? enemy.type.stats.maxHp || 100 : 100;
+  if (hp / maxHp < 0.3) enemy._auraSprite.setRadius((enemy.displayWidth || 24) * 1.1);
+};
+
+MMA.Sprites.updatePlayerStyleAura = function(scene) {
+  if (!scene || !scene.player) return;
+  var p = scene.player;
+
+  // Determine dominant style from style DNA counts
+  var strikeDNA = (p._styleDNACounts && p._styleDNACounts.strike) || 0;
+  var grapplerDNA = (p._styleDNACounts && p._styleDNACounts.grapple) || 0;
+  var color = null;
+  if (strikeDNA > grapplerDNA * 1.5) color = 0xff2200;       // striker = red
+  else if (grapplerDNA > strikeDNA * 1.5) color = 0x0044ff;  // grappler = blue
+  else color = 0x8800aa;                                       // balanced = purple
+
+  if (!p._styleAura || !p._styleAura.active) {
+    p._styleAura = scene.add.circle(p.x, p.y, 18, color, 0.12).setDepth(3);
+    scene.tweens.add({ targets: p._styleAura, alpha: 0.05, duration: 800, yoyo: true, repeat: -1 });
+  } else {
+    p._styleAura.setPosition(p.x, p.y + 8);
+    p._styleAura.setFillStyle(color, 0.12);
+  }
+};
+
+(function() {
+  if (!window || !window.GameScene || !window.GameScene.prototype) return;
+  if (window.GameScene.prototype._mmaStyleAuraPatched) return;
+
+  var originalUpdate = window.GameScene.prototype.update;
+  if (typeof originalUpdate !== 'function') return;
+
+  window.GameScene.prototype.update = function() {
+    var result = originalUpdate.apply(this, arguments);
+    var now = (this.time && typeof this.time.now === 'number') ? this.time.now : Date.now();
+    if (!this._styleAuraTickAt || now - this._styleAuraTickAt >= 1000) {
+      this._styleAuraTickAt = now;
+      MMA.Sprites.updatePlayerStyleAura(this);
+    }
+    return result;
+  };
+
+  window.GameScene.prototype._mmaStyleAuraPatched = true;
+})();
+
+// Feature 3: Crowd Surfing Victory Animation
+MMA.Sprites.showCrowdSurf = function(scene) {
+  if (!scene || !scene.player) return;
+  var zoneNum = scene.currentZone || 1;
+  if (zoneNum < 3) return; // Only in arena/beach zones
+  var p = scene.player;
+  var origY = p.y;
+  // Float player up
+  scene.tweens.add({
+    targets: p, y: origY - 30, duration: 500, ease: 'Sine.Out',
+    onComplete: function() {
+      // Sway back and forth
+      scene.tweens.add({
+        targets: p, x: p.x + 20, duration: 400, yoyo: true, repeat: 3,
+        onComplete: function() {
+          scene.tweens.add({ targets: p, y: origY, duration: 400 });
+        }
+      });
+    }
+  });
+  // Confetti
+  for (var i = 0; i < 12; i++) {
+    (function(idx) {
+      var W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+      var cx = Math.random() * W;
+      var conf = scene.add.circle(cx, -5, 4, [0xff0000,0xFFD700,0x00ff88,0x00aaff][idx%4], 0.9).setDepth(210);
+      scene.tweens.add({ targets: conf, y: 500, x: cx + (Math.random()*60-30), alpha: 0,
+        duration: 2500, delay: idx * 100, onComplete: function() { if(conf.active) conf.destroy(); } });
+    })(i);
+  }
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, p.x, p.y - 50, 'CROWD SURFING! 🏄', '#FFD700');
+  }
+};// === SIGNATURE ENTRANCE ANIMATION ===
+// Player entrance walk-in with style based on creed
+MMA.Sprites = window.MMA.Sprites || {};
+
+MMA.Sprites.playEntranceAnimation = MMA.Sprites.playEntranceAnimation || function(scene, onComplete) {
+  if (!scene || !scene.player) { if (onComplete) onComplete(); return; }
+  var p = scene.player;
+  var creed = (window.MMA && MMA.UI && typeof MMA.UI.getCreed === 'function') ? MMA.UI.getCreed() : 'balanced';
+  var startX = -60;
+  var targetX = p.x;
+  p.x = startX;
+  // Creed-based entrance color flash
+  var colors = { striker: 0xff4400, grappler: 0x4444ff, balanced: 0x00ff88, brawler: 0xff8800 };
+  var color = colors[creed] || 0xffffff;
+  var flash = scene.add.rectangle(startX, p.y, 80, 100, color, 0.6).setDepth(200);
+  scene.tweens.add({
+    targets: [p, flash],
+    x: targetX,
+    duration: 600,
+    ease: 'Cubic.Out',
+    onComplete: function() {
+      flash.destroy();
+      // Name flash
+      if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        MMA.UI.showDamageText(scene, targetX, p.y - 50, '🥊 FIGHTER ENTERS', '#FFD700');
+      }
+      if (onComplete) onComplete();
+    }
+  });
+};
+
+// === BOSS DEATH SEQUENCE ===
+// Dramatic boss KO: slow-mo tint + shatter effect
+MMA.Sprites.playBossDeathSequence = MMA.Sprites.playBossDeathSequence || function(scene, enemy, onComplete) {
+  if (!scene || !enemy) { if (onComplete) onComplete(); return; }
+  // Slow time feel: tint enemy red then explode
+  if (enemy.setTint) enemy.setTint(0xff2200);
+  // Camera shake
+  if (scene.cameras && scene.cameras.main) {
+    scene.cameras.main.shake(400, 0.015);
+  }
+  // Particle burst
+  var colors = [0xff0000, 0xFFD700, 0xff8800];
+  for (var i = 0; i < 12; i++) {
+    (function(idx) {
+      var angle = (idx / 12) * Math.PI * 2;
+      var speed = 60 + Math.random() * 80;
+      var dot = scene.add.circle(enemy.x, enemy.y, 5, colors[idx % colors.length], 1).setDepth(220);
+      scene.tweens.add({
+        targets: dot,
+        x: enemy.x + Math.cos(angle) * speed,
+        y: enemy.y + Math.sin(angle) * speed,
+        alpha: 0, scaleX: 0.2, scaleY: 0.2,
+        duration: 600,
+        onComplete: function() { if (dot.active) dot.destroy(); }
+      });
+    })(i);
+  }
+  scene.time.delayedCall(700, function() {
+    if (enemy.active) enemy.setAlpha(0);
+    if (onComplete) onComplete();
+  });
+};
+
+// === TECHNIQUE FAMILY TREE VISUAL ===
+// Brief visual showing which move family a technique belongs to
+MMA.Sprites.showTechniqueFamily = MMA.Sprites.showTechniqueFamily || function(scene, x, y, moveKey) {
+  if (!scene) return;
+  var families = {
+    jab: 'BOXING', cross: 'BOXING', hook: 'BOXING', uppercut: 'BOXING',
+    lowKick: 'MUAY THAI', headKick: 'MUAY THAI', clinchKnee: 'MUAY THAI',
+    takedown: 'WRESTLING', clinch: 'WRESTLING',
+    submission: 'BJJ', groundPound: 'MMA'
+  };
+  var family = families[moveKey];
+  if (!family) return;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, x, y - 45, family, '#aaaaff');
+  }
+};
+// === SWEAT EQUITY VISUAL ===
+// Persistent sweat accumulation during fights. Heavy sweat = -3% accuracy but +5% grapple success.
+MMA.Sprites.SWEAT_LEVELS = ['dry', 'damp', 'sweaty', 'drenched'];
+MMA.Sprites._playerSweat = 0; // 0-100
+
+MMA.Sprites.addSweat = MMA.Sprites.addSweat || function(amount) {
+  MMA.Sprites._playerSweat = Math.min(100, (MMA.Sprites._playerSweat || 0) + (amount || 5));
+};
+
+MMA.Sprites.resetSweat = MMA.Sprites.resetSweat || function() {
+  MMA.Sprites._playerSweat = 0;
+};
+
+MMA.Sprites.getSweatLevel = MMA.Sprites.getSweatLevel || function() {
+  var s = MMA.Sprites._playerSweat || 0;
+  if (s < 20) return 'dry';
+  if (s < 50) return 'damp';
+  if (s < 80) return 'sweaty';
+  return 'drenched';
+};
+
+MMA.Sprites.getSweatAccuracyMod = MMA.Sprites.getSweatAccuracyMod || function() {
+  var lvl = MMA.Sprites.getSweatLevel();
+  if (lvl === 'drenched') return 0.97; // -3% accuracy
+  if (lvl === 'sweaty') return 0.99;
+  return 1.0;
+};
+
+MMA.Sprites.getSweatGrappleMod = MMA.Sprites.getSweatGrappleMod || function() {
+  var lvl = MMA.Sprites.getSweatLevel();
+  if (lvl === 'drenched') return 1.05; // +5% grapple
+  if (lvl === 'sweaty') return 1.02;
+  return 1.0;
+};
+
+MMA.Sprites.updateSweatVisual = MMA.Sprites.updateSweatVisual || function(scene) {
+  if (!scene || !scene.player) return;
+  var lvl = MMA.Sprites.getSweatLevel();
+  if (lvl === 'dry') return;
+  // Emit brief sweat droplet particles
+  if (lvl === 'drenched' || lvl === 'sweaty') {
+    if (scene.add && Math.random() < (lvl === 'drenched' ? 0.15 : 0.05)) {
+      var p = scene.player;
+      var drop = scene.add.rectangle(p.x + (Math.random()-0.5)*12, p.y - 10, 2, 4, 0x88ccff, 0.7).setDepth(9);
+      scene.tweens.add({
+        targets: drop, y: drop.y + 20, alpha: 0, duration: 300,
+        onComplete: function() { if (drop.active) drop.destroy(); }
+      });
+    }
+  }
+};
+
+// === RING LIGHT GLARE ===
+// Arena spotlights create screen glare when camera faces them — 0.5s vulnerability window
+MMA.Sprites._glareActive = false;
+MMA.Sprites._glareEndsAt = 0;
+
+MMA.Sprites.triggerRingGlare = MMA.Sprites.triggerRingGlare || function(scene) {
+  if (!scene || MMA.Sprites._glareActive) return;
+  // Only in zone 4 (championship arena)
+  if ((scene.currentZone || 1) < 4) return;
+  if (Math.random() > 0.04) return; // 4% chance per call
+  MMA.Sprites._glareActive = true;
+  MMA.Sprites._glareEndsAt = Date.now() + 500;
+
+  var existing = document.getElementById('ring-glare');
+  if (!existing) {
+    var glare = document.createElement('div');
+    glare.id = 'ring-glare';
+    glare.style.cssText = 'position:absolute;inset:0;background:radial-gradient(ellipse at 70% 15%, rgba(255,255,220,0.55) 0%, transparent 60%);pointer-events:none;z-index:60;';
+    var gc = document.getElementById('game-container') || document.body;
+    gc.appendChild(glare);
+    setTimeout(function() {
+      var el = document.getElementById('ring-glare');
+      if (el) el.remove();
+      MMA.Sprites._glareActive = false;
+    }, 500);
+  }
+};
+
+MMA.Sprites.isGlareActive = MMA.Sprites.isGlareActive || function() {
+  if (!MMA.Sprites._glareActive) return false;
+  if (Date.now() > MMA.Sprites._glareEndsAt) {
+    MMA.Sprites._glareActive = false;
+    return false;
+  }
+  return true;
+};
+
+// Glare creates vulnerability: enemy gets +15% damage bonus while glare active
+MMA.Sprites.getGlareVulnerabilityMult = MMA.Sprites.getGlareVulnerabilityMult || function() {
+  return MMA.Sprites.isGlareActive() ? 1.15 : 1.0;
 };

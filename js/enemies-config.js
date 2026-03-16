@@ -420,64 +420,66 @@ Object.assign(window.MMA.Enemies, {
 
 
 
+  // Weight classes: 'light', 'medium', 'heavy'
+  // If not set, default to 'medium'
   TYPES: {
-    streetThug:{name:'Street Thug',hp:40,maxHp:40,speed:80,attackDamage:8,attackCooldownMax:1200,attackRange:55,chaseRange:220,color:0xe83030,xpReward:15,teachesMove:'hook',zone:1,aiPattern:'chase',groundDefense:0.2,groundEscape:0.2},
-    brawler:{name:'Brawler',hp:110,maxHp:110,speed:90,attackDamage:18,attackCooldownMax:1100,attackRange:62,chaseRange:220,color:0xaa0000,xpReward:28,teachesMove:'hook',zone:1,aiPattern:'chase',groundDefense:0.4,groundEscape:0.3,style:'striker',description:'Tough street fighter with heavy hands'},
-    barBrawler:{name:'Bar Brawler',hp:65,maxHp:65,speed:65,attackDamage:14,attackCooldownMax:1500,attackRange:60,chaseRange:200,color:0xe87030,xpReward:25,teachesMove:'cross',zone:1,aiPattern:'chase',groundDefense:0.4,groundEscape:0.35},
-    muayThaiFighter:{name:'Muay Thai Fighter',hp:85,maxHp:85,speed:90,attackDamage:18,attackCooldownMax:1000,attackRange:70,chaseRange:250,color:0x30e870,xpReward:40,teachesMove:'elbowStrike',zone:1,aiPattern:'kicker'},
-    wrestler:{name:'Wrestler',hp:90,maxHp:90,speed:70,attackDamage:12,attackCooldownMax:1300,attackRange:60,chaseRange:210,color:0x4488cc,xpReward:30,teachesMove:'singleLegTakedown',zone:2,aiPattern:'grasper',groundDefense:0.7,groundEscape:0.6},
-    judoka:{name:'Judoka',hp:85,maxHp:85,speed:75,attackDamage:14,attackCooldownMax:1200,attackRange:65,chaseRange:220,color:0x8844cc,xpReward:35,teachesMove:'hipThrow',zone:2,aiPattern:'thrower'},
-    groundNPounder:{name:'Ground-n-Pounder',hp:100,maxHp:100,speed:60,attackDamage:16,attackCooldownMax:1400,attackRange:70,chaseRange:230,color:0xcc8844,xpReward:40,teachesMove:'guardPass',zone:2,aiPattern:'chase'},
-    bjjBlackBelt:{name:'BJJ Black Belt',hp:120,maxHp:120,speed:55,attackDamage:22,attackCooldownMax:1600,attackRange:65,chaseRange:240,color:0x222222,xpReward:50,teachesMove:'armbar',zone:3,aiPattern:'subHunter'},
-    mmaChamp:{name:'MMA Champ',hp:200,maxHp:200,speed:85,attackDamage:25,attackCooldownMax:1100,attackRange:70,chaseRange:260,color:0xffd700,xpReward:100,teachesMove:'spinningBackFist',zone:3,aiPattern:'chase'},
-    kickboxer:{name:'Kickboxer',hp:70,maxHp:70,speed:100,attackDamage:16,attackCooldownMax:900,attackRange:90,chaseRange:280,color:0x00cccc,xpReward:35,teachesMove:'roundhouseKick',zone:2,aiPattern:'kickboxer',groundDefense:0.2,groundEscape:0.1},
-    striker:{name:'Striker',hp:55,maxHp:55,speed:95,attackDamage:10,attackCooldownMax:600,attackRange:50,chaseRange:260,color:0xff3366,xpReward:32,teachesMove:'jab',zone:2,aiPattern:'combo',groundDefense:0.2,groundEscape:0.1},
-    boxer:{name:'Boxer',hp:68,maxHp:68,speed:108,attackDamage:12,attackCooldownMax:700,attackRange:58,chaseRange:260,color:0xcc4444,xpReward:38,teachesMove:'jab',zone:2,aiPattern:'boxer',groundDefense:0.25,groundEscape:0.2},
-    karateka:{name:'Karateka',hp:82,maxHp:82,speed:78,attackDamage:18,attackCooldownMax:1400,attackRange:82,chaseRange:230,color:0xf1f1f1,xpReward:42,teachesMove:'roundhouseKick',zone:2,aiPattern:'karateka',groundDefense:0.3,groundEscape:0.2},
-    streetFighter:{name:'Street Fighter',hp:92,maxHp:92,speed:92,attackDamage:17,attackCooldownMax:1150,attackRange:68,chaseRange:270,color:0xff9922,xpReward:55,teachesMove:'bodyShot',zone:3,aiPattern:'streetFighter',groundDefense:0.35,groundEscape:0.3},
-    stunner:{name:'Stunner',hp:80,maxHp:80,speed:70,attackDamage:12,attackCooldownMax:1200,attackRange:60,chaseRange:250,color:0x8800ff,xpReward:45,teachesMove:null,zone:2,aiPattern:'stunner',groundDefense:0.3,groundEscape:0.2},
+    streetThug:{name:'Street Thug',hp:40,maxHp:40,speed:80,attackDamage:8,attackCooldownMax:1200,attackRange:55,chaseRange:220,color:0xe83030,xpReward:15,teachesMove:'hook',zone:1,aiPattern:'chase',groundDefense:0.2,groundEscape:0.2,weightClass:'medium'},
+    brawler:{name:'Brawler',hp:110,maxHp:110,speed:90,attackDamage:18,attackCooldownMax:1100,attackRange:62,chaseRange:220,color:0xaa0000,xpReward:28,teachesMove:'hook',zone:1,aiPattern:'chase',groundDefense:0.4,groundEscape:0.3,style:'striker',description:'Tough street fighter with heavy hands',weightClass:'medium'},
+    barBrawler:{name:'Bar Brawler',hp:65,maxHp:65,speed:65,attackDamage:14,attackCooldownMax:1500,attackRange:60,chaseRange:200,color:0xe87030,xpReward:25,teachesMove:'cross',zone:1,aiPattern:'chase',groundDefense:0.4,groundEscape:0.35,weightClass:'medium'},
+    muayThaiFighter:{name:'Muay Thai Fighter',hp:85,maxHp:85,speed:90,attackDamage:18,attackCooldownMax:1000,attackRange:70,chaseRange:250,color:0x30e870,xpReward:40,teachesMove:'elbowStrike',zone:1,aiPattern:'kicker',weightClass:'medium'},
+    wrestler:{name:'Wrestler',hp:90,maxHp:90,speed:70,attackDamage:12,attackCooldownMax:1300,attackRange:60,chaseRange:210,color:0x4488cc,xpReward:30,teachesMove:'singleLegTakedown',zone:2,aiPattern:'grasper',groundDefense:0.7,groundEscape:0.6,weightClass:'medium'},
+    judoka:{name:'Judoka',hp:85,maxHp:85,speed:75,attackDamage:14,attackCooldownMax:1200,attackRange:65,chaseRange:220,color:0x8844cc,xpReward:35,teachesMove:'hipThrow',zone:2,aiPattern:'thrower',weightClass:'light'},
+    groundNPounder:{name:'Ground-n-Pounder',hp:100,maxHp:100,speed:60,attackDamage:16,attackCooldownMax:1400,attackRange:70,chaseRange:230,color:0xcc8844,xpReward:40,teachesMove:'guardPass',zone:2,aiPattern:'chase',weightClass:'medium'},
+    bjjBlackBelt:{name:'BJJ Black Belt',hp:120,maxHp:120,speed:55,attackDamage:22,attackCooldownMax:1600,attackRange:65,chaseRange:240,color:0x222222,xpReward:50,teachesMove:'armbar',zone:3,aiPattern:'subHunter',weightClass:'medium'},
+    mmaChamp:{name:'MMA Champ',hp:200,maxHp:200,speed:85,attackDamage:25,attackCooldownMax:1100,attackRange:70,chaseRange:260,color:0xffd700,xpReward:100,teachesMove:'spinningBackFist',zone:3,aiPattern:'chase',weightClass:'medium'},
+    kickboxer:{name:'Kickboxer',hp:70,maxHp:70,speed:100,attackDamage:16,attackCooldownMax:900,attackRange:90,chaseRange:280,color:0x00cccc,xpReward:35,teachesMove:'roundhouseKick',zone:2,aiPattern:'kickboxer',groundDefense:0.2,groundEscape:0.1,weightClass:'medium'},
+    striker:{name:'Striker',hp:55,maxHp:55,speed:95,attackDamage:10,attackCooldownMax:600,attackRange:50,chaseRange:260,color:0xff3366,xpReward:32,teachesMove:'jab',zone:2,aiPattern:'combo',groundDefense:0.2,groundEscape:0.1,weightClass:'medium'},
+    boxer:{name:'Boxer',hp:68,maxHp:68,speed:108,attackDamage:12,attackCooldownMax:700,attackRange:58,chaseRange:260,color:0xcc4444,xpReward:38,teachesMove:'jab',zone:2,aiPattern:'boxer',groundDefense:0.25,groundEscape:0.2,weightClass:'medium'},
+    karateka:{name:'Karateka',hp:82,maxHp:82,speed:78,attackDamage:18,attackCooldownMax:1400,attackRange:82,chaseRange:230,color:0xf1f1f1,xpReward:42,teachesMove:'roundhouseKick',zone:2,aiPattern:'karateka',groundDefense:0.3,groundEscape:0.2,weightClass:'medium'},
+    streetFighter:{name:'Street Fighter',hp:92,maxHp:92,speed:92,attackDamage:17,attackCooldownMax:1150,attackRange:68,chaseRange:270,color:0xff9922,xpReward:55,teachesMove:'bodyShot',zone:3,aiPattern:'streetFighter',groundDefense:0.35,groundEscape:0.3,weightClass:'medium'},
+    stunner:{name:'Stunner',hp:80,maxHp:80,speed:70,attackDamage:12,attackCooldownMax:1200,attackRange:60,chaseRange:250,color:0x8800ff,xpReward:45,teachesMove:null,zone:2,aiPattern:'stunner',groundDefense:0.3,groundEscape:0.2,weightClass:'medium'},
     // Coach Enemy: support-type that boosts nearby allies (+15% attack speed per Coach in radius)
-    coach:{name:'Coach',hp:60,maxHp:60,speed:88,attackDamage:6,attackCooldownMax:1800,attackRange:40,chaseRange:260,color:0x33ffcc,xpReward:45,teachesMove:null,zone:2,aiPattern:'coach'},
-    drunkMonk:{name:'Drunk Monk',hp:70,maxHp:70,speed:75,attackDamage:12,attackCooldownMax:1300,attackRange:55,chaseRange:230,color:0x8866aa,xpReward:30,teachesMove:null,zone:2,aiPattern:'drunkMonk'},
+    coach:{name:'Coach',hp:60,maxHp:60,speed:88,attackDamage:6,attackCooldownMax:1800,attackRange:40,chaseRange:260,color:0x33ffcc,xpReward:45,teachesMove:null,zone:2,aiPattern:'coach',weightClass:'medium'},
+    drunkMonk:{name:'Drunk Monk',hp:70,maxHp:70,speed:75,attackDamage:12,attackCooldownMax:1300,attackRange:55,chaseRange:230,color:0x8866aa,xpReward:30,teachesMove:null,zone:2,aiPattern:'drunkMonk',weightClass:'medium'},
     // Rival System: recurring "Shadow" boss that appears across zones with scaling stats
-    shadowRival:{name:'Shadow Rival',hp:150,maxHp:150,speed:92,attackDamage:22,attackCooldownMax:1150,attackRange:70,chaseRange:280,color:0x111111,xpReward:90,teachesMove:null,zone:2,aiPattern:'chase'},
+    shadowRival:{name:'Shadow Rival',hp:150,maxHp:150,speed:92,attackDamage:22,attackCooldownMax:1150,attackRange:70,chaseRange:280,color:0x111111,xpReward:90,teachesMove:null,zone:2,aiPattern:'chase',weightClass:'medium'},
     // Feint Master: zones 2-3, mid HP, good speed, performs fake windup then real strike
-    feintMaster:{name:'Feint Master',hp:75,maxHp:75,speed:95,attackDamage:16,attackCooldownMax:1400,attackRange:65,chaseRange:250,color:0xff00ff,xpReward:50,teachesMove:null,zone:2,aiPattern:'feintMaster',groundDefense:0.3,groundEscape:0.25},
+    feintMaster:{name:'Feint Master',hp:75,maxHp:75,speed:95,attackDamage:16,attackCooldownMax:1400,attackRange:65,chaseRange:250,color:0xff00ff,xpReward:50,teachesMove:null,zone:2,aiPattern:'feintMaster',groundDefense:0.3,groundEscape:0.25,weightClass:'medium'},
 
     // Bully AI: pressures harder when player is low HP; panics/flees when its own HP is critical
-    bully:{name:'Bully',hp:95,maxHp:95,speed:82,attackDamage:15,attackCooldownMax:1150,attackRange:60,chaseRange:260,color:0xff8800,xpReward:55,teachesMove:null,zone:2,aiPattern:'bully',groundDefense:0.35,groundEscape:0.25},
+    bully:{name:'Bully',hp:95,maxHp:95,speed:82,attackDamage:15,attackCooldownMax:1150,attackRange:60,chaseRange:260,color:0xff8800,xpReward:55,teachesMove:null,zone:2,aiPattern:'bully',groundDefense:0.35,groundEscape:0.25,weightClass:'medium'},
 
     // Gimmick Specialist: Regenerator (slow heal over time; punishes passive play)
-    regenerator:{name:'Regenerator',hp:85,maxHp:85,speed:78,attackDamage:12,attackCooldownMax:1250,attackRange:60,chaseRange:240,color:0x22ff66,xpReward:60,teachesMove:null,zone:2,aiPattern:'regen',groundDefense:0.35,groundEscape:0.25},
+    regenerator:{name:'Regenerator',hp:85,maxHp:85,speed:78,attackDamage:12,attackCooldownMax:1250,attackRange:60,chaseRange:240,color:0x22ff66,xpReward:60,teachesMove:null,zone:2,aiPattern:'regen',groundDefense:0.35,groundEscape:0.25,weightClass:'medium'},
 
     // Gimmick Specialist: Glitcher (blink teleport behind player + quick strike)
-    glitcher:{name:'Glitcher',hp:80,maxHp:80,speed:92,attackDamage:14,attackCooldownMax:1050,attackRange:62,chaseRange:270,color:0x00e5ff,xpReward:65,teachesMove:null,zone:2,aiPattern:'glitcher',groundDefense:0.30,groundEscape:0.25},
+    glitcher:{name:'Glitcher',hp:80,maxHp:80,speed:92,attackDamage:14,attackCooldownMax:1050,attackRange:62,chaseRange:270,color:0x00e5ff,xpReward:65,teachesMove:null,zone:2,aiPattern:'glitcher',groundDefense:0.30,groundEscape:0.25,weightClass:'medium'},
 
     // Tutor Enemy: trainer-type that teaches a technique upon victory.
     // Also "mirrors" the player's recent attacks (best-effort) to force adaptation.
-    tutor:{name:'Tutor',hp:95,maxHp:95,speed:84,attackDamage:14,attackCooldownMax:1150,attackRange:65,chaseRange:260,color:0x66ff33,xpReward:70,teachesMove:null,zone:2,aiPattern:'tutor',groundDefense:0.45,groundEscape:0.35},
+    tutor:{name:'Tutor',hp:95,maxHp:95,speed:84,attackDamage:14,attackCooldownMax:1150,attackRange:65,chaseRange:260,color:0x66ff33,xpReward:70,teachesMove:null,zone:2,aiPattern:'tutor',groundDefense:0.45,groundEscape:0.35,weightClass:'medium'},
 
     // Echo Enemy: rare zone 3+ enemy that records player attacks and plays them back
-    echo:{name:'Echo',hp:110,maxHp:110,speed:88,attackDamage:16,attackCooldownMax:1000,attackRange:60,chaseRange:250,color:0x9933ff,xpReward:65,teachesMove:null,zone:3,aiPattern:'echo',groundDefense:0.35,groundEscape:0.25},
+    echo:{name:'Echo',hp:110,maxHp:110,speed:88,attackDamage:16,attackCooldownMax:1000,attackRange:60,chaseRange:250,color:0x9933ff,xpReward:65,teachesMove:null,zone:3,aiPattern:'echo',groundDefense:0.35,groundEscape:0.25,weightClass:'medium'},
 
     // Temperamental Enforcer: heavy enemy that enrages when allies are defeated - gains +30% attack speed but loses 10% accuracy
-    enforcer:{name:'Enforcer',hp:130,maxHp:130,speed:55,attackDamage:20,attackCooldownMax:1600,attackRange:65,chaseRange:220,color:0xff4444,xpReward:60,teachesMove:null,zone:2,aiPattern:'enforcer',groundDefense:0.5,groundEscape:0.4},
+    enforcer:{name:'Enforcer',hp:130,maxHp:130,speed:55,attackDamage:20,attackCooldownMax:1600,attackRange:65,chaseRange:220,color:0xff4444,xpReward:60,teachesMove:null,zone:2,aiPattern:'enforcer',groundDefense:0.5,groundEscape:0.4,weightClass:'medium'},
 
     // Tank: slow, heavily armored enemy that absorbs hits and delivers slow but powerful strikes
     // Designed to be a "wall" that players must work around - high defense, slow attacks, punishing to focus fire on
-    tank:{name:'Tank',hp:150,maxHp:150,speed:45,attackDamage:18,attackCooldownMax:1800,attackRange:55,chaseRange:200,color:0x555555,xpReward:50,teachesMove:null,zone:2,aiPattern:'tank',groundDefense:0.75,groundEscape:0.3},
+    tank:{name:'Tank',hp:150,maxHp:150,speed:45,attackDamage:18,attackCooldownMax:1800,attackRange:55,chaseRange:200,color:0x555555,xpReward:50,teachesMove:null,zone:2,aiPattern:'tank',groundDefense:0.75,groundEscape:0.3,weightClass:'medium'},
 
     // Trickster: special enemy that occasionally vanishes and reappears behind the player during combat
     // Requires quick camera awareness to defend. Visual: dissolve particle effect followed by reappearance behind player
-    trickster:{name:'Trickster',hp:75,maxHp:75,speed:95,attackDamage:14,attackCooldownMax:1100,attackRange:65,chaseRange:270,color:0xff00aa,xpReward:55,teachesMove:null,zone:2,aiPattern:'trickster',groundDefense:0.25,groundEscape:0.2},
+    trickster:{name:'Trickster',hp:75,maxHp:75,speed:95,attackDamage:14,attackCooldownMax:1100,attackRange:65,chaseRange:270,color:0xff00aa,xpReward:55,teachesMove:null,zone:2,aiPattern:'trickster',groundDefense:0.25,groundEscape:0.2,weightClass:'medium'},
 
     // Showstopper: rare boss variant that "pauses" the player mid-attack
     // Requires timing adjustment to land hits. Visual: clockwork gears appear briefly around the enemy during pause
-    showstopper:{name:'Showstopper',hp:140,maxHp:140,speed:75,attackDamage:18,attackCooldownMax:1400,attackRange:65,chaseRange:250,color:0xffaa00,xpReward:80,teachesMove:null,zone:3,aiPattern:'showstopper',groundDefense:0.4,groundEscape:0.3},
+    showstopper:{name:'Showstopper',hp:140,maxHp:140,speed:75,attackDamage:18,attackCooldownMax:1400,attackRange:65,chaseRange:250,color:0xffaa00,xpReward:80,teachesMove:null,zone:3,aiPattern:'showstopper',groundDefense:0.4,groundEscape:0.3,weightClass:'medium'},
 
     // Bounty Hunter: mercenary hunter that tracks players with active bounties
     // Spawns based on bounty level, scales with player progress, has unique red glow
-    bountyHunter:{name:'Bounty Hunter',hp:110,maxHp:110,speed:98,attackDamage:18,attackCooldownMax:950,attackRange:65,chaseRange:280,color:0xff4444,xpReward:75,teachesMove:null,zone:2,aiPattern:'bountyHunter',groundDefense:0.35,groundEscape:0.25}
+    bountyHunter:{name:'Bounty Hunter',hp:110,maxHp:110,speed:98,attackDamage:18,attackCooldownMax:950,attackRange:65,chaseRange:280,color:0xff4444,xpReward:75,teachesMove:null,zone:2,aiPattern:'bountyHunter',groundDefense:0.35,groundEscape:0.25,weightClass:'medium'}
   },
 
 
@@ -713,3 +715,288 @@ Object.assign(window.MMA.Enemies, {
     }
   }
 });
+
+// New enemy types (append-safe patch)
+(function() {
+  var T = window.MMA && MMA.Enemies && MMA.Enemies.TYPES;
+  if (!T) return;
+
+  if (!T.feintMaster) T.feintMaster = {
+    name: 'Feint Master', key: 'feintMaster', color: 0xff8800,
+    stats: { hp: 65, maxHp: 65, attackDamage: 14, speed: 80, xpReward: 45, gold: 20 },
+    behaviorType: 'feint', weightClass: 'light',
+    attackPattern: ['feint', 'strike', 'feint', 'kick'],
+    description: 'Fakes you out then lands the real hit 300ms later'
+  };
+
+  if (!T.drunkMonk) T.drunkMonk = {
+    name: 'Drunk Monk', key: 'drunkMonk', color: 0x886644,
+    stats: { hp: 55, maxHp: 55, attackDamage: 18, speed: 55, xpReward: 35, gold: 15 },
+    behaviorType: 'erratic', weightClass: 'medium',
+    attackPattern: ['strike', 'stumble', 'strike', 'wild'],
+    description: 'Unpredictable drunk brawler — occasionally lands devastating accidental hits'
+  };
+
+  if (!T.brawler) T.brawler = {
+    name: 'Street Brawler', key: 'brawler', color: 0xcc4444,
+    stats: { hp: 70, maxHp: 70, attackDamage: 12, speed: 65, xpReward: 30, gold: 12 },
+    behaviorType: 'aggressive', weightClass: 'medium',
+    attackPattern: ['hook', 'cross', 'hook', 'bodyShot'],
+    description: 'Aggressive street fighter with simple but hard-hitting patterns'
+  };
+})();
+// === BATCH 26 NEW ENEMY TYPES ===
+
+// Tournament Fighter — balanced, high stats, uses all move types
+(function() {
+  var cfg = window.MMA && window.MMA.EnemiesConfig;
+  if (!cfg) return;
+
+  cfg.tournamentFighter = cfg.tournamentFighter || {
+    type: 'tournamentFighter',
+    label: 'Tournament Pro',
+    tier: 'elite',
+    weightClass: 'welterweight',
+    stats: { hp: 180, maxHp: 180, stamina: 120, maxStamina: 120, speed: 100, armor: 10, level: 5 },
+    style: 'balanced',
+    isBoss: false,
+    xpReward: 80,
+    goldReward: 40,
+    color: 0x8800ff,
+    size: { w: 32, h: 48 },
+    ai: 'tournament',
+    canParry: true
+  };
+
+  // Weather Hazard Enemy — spawns only in weather rooms, has elemental moves
+  cfg.weatherGuard = cfg.weatherGuard || {
+    type: 'weatherGuard',
+    label: 'Weather Guardian',
+    tier: 'special',
+    weightClass: 'middleweight',
+    stats: { hp: 140, maxHp: 140, stamina: 100, maxStamina: 100, speed: 85, armor: 5, level: 3 },
+    style: 'special',
+    isBoss: false,
+    xpReward: 60,
+    goldReward: 25,
+    color: 0x00aaff,
+    size: { w: 30, h: 46 },
+    ai: 'weather'
+  };
+
+  // Rivalry Fighter — picks counter-style to player's dominant style
+  cfg.rivalryFighter = cfg.rivalryFighter || {
+    type: 'rivalryFighter',
+    label: 'Rival',
+    tier: 'elite',
+    weightClass: 'lightweight',
+    stats: { hp: 160, maxHp: 160, stamina: 110, maxStamina: 110, speed: 95, armor: 8, level: 4 },
+    style: 'adaptive',
+    isBoss: false,
+    xpReward: 70,
+    goldReward: 30,
+    color: 0xff0088,
+    size: { w: 30, h: 46 },
+    ai: 'rivalry',
+    canParry: true
+  };
+})();
+// === ENEMY WARMUP VULNERABILITY ===
+// Pre-fight warmup routine config — first hit during warmup deals +40% damage
+MMA.Enemies.WARMUP_CONFIG = MMA.Enemies.WARMUP_CONFIG || {
+  duration: { default: 1200, brawler: 600, wrestler: 1800, boxer: 1000 },
+  damageBonus: 1.40,
+  label: '⚡ COLD!'
+};
+
+MMA.Enemies.startWarmup = MMA.Enemies.startWarmup || function(enemy) {
+  if (!enemy) return;
+  var dur = (MMA.Enemies.WARMUP_CONFIG.duration[enemy.type && enemy.type.aiPattern] ||
+             MMA.Enemies.WARMUP_CONFIG.duration.default);
+  enemy._warmupActive = true;
+  enemy._warmupEndsAt = Date.now() + dur;
+};
+
+MMA.Enemies.isWarmingUp = MMA.Enemies.isWarmingUp || function(enemy) {
+  if (!enemy || !enemy._warmupActive) return false;
+  if (Date.now() > (enemy._warmupEndsAt || 0)) {
+    enemy._warmupActive = false;
+    return false;
+  }
+  return true;
+};
+
+MMA.Enemies.getWarmupDamageBonus = MMA.Enemies.getWarmupDamageBonus || function(enemy) {
+  if (!MMA.Enemies.isWarmingUp(enemy)) return 1;
+  // First hit ends warmup
+  enemy._warmupActive = false;
+  return MMA.Enemies.WARMUP_CONFIG.damageBonus;
+};
+
+// === FIGHTER'S STAMINA SIGNATURE ===
+// Each enemy archetype has a unique stamina recovery/depletion pattern
+MMA.Enemies.STAMINA_SIGNATURES = MMA.Enemies.STAMINA_SIGNATURES || {
+  boxer:    { regenRate: 0.4, burstOnLow: true,  clinchRegen: false, label: 'Explosive Bursts' },
+  wrestler: { regenRate: 0.7, burstOnLow: false, clinchRegen: true,  label: 'Grinding Recovery' },
+  brawler:  { regenRate: 0.3, burstOnLow: false, clinchRegen: false, surgeAtEnd: true, label: 'Last-Ditch Surge' },
+  kickboxer:{ regenRate: 0.6, burstOnLow: false, clinchRegen: false, label: 'Steady Recovery' },
+  muayThai: { regenRate: 0.5, burstOnLow: true,  clinchRegen: false, label: 'Rhythm Recovery' },
+  default:  { regenRate: 0.5, burstOnLow: false, clinchRegen: false, label: 'Standard' }
+};
+
+MMA.Enemies.getStaminaSignature = MMA.Enemies.getStaminaSignature || function(enemy) {
+  var pattern = (enemy && enemy.type && enemy.type.aiPattern) || 'default';
+  return MMA.Enemies.STAMINA_SIGNATURES[pattern] || MMA.Enemies.STAMINA_SIGNATURES.default;
+};
+
+MMA.Enemies.updateEnemyStaminaSignature = MMA.Enemies.updateEnemyStaminaSignature || function(enemy, scene, dt) {
+  if (!enemy || !enemy.stats) return;
+  var sig = MMA.Enemies.getStaminaSignature(enemy);
+  var hp = enemy.stats.hp || 0;
+  var maxHp = (enemy.type && enemy.type.hp) || 100;
+
+  // Burst on low HP (boxer style)
+  if (sig.burstOnLow && hp < maxHp * 0.25 && !enemy._burstTriggered) {
+    enemy._burstTriggered = true;
+    enemy.attackSpeedMod = (enemy.attackSpeedMod || 1) * 1.3;
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, 'SECOND WIND!', '#ffaa00');
+    }
+  }
+
+  // End-of-fight surge (brawler)
+  if (sig.surgeAtEnd && hp < maxHp * 0.15 && !enemy._surgeTriggered) {
+    enemy._surgeTriggered = true;
+    enemy.moveSpeedMod = (enemy.moveSpeedMod || 1) * 1.4;
+  }
+};
+
+// === FACTION LOYALTY SYSTEM ===
+MMA.Enemies.FACTIONS = MMA.Enemies.FACTIONS || {
+  street:      { label: 'Street', enemies: ['brawler','drunkMonk','enforcer'], alertThreshold: 3 },
+  underground: { label: 'Underground', enemies: ['trickster','showstopper','feintMaster'], alertThreshold: 2 },
+  pro:         { label: 'Pro', enemies: ['boxer','kickboxer','wrestler','muayThai'], alertThreshold: 4 }
+};
+
+MMA.Enemies.getFactionForEnemy = MMA.Enemies.getFactionForEnemy || function(aiPattern) {
+  var factions = MMA.Enemies.FACTIONS;
+  for (var key in factions) {
+    if (factions[key].enemies.indexOf(aiPattern) !== -1) return key;
+  }
+  return null;
+};
+
+MMA.Enemies.recordFactionKill = MMA.Enemies.recordFactionKill || function(aiPattern) {
+  try {
+    var faction = MMA.Enemies.getFactionForEnemy(aiPattern);
+    if (!faction) return;
+    var key = 'mma_faction_kills';
+    var data = JSON.parse(localStorage.getItem(key) || '{}');
+    data[faction] = (data[faction] || 0) + 1;
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch(e) {}
+};
+
+MMA.Enemies.getFactionAlert = MMA.Enemies.getFactionAlert || function(aiPattern) {
+  try {
+    var faction = MMA.Enemies.getFactionForEnemy(aiPattern);
+    if (!faction) return false;
+    var data = JSON.parse(localStorage.getItem('mma_faction_kills') || '{}');
+    var kills = data[faction] || 0;
+    var threshold = MMA.Enemies.FACTIONS[faction].alertThreshold;
+    return kills >= threshold;
+  } catch(e) { return false; }
+};
+
+// When faction alert is active, enemies know player's top 3 moves — counter bonus
+MMA.Enemies.getFactionAlertCounterBonus = MMA.Enemies.getFactionAlertCounterBonus || function(enemy, moveKey) {
+  if (!MMA.Enemies.getFactionAlert(enemy && enemy.type && enemy.type.aiPattern)) return 1;
+  try {
+    var hist = JSON.parse(localStorage.getItem('mma_move_history') || '{}');
+    var top3 = Object.keys(hist).sort(function(a,b){ return (hist[b]||0)-(hist[a]||0); }).slice(0,3);
+    if (top3.indexOf(moveKey) !== -1) return 0.85; // -15% damage when telegraphed
+  } catch(e) {}
+  return 1;
+};
+// === ENEMY CONFIG NORMALIZATION LAYER ===
+// Boot-time pass that normalizes all enemy type entries to a canonical schema.
+// Runs once after all batch appends have loaded. Fixes schema drift between
+// original TYPES entries and batch-appended patch entries.
+
+MMA.Enemies._configNormalized = false;
+
+MMA.Enemies.CANONICAL_DEFAULTS = {
+  key:          'unknown',
+  label:        'Fighter',
+  hp:           80,
+  speed:        90,
+  attackDamage: 10,
+  attackRange:  60,
+  chaseRange:   200,
+  attackCooldownMs: 1200,
+  xpReward:     10,
+  goldReward:   5,
+  aiPattern:    'brawler',
+  tier:         'normal',
+  color:        0x888888,
+  isBoss:       false,
+  spawnWeight:  1
+};
+
+MMA.Enemies.normalizeConfig = MMA.Enemies.normalizeConfig || function() {
+  if (MMA.Enemies._configNormalized) return;
+  MMA.Enemies._configNormalized = true;
+
+  var TYPES = MMA.Enemies.TYPES;
+  if (!TYPES) return;
+
+  var defaults = MMA.Enemies.CANONICAL_DEFAULTS;
+  var warned = [];
+
+  Object.keys(TYPES).forEach(function(key) {
+    var t = TYPES[key];
+    if (!t || typeof t !== 'object') return;
+
+    // Ensure key field
+    if (!t.key) t.key = key;
+
+    // Normalize hp: some entries use stats.hp
+    if (t.stats && typeof t.stats.hp === 'number' && !t.hp) {
+      t.hp = t.stats.hp;
+    }
+    if (!t.hp || typeof t.hp !== 'number') {
+      t.hp = defaults.hp;
+      warned.push(key + '.hp');
+    }
+
+    // Normalize aiPattern: some use behaviorType or attackPattern
+    if (!t.aiPattern) {
+      t.aiPattern = t.behaviorType || t.attackPattern || t.key || defaults.aiPattern;
+    }
+
+    // Backfill missing required fields from defaults
+    ['speed','attackDamage','attackRange','chaseRange','attackCooldownMs',
+     'xpReward','goldReward','tier','color','isBoss','spawnWeight'].forEach(function(field) {
+      if (t[field] === undefined || t[field] === null) {
+        t[field] = defaults[field];
+      }
+    });
+
+    // Normalize label
+    if (!t.label) {
+      t.label = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
+    }
+  });
+
+  if (warned.length > 0 && typeof console !== 'undefined') {
+    console.warn('[MMA] Enemy config normalized missing fields:', warned.join(', '));
+  }
+};
+
+// Register for call via MMAGameHooks.onCreate or direct boot call
+if (window.MMAGameHooks && typeof MMAGameHooks.onCreate === 'function') {
+  MMAGameHooks.onCreate(function() { MMA.Enemies.normalizeConfig(); });
+} else {
+  // Fallback: run after short delay to ensure all scripts loaded
+  setTimeout(function() { MMA.Enemies.normalizeConfig(); }, 100);
+}

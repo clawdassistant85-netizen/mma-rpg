@@ -2,6 +2,8 @@ window.MMA = window.MMA || {};
 window.MMA.Combat = window.MMA.Combat || {};
 Object.assign(window.MMA.Combat, {
   executeAttack: function(scene, moveKey) {
+      // Timing Window Mastery input record
+      MMA.Combat.recordTimingInput(scene);
       if (scene.groundState && scene.groundState.active) return this.executeGroundMove(scene, moveKey);
       if (scene.player.unlockedMoves.indexOf(moveKey) === -1) return MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'LOCKED', '#888888');
       var move = this.MOVE_ROSTER[moveKey]; if (!move) return;
@@ -12,11 +14,15 @@ Object.assign(window.MMA.Combat, {
       var intuitionState = this.ensureIntuitionState(scene);
       var intuitionPrimed = !!intuitionState.ready;
       var adrenalinePrimed = this.isAdrenalinePrimed(scene);
+      var staminaCost = move.staminaCost;
       if (!cd[moveKey]) cd[moveKey] = 0;
-      if (cd[moveKey] > 0 || (!intuitionPrimed && !adrenalinePrimed && s.stamina < move.staminaCost) || scene.gameOver) return;
-      if (!intuitionPrimed && !adrenalinePrimed) s.stamina -= move.staminaCost;
+      if (MMA.Combat.isOverdriveActive(scene)) {
+        staminaCost = (staminaCost || 0) * 2;
+      }
+      if (cd[moveKey] > 0 || (!intuitionPrimed && !adrenalinePrimed && s.stamina < staminaCost) || scene.gameOver) return;
+      if (!intuitionPrimed && !adrenalinePrimed) s.stamina -= staminaCost;
       cd[moveKey] = move.cooldown;
-      this.markAttackForTransitionCancel(scene, moveKey, move.staminaCost);
+      this.markAttackForTransitionCancel(scene, moveKey, staminaCost);
       if (window.sfx) { if (moveKey === 'jab' || moveKey === 'cross') window.sfx.punch(); else if (moveKey === 'lowKick' || moveKey === 'headKick') window.sfx.kick(); }
       var DT = CONFIG.DISPLAY_TILE, px = scene.player.x + scene.lastDir.x * DT * 0.5, py = scene.player.y + scene.lastDir.y * DT * 0.5;
       var hitbox = scene.add.image(px, py, 'hitbox').setDisplaySize(DT, DT).setAlpha(0.5);
@@ -53,7 +59,11 @@ Object.assign(window.MMA.Combat, {
           var momentumDamage = momentum.surgeReady ? Math.round(momentum.damage * this.MOMENTUM_SURGE_DAMAGE_MULTIPLIER) : momentum.damage;
           var exploitRecovery = this.applyExploitRecoveryIfActive(scene, momentumDamage);
           var whiffShift = this.applyWhiffShiftIfReady(scene, exploitRecovery.damage);
-          var rolled = this.rollDamage(whiffShift.damage, momentum.critChance, momentum.forceCrit || intuitionPrimed);
+          var isCritical = momentum.forceCrit || intuitionPrimed;
+          if (MMA.Combat.isOverdriveActive(scene)) {
+            isCritical = true;
+          }
+          var rolled = this.rollDamage(whiffShift.damage, momentum.critChance, isCritical);
           var comboResult = this.applyComboBonus(scene, moveKey, rolled.damage, true);
           var pressureResult = this.applyPressureBreakIfReady(scene, comboResult.damage, enemy);
           var staminaBreakDamage = this.applyStaminaBreakIfActive(scene, enemy, pressureResult.damage);
@@ -68,13 +78,18 @@ Object.assign(window.MMA.Combat, {
           this.applyLimbInjuryOnHit(scene, enemy, moveKey);
           var injuryAdjusted = this.applyInjuryDamageBonus(enemy, finishHimAdjusted.damage);
           var adaptiveDefenseMult = MMA.Enemies.onPlayerAttack(scene, enemy, moveKey);
-          var effectiveDefenseMult = this.getDefenseMultiplierWithAdrenaline(adaptiveDefenseMult, adrenalinePrimed);
+          var effectiveDefenseMult = adrenalinePrimed ? (1 + ((adaptiveDefenseMult - 1) * 0.5)) : this.getDefenseMultiplierWithAdrenaline(adaptiveDefenseMult, adrenalinePrimed);
           var styleMasteryApplied = this.applyStyleMasteryIfPrimed(scene, moveKey, injuryAdjusted.damage, effectiveDefenseMult);
           var dmg = Math.round(styleMasteryApplied.damage / styleMasteryApplied.defenseMult);
           var weightAdjusted = this.applyWeightClassAdvantage(enemy, moveKey, dmg);
           dmg = weightAdjusted.damage;
           var crowdBonus = scene.registry.get('crowdDamageBonus') || 0;
           if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
+          var varietyBonus = MMA.Combat.getVarietyBonus();
+          if (varietyBonus > 0 && scene.player && scene.player.comboState && scene.player.comboState.active) {
+            dmg = Math.round(dmg * (1 + varietyBonus));
+          }
+          MMA.Combat.trackVariety(moveKey || 'jab');
           enemy.stats.hp -= dmg;
           // Audio: Trigger fight intensity layer on first hit
           if (window.MMA_AUDIO && window.MMA_AUDIO.onFirstHit) window.MMA_AUDIO.onFirstHit();
@@ -159,6 +174,9 @@ Object.assign(window.MMA.Combat, {
             this.consumeMomentumSurge(scene);
           } else {
             var momentumState = this.onMomentumHit(scene);
+            if (scene.player._momentumStacks >= 5 && typeof MMA.Combat.triggerOverdrive === 'function') {
+              MMA.Combat.triggerOverdrive(scene);
+            }
             if (momentumState.stacks > 0) MMA.UI.showDamageText(scene, enemy.x, enemy.y - 128, 'MOMENTUM x' + momentumState.stacks, '#7ce8ff');
           }
           this.onPressureHit(scene);
@@ -194,6 +212,7 @@ Object.assign(window.MMA.Combat, {
         this.onWhiffShiftMiss(scene);
         this.resetComboBreakerState(scene);
         this.resetBreakingPointChain(scene);
+        MMA.Combat.resetVariety();
         MMA.UI.resetCombo();
       }
       MMA.VFX.playAttackEffect(scene, moveKey, scene.player.x, scene.player.y - 3, px, py);
@@ -719,3 +738,299 @@ Object.assign(window.MMA.Combat, {
       };
     }
 });
+
+// Combo Variety Multiplier
+if (!MMA.Combat._comboVariety) MMA.Combat._comboVariety = { types: [], bonus: 0, lastType: null };
+
+MMA.Combat.trackVariety = function(moveKey) {
+  var cv = MMA.Combat._comboVariety || { types: [], bonus: 0, lastType: null };
+  var moveType = 'strike';
+  if (['takedown','guillotine','hipThrow','suplex','scissorSweep'].indexOf(moveKey) >= 0) moveType = 'grapple';
+  else if (['headKick','lowKick','tigerKnee','backKick'].indexOf(moveKey) >= 0) moveType = 'kick';
+  else if (['special','wingChun','spinningHeelKick'].indexOf(moveKey) >= 0) moveType = 'special';
+  else if (['hook','uppercut','gutPunch','elbowStrike','overhangRight'].indexOf(moveKey) >= 0) moveType = 'power';
+
+  if (cv.lastType === moveType) {
+    cv.types = [];
+  }
+  if (cv.types.indexOf(moveType) < 0) {
+    cv.types.push(moveType);
+  }
+  cv.lastType = moveType;
+  cv.bonus = Math.min(0.40, cv.types.length * 0.05);
+  MMA.Combat._comboVariety = cv;
+  return cv.bonus;
+};
+
+MMA.Combat.resetVariety = function() {
+  MMA.Combat._comboVariety = { types: [], bonus: 0, lastType: null };
+};
+
+MMA.Combat.getVarietyBonus = function() {
+  return MMA.Combat._comboVariety ? MMA.Combat._comboVariety.bonus : 0;
+};
+
+MMA.Combat.triggerOverdrive = function(scene) {
+  if (!scene || !scene.player) return;
+  var p = scene.player;
+  var momentum = p._momentumStacks || 0;
+  if (momentum < 5) return;
+  if (p._overdriveCooldown && scene.time.now < p._overdriveCooldown) return;
+
+  p._overdriveActive = true;
+  p._overdriveUntil = scene.time.now + 3000;
+  p._overdriveCooldown = scene.time.now + 30000;
+
+  // Visual indicator
+  if (window.MMA && MMA.VFX && typeof MMA.VFX.showSkillUnlock === 'function') {
+    MMA.VFX.showSkillUnlock(scene, '⚡ OVERDRIVE!');
+  }
+
+  scene.time.delayedCall(3000, function() {
+    p._overdriveActive = false;
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 20, 'OVERDRIVE END', '#888888');
+    }
+  });
+};
+
+MMA.Combat.isOverdriveActive = function(scene) {
+  var p = scene && scene.player;
+  return !!(p && p._overdriveActive && scene.time.now < p._overdriveUntil);
+};
+
+MMA.Combat.checkSecondWind = function(scene) {
+  var p = scene && scene.player;
+  if (!p || !p.stats) return;
+  var ratio = p.stats.hp / (p.stats.maxHp || 100);
+  if (ratio > 0.15) return;
+  if (p._secondWindUsedAt && scene.time.now - p._secondWindUsedAt < 60000) return;
+  if (p._secondWindActive) return;
+
+  p._secondWindActive = true;
+  p._secondWindUsedAt = scene.time.now;
+  p._secondWindUntil = scene.time.now + 3000;
+  p._knockbackImmune = true;
+
+  if (window.MMA && MMA.VFX && typeof MMA.VFX.showSkillUnlock === 'function') {
+    MMA.VFX.showSkillUnlock(scene, '💪 SECOND WIND!');
+  }
+  if (scene.cameras) scene.cameras.main.flash(150, 255, 255, 200);
+
+  scene.time.delayedCall(3000, function() {
+    p._secondWindActive = false;
+    p._knockbackImmune = false;
+  });
+};
+
+// === ELEMENTAL ZONE RESONANCE ===
+// Certain moves get bonus in matching zones (zone 1=fire/strike, zone 2=water/grapple, etc.)
+MMA.CombatMoves = window.MMA.CombatMoves || {};
+
+MMA.CombatMoves.ZONE_RESONANCE = {
+  1: { moveTypes: ['jab','cross','hook','uppercut'], bonus: 0.15, label: '🔥 Fire Zone' },
+  2: { moveTypes: ['takedown','clinch','submission'], bonus: 0.15, label: '💧 Water Zone' },
+  3: { moveTypes: ['lowKick','headKick','clinchKnee'], bonus: 0.15, label: '⚡ Storm Zone' },
+  4: { moveTypes: ['groundPound','submission','takedown'], bonus: 0.20, label: '🌑 Final Zone' }
+};
+
+MMA.CombatMoves.getZoneResonanceBonus = MMA.CombatMoves.getZoneResonanceBonus || function(scene, moveKey) {
+  if (!scene) return 1.0;
+  var zone = scene.currentZone || 1;
+  var res = MMA.CombatMoves.ZONE_RESONANCE[zone];
+  if (!res) return 1.0;
+  if (res.moveTypes.indexOf(moveKey) !== -1) return 1.0 + res.bonus;
+  return 1.0;
+};
+
+MMA.CombatMoves.showZoneResonance = MMA.CombatMoves.showZoneResonance || function(scene, x, y, moveKey) {
+  if (!scene) return;
+  var zone = scene.currentZone || 1;
+  var res = MMA.CombatMoves.ZONE_RESONANCE[zone];
+  if (!res || res.moveTypes.indexOf(moveKey) === -1) return;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, x, y - 55, res.label, '#FFD700');
+  }
+};
+
+// === WEATHER TECHNIQUE UNLOCKS ===
+// Random "weather" condition per session unlocks special variants
+MMA.CombatMoves.SESSION_WEATHER = (function() {
+  var weathers = ['clear', 'rain', 'fog', 'storm', 'heat'];
+  try {
+    var stored = sessionStorage.getItem('mma_session_weather');
+    if (stored) return stored;
+    var w = weathers[Math.floor(Math.random() * weathers.length)];
+    sessionStorage.setItem('mma_session_weather', w);
+    return w;
+  } catch(e) { return 'clear'; }
+})();
+
+MMA.CombatMoves.WEATHER_EFFECTS = {
+  clear:  { label: '☀️ Clear', bonusMoves: [] },
+  rain:   { label: '🌧️ Rain',  bonusMoves: ['takedown','clinch'],     bonus: 0.12 },
+  fog:    { label: '🌫️ Fog',   bonusMoves: ['submission'],            bonus: 0.18 },
+  storm:  { label: '⛈️ Storm', bonusMoves: ['headKick','lowKick'],    bonus: 0.15 },
+  heat:   { label: '🌡️ Heat',  bonusMoves: ['jab','cross','hook'],    bonus: 0.10 }
+};
+
+MMA.CombatMoves.getWeatherBonus = MMA.CombatMoves.getWeatherBonus || function(moveKey) {
+  var w = MMA.CombatMoves.SESSION_WEATHER;
+  var fx = MMA.CombatMoves.WEATHER_EFFECTS[w];
+  if (!fx || !fx.bonusMoves || fx.bonusMoves.indexOf(moveKey) === -1) return 1.0;
+  return 1.0 + (fx.bonus || 0);
+};
+
+MMA.CombatMoves.getWeatherLabel = MMA.CombatMoves.getWeatherLabel || function() {
+  var w = MMA.CombatMoves.SESSION_WEATHER;
+  return (MMA.CombatMoves.WEATHER_EFFECTS[w] || {}).label || '';
+};
+
+// === RING CORNER TRAP ===
+// Cornering an enemy opens a brief +30% damage window
+MMA.CombatMoves.checkCornerTrap = MMA.CombatMoves.checkCornerTrap || function(scene, enemy) {
+  if (!scene || !enemy) return 1.0;
+  var CANVAS_W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var CANVAS_H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 700;
+  var MARGIN = 70;
+  var cornered = (
+    (enemy.x < MARGIN || enemy.x > CANVAS_W - MARGIN) &&
+    (enemy.y < MARGIN + 80 || enemy.y > CANVAS_H - MARGIN)
+  );
+  if (!cornered) return 1.0;
+  if (!enemy._cornerTrapShown) {
+    enemy._cornerTrapShown = true;
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, 'CORNERED! +30%', '#ff4400');
+    }
+  }
+  return 1.3;
+};
+
+// === SHARED HIT RESOLVER ===
+// Extracts the common damage pipeline used by both executeAttack and executeSpecialMove.
+// Both functions can call MMA.Combat._resolveDamagePipeline(ctx) instead of duplicating logic.
+// ctx = { scene, enemy, moveKey, baseDamage, counterAttack, intuitionPrimed, adrenalinePrimed, isCritical }
+// Returns { dmg, rolled, flags } where flags has booleans for each active modifier
+
+MMA.Combat._resolveDamagePipeline = MMA.Combat._resolveDamagePipeline || function(ctx) {
+  var scene         = ctx.scene;
+  var enemy         = ctx.enemy;
+  var moveKey       = ctx.moveKey || 'jab';
+  var baseDamage    = ctx.baseDamage || 0;
+  var counterAttack = ctx.counterAttack || false;
+  var intuitionPrimed = ctx.intuitionPrimed || false;
+  var adrenalinePrimed = ctx.adrenalinePrimed || false;
+  var isCritical    = ctx.isCritical || false;
+  var C = MMA.Combat;
+
+  // Stage 1: modifier chain
+  var d = baseDamage;
+  var intuitionDmg   = intuitionPrimed   ? Math.round(d * C.INTUITION_DAMAGE_MULTIPLIER)   : d;
+  var adrenalineDmg  = adrenalinePrimed  ? Math.round(intuitionDmg * C.ADRENALINE_DAMAGE_MULTIPLIER) : intuitionDmg;
+
+  var breakthroughAdjusted  = C.applyBreakthroughDamageIfActive(scene, adrenalineDmg);
+  C.maybeTriggerMomentumShift(scene, counterAttack);
+  var momentumShiftAdjusted = C.applyMomentumShiftIfActive(scene, breakthroughAdjusted.damage);
+  var momentum              = C.getMomentumModifiers(scene, momentumShiftAdjusted.damage);
+  var momentumDamage        = momentum.surgeReady ? Math.round(momentum.damage * C.MOMENTUM_SURGE_DAMAGE_MULTIPLIER) : momentum.damage;
+  var exploitRecovery       = C.applyExploitRecoveryIfActive(scene, momentumDamage);
+  var whiffShift            = C.applyWhiffShiftIfReady(scene, exploitRecovery.damage);
+
+  if (C.isOverdriveActive && C.isOverdriveActive(scene)) isCritical = true;
+  if (momentum.forceCrit) isCritical = true;
+
+  var rolled         = C.rollDamage(whiffShift.damage, momentum.critChance, isCritical);
+  var comboResult    = C.applyComboBonus(scene, moveKey, rolled.damage, true);
+  var pressureResult = C.applyPressureBreakIfReady(scene, comboResult.damage, enemy);
+  var staminaBreak   = C.applyStaminaBreakIfActive(scene, enemy, pressureResult.damage);
+  var tauntDmg       = C.applyTauntDebuffIfActive(scene, enemy, staminaBreak.damage);
+  var rageAdj        = C.applyRageDefenseModifierIfActive(scene, enemy, tauntDmg);
+  var panicAdj       = C.applyMentalPanicIfActive(scene, enemy, rageAdj);
+  var deadlyAdj      = C.applyDeadlyWindowIfActive(scene, enemy, panicAdj.damage);
+  var chainCounterAdj= C.applyChainCounterIfActive(scene, deadlyAdj.damage, counterAttack);
+  var counterFlowAdj = C.applyCounterFlowOnCounterHit(scene, chainCounterAdj.damage, counterAttack);
+  var breakingPtAdj  = C.applyBreakingPointIfActive(scene, enemy, counterFlowAdj.damage);
+  var finishHimAdj   = C.applyFinishHimIfArmed(scene, enemy, breakingPtAdj.damage);
+
+  C.applyLimbInjuryOnHit(scene, enemy, moveKey);
+  var injuryAdj      = C.applyInjuryDamageBonus(enemy, finishHimAdj.damage);
+  var adaptiveDef    = MMA.Enemies.onPlayerAttack(scene, enemy, moveKey);
+  var effectiveDef   = adrenalinePrimed ? (1 + ((adaptiveDef - 1) * 0.5)) : C.getDefenseMultiplierWithAdrenaline(adaptiveDef, adrenalinePrimed);
+  var styleMastery   = C.applyStyleMasteryIfPrimed(scene, moveKey, injuryAdj.damage, effectiveDef);
+  var dmg            = Math.round(styleMastery.damage / styleMastery.defenseMult);
+
+  // Stage 2: bonus multipliers
+  var weightAdj   = C.applyWeightClassAdvantage(enemy, moveKey, dmg);
+  dmg = weightAdj.damage;
+  var crowdBonus  = scene.registry ? (scene.registry.get('crowdDamageBonus') || 0) : 0;
+  if (crowdBonus > 0) dmg = Math.round(dmg * (1 + crowdBonus));
+  var varietyBonus = C.getVarietyBonus ? C.getVarietyBonus() : 0;
+  if (varietyBonus > 0 && scene.player && scene.player.comboState && scene.player.comboState.active) {
+    dmg = Math.round(dmg * (1 + varietyBonus));
+  }
+
+  // Stage 3: batch modifiers (creed, ring position, glare, sweat, inheritance, fear memory)
+  var creedMult = (window.MMA && MMA.Player && typeof MMA.Player.getCreedAttackMult === 'function') ? MMA.Player.getCreedAttackMult() : 1;
+  dmg = Math.round(dmg * creedMult);
+
+  var ringMult = (window.MMA && MMA.Combat && typeof MMA.Combat.getRingPositionDamageMult === 'function') ? MMA.Combat.getRingPositionDamageMult(scene) : 1;
+  dmg = Math.round(dmg * ringMult);
+
+  var fearMult = (window.MMA && MMA.Combat && typeof MMA.Combat.getFearCritBonus === 'function') ? MMA.Combat.getFearCritBonus(enemy, moveKey) : 1;
+  dmg = Math.round(dmg * fearMult);
+
+  var inheritMult = (window.MMA && MMA.Player && typeof MMA.Player.getInheritedTechBonus === 'function') ? MMA.Player.getInheritedTechBonus(moveKey) : 1;
+  dmg = Math.round(dmg * inheritMult);
+
+  var mutMult = (window.MMA && MMA.Combat && typeof MMA.Combat.getMutationDamageMult === 'function') ? MMA.Combat.getMutationDamageMult(moveKey) : 1;
+  dmg = Math.round(dmg * mutMult);
+
+  var warmupMult = (window.MMA && MMA.Enemies && typeof MMA.Enemies.getWarmupDamageBonus === 'function') ? MMA.Enemies.getWarmupDamageBonus(enemy) : 1;
+  dmg = Math.round(dmg * warmupMult);
+
+  var glareMult = (window.MMA && MMA.Sprites && typeof MMA.Sprites.getGlareVulnerabilityMult === 'function') ? MMA.Sprites.getGlareVulnerabilityMult() : 1;
+  dmg = Math.round(dmg * glareMult);
+
+  var factionMult = (window.MMA && MMA.Enemies && typeof MMA.Enemies.getFactionAlertCounterBonus === 'function') ? MMA.Enemies.getFactionAlertCounterBonus(enemy, moveKey) : 1;
+  dmg = Math.round(dmg * factionMult);
+
+  // Record fear hit
+  if (window.MMA && MMA.Combat && typeof MMA.Combat.recordFearHit === 'function') {
+    MMA.Combat.recordFearHit(enemy, moveKey);
+  }
+
+  // Track variety
+  if (C.trackVariety) C.trackVariety(moveKey);
+
+  return {
+    dmg: dmg,
+    rolled: rolled,
+    flags: {
+      counterAttack: counterAttack,
+      intuitionPrimed: intuitionPrimed,
+      adrenalinePrimed: adrenalinePrimed,
+      comboResult: comboResult,
+      pressureResult: pressureResult,
+      staminaBreak: staminaBreak,
+      panicAdj: panicAdj,
+      deadlyAdj: deadlyAdj,
+      chainCounterAdj: chainCounterAdj,
+      counterFlowAdj: counterFlowAdj,
+      breakingPtAdj: breakingPtAdj,
+      exploitRecovery: exploitRecovery,
+      whiffShift: whiffShift,
+      breakthroughAdjusted: breakthroughAdjusted,
+      momentumShiftAdjusted: momentumShiftAdjusted,
+      styleMastery: styleMastery,
+      weightAdj: weightAdj,
+      injuryAdj: injuryAdj,
+      adaptiveDef: adaptiveDef,
+      effectiveDef: effectiveDef,
+      momentum: momentum,
+      warmupMult: warmupMult,
+      fearMult: fearMult,
+      ringMult: ringMult
+    }
+  };
+};

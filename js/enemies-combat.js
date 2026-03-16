@@ -840,6 +840,11 @@ Object.assign(window.MMA.Enemies, {
       dmg = Math.round(dmg * tauntMult);
     }
 
+    // Pack morale burst: temporarily increased outgoing damage
+    if (attackerEnemy && attackerEnemy._packAttackMult) {
+      dmg = Math.round(dmg * attackerEnemy._packAttackMult);
+    }
+
     // Sore Loser AI: apply accuracy penalty (miss chance) when active
     if (attackerEnemy && attackerEnemy.soreLoserActive && attackerEnemy.soreLoserAccuracyPenalty) {
       // Roll for miss
@@ -861,6 +866,20 @@ Object.assign(window.MMA.Enemies, {
     if (typeof MMA !== 'undefined' && MMA.Player && typeof MMA.Player.damage === 'function') {
       MMA.Player.damage(scene, dmg);
     }
+
+    // Nemesis System: record which archetype killed the player
+    try {
+      if (scene && scene.player && scene.player.stats && scene.player.stats.hp <= 0) {
+        var killerType = (attackerEnemy && attackerEnemy.type && attackerEnemy.type.key) ||
+                         (attackerEnemy && attackerEnemy.typeKey) ||
+                         (attackerEnemy && attackerEnemy.type && attackerEnemy.type.behaviorType) ||
+                         (scene._lastAttackerTypeKey) ||
+                         'unknown';
+        if (typeof this.recordPlayerDeath === 'function') {
+          this.recordPlayerDeath(killerType);
+        }
+      }
+    } catch (e) {}
   },
 
 
@@ -1385,6 +1404,42 @@ Object.assign(window.MMA.Enemies, {
       this.applyVengeanceToNearby(enemy, scene);
     }
 
+    // Pack morale burst: surviving pack allies briefly rage (+30% attack, -10% defense)
+    if (!enemy.isBoss) {
+      (scene.enemies || []).forEach(function(other) {
+        if (!other || other === enemy) return;
+        if (!other.active || other.state === 'dead') return;
+
+        var dyingPattern = (enemy.type && enemy.type.attackPattern) || enemy.attackPattern || '';
+        var otherPattern = (other.type && other.type.attackPattern) || other.attackPattern || '';
+        var dyingIsPack = (typeof dyingPattern === 'string' && dyingPattern.indexOf('pack') !== -1) || (Array.isArray(dyingPattern) && dyingPattern.indexOf('pack') !== -1);
+        var otherIsPack = (typeof otherPattern === 'string' && otherPattern.indexOf('pack') !== -1) || (Array.isArray(otherPattern) && otherPattern.indexOf('pack') !== -1);
+        if (!dyingIsPack || !otherIsPack) return;
+
+        other._packMoraleBoost = true;
+        other._packMoraleTimer = 2000;
+        other._packAttackMult = 1.3;
+        other._packDefenseMult = 0.9;
+        scene.time.delayedCall(2000, function() {
+          if (!other) return;
+          other._packMoraleBoost = false;
+          other._packAttackMult = 1;
+          other._packDefenseMult = 1;
+        });
+      });
+
+      // Pack rush on comrade death
+      if (scene && scene.player) {
+        var aliveEnemies = scene.enemyGroup ? scene.enemyGroup.getChildren().filter(function(e) { return e.active && e.stats && e.stats.hp > 0; }) : [];
+        aliveEnemies.forEach(function(e) {
+          if (e._packMoraleBoost) {
+            e._packRush = true;
+            scene.time.delayedCall(2000, function() { e._packRush = false; });
+          }
+        });
+      }
+    }
+
     // Temperamental Enforcer: when an ally dies nearby, Enforcer gains enrage stacks
     if (!enemy.isBoss && enemy.typeKey !== 'enforcer') {
       var enfCfg = this.ENFORCER_CONFIG;
@@ -1682,3 +1737,124 @@ Object.assign(window.MMA.Enemies, {
     }
   }
 });
+
+// Echo enemy: record player attacks and replay
+MMA.Enemies.updateEchoEnemy = function(scene, enemy) {
+  if (!enemy || !enemy.type || enemy.type.key !== 'echo') return;
+  if (!enemy._recordedMoves) enemy._recordedMoves = [];
+  if (!enemy._echoPlaybackAt) enemy._echoPlaybackAt = scene.time.now + 5000;
+
+  // Record player attacks (check last move from scene)
+  if (scene._lastMoveKey && scene._lastMoveKeyTs !== scene._lastMoveKeyRecorded) {
+    enemy._recordedMoves.push(scene._lastMoveKey);
+    enemy._lastMoveKeyRecorded = scene._lastMoveKeyTs;
+    if (enemy._recordedMoves.length > 5) enemy._recordedMoves.shift();
+  }
+
+  // Play back after 5 seconds
+  if (scene.time.now >= enemy._echoPlaybackAt && enemy._recordedMoves.length > 0) {
+    enemy._echoPlaybackAt = scene.time.now + 8000;
+    var moves = enemy._recordedMoves.slice();
+
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, 'ECHO!', '#cc88ff');
+    }
+
+    moves.forEach(function(moveKey, i) {
+      scene.time.delayedCall(i * 400, function() {
+        if (!enemy.active || !scene.player) return;
+        var dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, scene.player.x, scene.player.y);
+        if (dist < 120) {
+          // Deal echo damage (60% of base)
+          var roster = window.MMA && MMA.Combat && MMA.Combat.MOVE_ROSTER;
+          var move = roster && roster[moveKey];
+          var dmg = move ? Math.round((move.baseDamage || 10) * 0.6) : 6;
+          if (scene.player.stats) {
+            scene.player.stats.hp = Math.max(0, scene.player.stats.hp - dmg);
+            if (typeof MMA.UI.showDamageText === 'function') {
+              MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 20, 'ECHO -' + dmg, '#cc88ff');
+            }
+          }
+        }
+      });
+    });
+  }
+};
+// === REVENGE STRIKE ===
+// Enemy that gets knocked down gets +25% damage on next hit
+MMA.EnemiesCombat = window.MMA.EnemiesCombat || {};
+
+MMA.EnemiesCombat.onEnemyKnockdown = MMA.EnemiesCombat.onEnemyKnockdown || function(scene, enemy) {
+  if (!enemy) return;
+  enemy._revengeCharged = true;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, '😤 REVENGE!', '#ff4400');
+  }
+};
+
+MMA.EnemiesCombat.getRevengeMult = MMA.EnemiesCombat.getRevengeMult || function(enemy) {
+  if (enemy && enemy._revengeCharged) {
+    enemy._revengeCharged = false;
+    return 1.25;
+  }
+  return 1.0;
+};
+
+// === BERSERKER RAGE ===
+// Enemy below 25% HP enters berserker state: +40% speed, +20% dmg, ignores stamina
+MMA.EnemiesCombat.checkBerserkerRage = MMA.EnemiesCombat.checkBerserkerRage || function(scene, enemy) {
+  if (!enemy || !enemy.stats) return;
+  var ratio = enemy.hp / (enemy.stats.maxHp || enemy.stats.hp || 100);
+  if (ratio <= 0.25 && !enemy._berserker) {
+    enemy._berserker = true;
+    if (enemy.stats) {
+      enemy.stats._berserkerSpeedBonus = (enemy.stats.speed || 80) * 0.4;
+    }
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 40, '🔥 BERSERK!', '#ff0000');
+    }
+    // Visual tint
+    if (enemy.setTint) enemy.setTint(0xff2200);
+  }
+};
+
+MMA.EnemiesCombat.getBerserkerDamageMult = MMA.EnemiesCombat.getBerserkerDamageMult || function(enemy) {
+  return (enemy && enemy._berserker) ? 1.20 : 1.0;
+};
+
+// === PARRY SYSTEM ===
+// Enemy can parry: brief flash then counter if player attacks during parry window
+MMA.EnemiesCombat.startEnemyParry = MMA.EnemiesCombat.startEnemyParry || function(scene, enemy) {
+  if (!enemy || enemy._parrying) return;
+  enemy._parrying = true;
+  enemy._parryUntil = Date.now() + 500;
+  if (enemy.setTint) enemy.setTint(0xffffff);
+  scene.time.delayedCall(500, function() {
+    if (enemy.active) {
+      enemy._parrying = false;
+      if (enemy._berserker) {
+        if (enemy.setTint) enemy.setTint(0xff2200);
+      } else {
+        if (enemy.clearTint) enemy.clearTint();
+      }
+    }
+  });
+};
+
+MMA.EnemiesCombat.isEnemyParrying = MMA.EnemiesCombat.isEnemyParrying || function(enemy) {
+  return !!(enemy && enemy._parrying && enemy._parryUntil && Date.now() < enemy._parryUntil);
+};
+
+MMA.EnemiesCombat.handleParryCounter = MMA.EnemiesCombat.handleParryCounter || function(scene, enemy) {
+  if (!MMA.EnemiesCombat.isEnemyParrying(enemy)) return false;
+  // Parry succeeds: player gets staggered
+  var p = scene && scene.player;
+  if (p) {
+    p._staggeredUntil = Date.now() + 600;
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, p.x, p.y - 30, 'PARRIED!', '#ffffff');
+    }
+  }
+  enemy._parrying = false;
+  return true;
+};

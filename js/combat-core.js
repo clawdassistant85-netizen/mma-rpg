@@ -412,13 +412,25 @@ Object.assign(window.MMA.Combat, {
 
           var anyFired = false;
           strikeKeys.forEach(function(k){
-            if (window.MMA_ACTION[k]) { window.MMA_ACTION[k] = false; if (!anyFired) { anyFired = true; self2.executeGroundMove(scene, k === 'cross' ? 'elbow' : 'gnp'); } }
+            if (window.MMA_ACTION[k] && !anyFired) {
+              window.MMA_ACTION[k] = false;
+              anyFired = true;
+              self2.executeGroundMove(scene, k === 'cross' ? 'elbow' : 'gnp');
+            }
           });
           subKeys.forEach(function(k){
-            if (window.MMA_ACTION[k]) { window.MMA_ACTION[k] = false; if (!anyFired) { anyFired = true; self2.executeGroundMove(scene, 'submission'); } }
+            if (window.MMA_ACTION[k] && !anyFired) {
+              window.MMA_ACTION[k] = false;
+              anyFired = true;
+              self2.executeGroundMove(scene, 'submission');
+            }
           });
           improveKeys.forEach(function(k){
-            if (window.MMA_ACTION[k]) { window.MMA_ACTION[k] = false; if (!anyFired) { anyFired = true; self2.executeGroundMove(scene, 'improve'); } }
+            if (window.MMA_ACTION[k] && !anyFired) {
+              window.MMA_ACTION[k] = false;
+              anyFired = true;
+              self2.executeGroundMove(scene, 'improve');
+            }
           });
 
         } else {
@@ -1378,3 +1390,897 @@ Object.assign(window.MMA.Combat, {
       return true;
     }
 });
+
+// --- Compatibility/feature hooks: stamina break, pressure, and deadly windows ---
+Object.assign(window.MMA.Combat, {
+  _pressureLevel: 0,
+  _pressureReady: false,
+
+  // Stamina Break — enemy at 0 stamina staggers
+  checkStaminaBreak: function(scene, enemy) {
+    if (!enemy || !enemy.stats) return;
+    if (enemy.stats.stamina > 0) return;
+    if (enemy._staminaBreakUntil && scene.time.now < enemy._staminaBreakUntil) return;
+
+    enemy._staminaBreakUntil = scene.time.now + 2000;
+    enemy._staminaBroken = true;
+    if (enemy.setTint) enemy.setTint(0x8888ff);
+
+    scene.time.delayedCall(2000, function() {
+      enemy._staminaBroken = false;
+      if (enemy.active && enemy.clearTint) enemy.clearTint();
+    });
+
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, enemy.x, enemy.y - 30, 'STAMINA BREAK!', '#8888ff');
+    }
+  },
+
+  addPressure: function(scene, amt) {
+    window.MMA.Combat._pressureLevel = Math.min(100, (window.MMA.Combat._pressureLevel || 0) + (amt || 10));
+    if (window.MMA.Combat._pressureLevel >= 100) {
+      window.MMA.Combat._pressureReady = true;
+      if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function' && scene && scene.player) {
+        MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 40, 'PRESSURE!', '#ff4400');
+      }
+    }
+  },
+
+  consumePressure: function() {
+    if (!window.MMA.Combat._pressureReady) return 1.0;
+    window.MMA.Combat._pressureReady = false;
+    window.MMA.Combat._pressureLevel = 0;
+    return 2.5; // damage multiplier
+  },
+
+  resetPressure: function() {
+    window.MMA.Combat._pressureLevel = 0;
+    window.MMA.Combat._pressureReady = false;
+  }
+});
+
+  // Timing Window Mastery
+MMA.Combat._timingMastery = 0;
+MMA.Combat._lastInputTs = 0;
+MMA.Combat._timingReady = false;
+MMA.Combat.recordTimingInput = function(scene) {
+    var now = scene ? scene.time.now : Date.now();
+    var gap = now - (MMA.Combat._lastInputTs || 0);
+    MMA.Combat._lastInputTs = now;
+    if (gap >= 100 && gap <= 300) {
+      MMA.Combat._timingMastery = Math.min(100, (MMA.Combat._timingMastery || 0) + 15);
+      if (MMA.Combat._timingMastery >= 100) {
+        MMA.Combat._timingReady = true;
+        if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+          var p = scene && scene.player;
+          if (p) MMA.UI.showDamageText(scene, p.x, p.y - 35, '🎯 PERFECT TIMING!', '#00ffcc');
+        }
+      }
+    } else if (gap > 600) {
+      MMA.Combat._timingMastery = Math.max(0, (MMA.Combat._timingMastery || 0) - 10);
+    }
+  };
+MMA.Combat.consumeTimingBonus = function() {
+    if (!MMA.Combat._timingReady) return 1.0;
+    MMA.Combat._timingReady = false;
+    MMA.Combat._timingMastery = 0;
+    return 1.25;
+  };
+
+  // Technique Harmony System
+MMA.Combat.HARMONIES = {
+    'jab|cross|hook': { name: "Boxer's Rhythm", bonus: 0.15, type: 'combo' },
+    'jab|takedown': { name: "Grappling Flow", bonus: 0.10, type: 'grapple' },
+    'lowKick|hook|uppercut': { name: "Low-High Chain", bonus: 0.12, type: 'combo' },
+    'hook|clinchKnee': { name: "Clinch Dominator", bonus: 0.18, type: 'strike' },
+    'headKick|cross': { name: "High-Low Striker", bonus: 0.13, type: 'combo' }
+  };
+MMA.Combat._moveSequence = [];
+MMA.Combat._discoveredHarmonies = {};
+MMA.Combat.trackHarmony = function(scene, moveKey) {
+    var seq = MMA.Combat._moveSequence;
+    seq.push(moveKey);
+    if (seq.length > 3) seq.shift();
+    var key2 = seq.slice(-2).join('|');
+    var key3 = seq.slice(-3).join('|');
+    [key2, key3].forEach(function(k) {
+      var h = MMA.Combat.HARMONIES[k];
+      if (!h) return;
+      try {
+        var counts = JSON.parse(localStorage.getItem('mma_harmony_counts') || '{}');
+        counts[k] = (counts[k] || 0) + 1;
+        localStorage.setItem('mma_harmony_counts', JSON.stringify(counts));
+        if (counts[k] === 5 && !MMA.Combat._discoveredHarmonies[k]) {
+          MMA.Combat._discoveredHarmonies[k] = true;
+          if (window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+            MMA.UI.queueAchievementToast(scene, 'HARMONY: ' + h.name, '⚡');
+          }
+        }
+      } catch(e) {}
+    });
+  };
+MMA.Combat.getHarmonyBonus = function() {
+    try {
+      var counts = JSON.parse(localStorage.getItem('mma_harmony_counts') || '{}');
+      var bonus = 0;
+      Object.keys(counts).forEach(function(k) {
+        if (counts[k] >= 5) {
+          var h = MMA.Combat.HARMONIES[k];
+          if (h) bonus += h.bonus;
+        }
+      });
+      return Math.min(1.5, 1.0 + bonus);
+    } catch(e) { return 1.0; }
+  };
+
+  MMA.Combat.openDeadlyWindow = function(enemy, durationMs) {
+    if (!enemy) return;
+    enemy._deadlyWindowUntil = Date.now() + (durationMs || 300);
+  };
+  MMA.Combat.isInDeadlyWindow = function(enemy) {
+    return !!(enemy && enemy._deadlyWindowUntil && Date.now() < enemy._deadlyWindowUntil);
+  };
+
+(function() {
+  var Combat = window.MMA && window.MMA.Combat;
+  if (!Combat) return;
+
+  var _origHandleInput = Combat.handleInput;
+  if (typeof _origHandleInput === 'function') {
+    Combat.handleInput = function(scene, delta) {
+      if (!Combat._hooksInstalled) {
+        Combat._hooksInstalled = true;
+
+        if (window.MMA && MMA.Player && typeof MMA.Player.damage === 'function' && !MMA.Player._combatPressureWrapped) {
+          var _origPlayerDamage = MMA.Player.damage;
+          MMA.Player.damage = function(sceneArg, dmg) {
+            if (sceneArg && sceneArg._lastDamagingEnemy) {
+              sceneArg._lastDamagingEnemy._deadlyWindowUntil = (sceneArg.time && sceneArg.time.now ? sceneArg.time.now : Date.now()) + 300;
+            }
+            Combat.resetPressure();
+            return _origPlayerDamage.call(this, sceneArg, dmg);
+          };
+          MMA.Player._combatPressureWrapped = true;
+        }
+
+        if (window.MMA && MMA.Enemies && typeof MMA.Enemies.damagePlayer === 'function' && !MMA.Enemies._deadlyWindowWrapped) {
+          var _origDamagePlayer = MMA.Enemies.damagePlayer;
+          MMA.Enemies.damagePlayer = function(attackerEnemy, sceneArg, dmg) {
+            if (sceneArg && attackerEnemy) {
+              sceneArg._lastDamagingEnemy = attackerEnemy;
+              attackerEnemy._deadlyWindowUntil = (sceneArg.time && sceneArg.time.now ? sceneArg.time.now : Date.now()) + 300;
+            }
+            return _origDamagePlayer.call(this, attackerEnemy, sceneArg, dmg);
+          };
+          MMA.Enemies._deadlyWindowWrapped = true;
+        }
+      }
+
+      return _origHandleInput.call(this, scene, delta);
+    };
+  }
+
+  var _origOnEnemyStaminaHit = Combat.onEnemyStaminaHit;
+  if (typeof _origOnEnemyStaminaHit === 'function') {
+    Combat.onEnemyStaminaHit = function(scene, enemy, move) {
+      var result = _origOnEnemyStaminaHit.call(this, scene, enemy, move);
+      if (enemy && enemy.stats) {
+        if (typeof enemy.stats.stamina !== 'number') {
+          enemy.stats.stamina = Math.max(0, (enemy.stats.maxStamina || 100));
+        }
+        var staminaDamage = Math.max(4, Math.round((move && move.staminaCost ? move.staminaCost : 8) * 1.1));
+        enemy.stats.stamina = Math.max(0, enemy.stats.stamina - staminaDamage);
+        this.checkStaminaBreak(scene, enemy);
+      }
+      return result;
+    };
+  }
+
+  var _origApplyStaminaBreakIfActive = Combat.applyStaminaBreakIfActive;
+  if (typeof _origApplyStaminaBreakIfActive === 'function') {
+    Combat.applyStaminaBreakIfActive = function(scene, enemy, damage) {
+      if (enemy && enemy._staminaBroken) {
+        return {
+          damage: Math.round(damage * 1.5),
+          staminaBreakActive: true
+        };
+      }
+      return _origApplyStaminaBreakIfActive.call(this, scene, enemy, damage);
+    };
+  }
+
+  var _origApplyDeadlyWindowIfActive = Combat.applyDeadlyWindowIfActive;
+  Combat.applyDeadlyWindowIfActive = function(scene, target, damage) {
+    if (target && this.isInDeadlyWindow(target)) {
+      if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        MMA.UI.showDamageText(scene, target.x, target.y - 20, 'COUNTER! ×1.5', '#00ffcc');
+      }
+      return { damage: Math.round(damage * 1.5), deadlyWindow: true };
+    }
+    if (typeof _origApplyDeadlyWindowIfActive === 'function') {
+      return _origApplyDeadlyWindowIfActive.call(this, scene, target, damage);
+    }
+    return { damage: damage, deadlyWindow: false };
+  };
+
+  Combat.applyPressureBreakIfReady = function(scene, damage, enemy) {
+    var pressureMult = this.consumePressure();
+    if (pressureMult > 1) {
+      var boosted = Math.round(damage * pressureMult);
+      if (enemy) enemy._guardBroken = true;
+      if (scene && scene._groundTarget) scene._groundTarget._guardBroken = true;
+      return { damage: boosted, pressureBreak: true };
+    }
+    return { damage: damage, pressureBreak: false };
+  };
+
+  Combat.onPressureHit = function(scene) {
+    this.addPressure(scene, 10);
+    return null;
+  };
+
+  Combat.onPressureMiss = function(scene) {
+    this.resetPressure();
+    return null;
+  };
+})();
+
+MMA.Combat.triggerAdrenaline = function(scene) {
+  var p = scene && scene.player;
+  if (!p) return;
+  p._adrenalineActive = true;
+  p._adrenalineUntil = scene.time.now + 5000;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, p.x, p.y - 30, '⚡ ADRENALINE!', '#ff8800');
+  }
+};
+
+MMA.Combat.consumeAdrenaline = function(scene) {
+  var p = scene && scene.player;
+  if (!p || !p._adrenalineActive) return false;
+  if (scene.time.now > (p._adrenalineUntil || 0)) {
+    p._adrenalineActive = false;
+    return false;
+  }
+  p._adrenalineActive = false;
+  return true;
+};
+
+MMA.Combat.getWeightClassMult = function(moveKey, enemy) {
+  if (!enemy || !enemy.type) return 1.0;
+  var wc = enemy.type.weightClass || 'medium';
+  var lightMoves = ['jab','cross','lowKick','backKick','wingChun'];
+  var heavyMoves = ['hook','uppercut','suplex','tigerKnee','spinningHeelKick','overhangRight','clinchKnee'];
+  var isLight = lightMoves.indexOf(moveKey) >= 0;
+  var isHeavy = heavyMoves.indexOf(moveKey) >= 0;
+  if (isLight && wc === 'heavy') return 1.2;
+  if (isLight && wc === 'light') return 0.85;
+  if (isHeavy && wc === 'light') return 1.2;
+  if (isHeavy && wc === 'heavy') return 0.85;
+  return 1.0;
+};
+
+(function() {
+  var Combat = MMA && MMA.Combat;
+  if (!Combat) return;
+
+  var _origRefreshCounterFlowState = Combat.refreshCounterFlowState;
+  if (typeof _origRefreshCounterFlowState === 'function') {
+    Combat.refreshCounterFlowState = function(scene) {
+      var lastBlockAtBefore = Combat.getLastBlockTimestamp(scene);
+      var result = _origRefreshCounterFlowState.call(this, scene);
+      var lastBlockAtAfter = Combat.getLastBlockTimestamp(scene);
+      if (
+        lastBlockAtAfter &&
+        lastBlockAtAfter !== lastBlockAtBefore &&
+        scene && scene._lastEnemyAttackTs &&
+        (lastBlockAtAfter - scene._lastEnemyAttackTs) >= 0 &&
+        (lastBlockAtAfter - scene._lastEnemyAttackTs) <= 150
+      ) {
+        Combat.triggerAdrenaline(scene);
+      }
+      return result;
+    };
+  }
+
+  if (window.MMA && MMA.Enemies && typeof MMA.Enemies.damagePlayer === 'function' && !MMA.Enemies._adrenalineEnemyAttackWrapped) {
+    var _origDamagePlayer = MMA.Enemies.damagePlayer;
+    MMA.Enemies.damagePlayer = function(attackerEnemy, sceneArg, dmg) {
+      if (sceneArg && sceneArg.time) sceneArg._lastEnemyAttackTs = sceneArg.time.now;
+      var result = _origDamagePlayer.call(this, attackerEnemy, sceneArg, dmg);
+      if (sceneArg && window.MMA && MMA.Combat && typeof MMA.Combat.checkSecondWind === 'function') {
+        MMA.Combat.checkSecondWind(sceneArg);
+      }
+      return result;
+    };
+    MMA.Enemies._adrenalineEnemyAttackWrapped = true;
+  }
+
+  if (window.MMA && MMA.Player && typeof MMA.Player.damage === 'function' && !MMA.Player._secondWindWrapped) {
+    var _origPlayerDamage2 = MMA.Player.damage;
+    MMA.Player.damage = function(sceneArg, dmg) {
+      var result = _origPlayerDamage2.call(this, sceneArg, dmg);
+      if (sceneArg && window.MMA && MMA.Combat && typeof MMA.Combat.checkSecondWind === 'function') {
+        MMA.Combat.checkSecondWind(sceneArg);
+      }
+      return result;
+    };
+    MMA.Player._secondWindWrapped = true;
+  }
+})();
+
+// === TIMING WINDOW MASTERY ===
+MMA.Combat._timingMastery = MMA.Combat._timingMastery || 0;
+MMA.Combat._lastInputTs = MMA.Combat._lastInputTs || 0;
+MMA.Combat._timingReady = MMA.Combat._timingReady || false;
+MMA.Combat.recordTimingInput = function(scene) {
+  var now = scene ? scene.time.now : Date.now();
+  var gap = now - (MMA.Combat._lastInputTs || 0);
+  MMA.Combat._lastInputTs = now;
+  if (gap >= 100 && gap <= 300) {
+    MMA.Combat._timingMastery = Math.min(100, (MMA.Combat._timingMastery || 0) + 15);
+    if (MMA.Combat._timingMastery >= 100 && !MMA.Combat._timingReady) {
+      MMA.Combat._timingReady = true;
+      var p = scene && scene.player;
+      if (p && window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        MMA.UI.showDamageText(scene, p.x, p.y - 35, '🎯 TIMING!', '#00ffcc');
+      }
+    }
+  } else if (gap > 600) {
+    MMA.Combat._timingMastery = Math.max(0, (MMA.Combat._timingMastery || 0) - 10);
+  }
+};
+MMA.Combat.consumeTimingBonus = function() {
+  if (!MMA.Combat._timingReady) return 1.0;
+  MMA.Combat._timingReady = false;
+  MMA.Combat._timingMastery = 0;
+  return 1.25;
+};
+
+// === TECHNIQUE HARMONY SYSTEM ===
+MMA.Combat.HARMONIES = MMA.Combat.HARMONIES || {
+  'jab|cross|hook': { name: "Boxer's Rhythm", bonus: 0.15 },
+  'jab|takedown': { name: "Grappling Flow", bonus: 0.10 },
+  'lowKick|hook|uppercut': { name: "Low-High Chain", bonus: 0.12 },
+  'hook|clinchKnee': { name: "Clinch Dominator", bonus: 0.18 },
+  'headKick|cross': { name: "High-Low", bonus: 0.13 },
+};
+MMA.Combat._moveSequence = MMA.Combat._moveSequence || [];
+MMA.Combat.trackHarmony = function(scene, moveKey) {
+  if (!moveKey) return;
+  var seq = MMA.Combat._moveSequence;
+  seq.push(moveKey);
+  if (seq.length > 3) seq.shift();
+  var k2 = seq.slice(-2).join('|');
+  var k3 = seq.slice(-3).join('|');
+  [k2, k3].forEach(function(k) {
+    var h = MMA.Combat.HARMONIES[k];
+    if (!h) return;
+    try {
+      var counts = JSON.parse(localStorage.getItem('mma_harmony_counts') || '{}');
+      counts[k] = (counts[k] || 0) + 1;
+      localStorage.setItem('mma_harmony_counts', JSON.stringify(counts));
+      if (counts[k] === 5 && window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+        MMA.UI.queueAchievementToast(scene, 'HARMONY: ' + h.name, '⚡');
+      }
+    } catch(e) {}
+  });
+};
+MMA.Combat.getHarmonyBonus = function() {
+  try {
+    var counts = JSON.parse(localStorage.getItem('mma_harmony_counts') || '{}');
+    var bonus = 0;
+    Object.keys(counts).forEach(function(k) {
+      if (counts[k] >= 5 && MMA.Combat.HARMONIES[k]) bonus += MMA.Combat.HARMONIES[k].bonus;
+    });
+    return Math.min(1.5, 1.0 + bonus);
+  } catch(e) { return 1.0; }
+};
+
+// === SHADOW CLONE MIRROR MATCH ===
+MMA.Combat.triggerShadowClone = function(scene, enemy) {
+  if (!scene || !enemy || !scene.player) return;
+  if (Math.random() > 0.3) return;
+  var dmg = Math.round(((enemy.stats && enemy.stats.attackDamage) || 8) * 0.5);
+  if (scene.add) {
+    var clone = scene.add.rectangle(enemy.x, enemy.y, 20, 36, 0xff2200, 0.35).setDepth(195).setScrollFactor(0);
+    scene.tweens.add({ targets: clone, alpha: 0, x: scene.player.x, y: scene.player.y, duration: 400,
+      onComplete: function() {
+        if (clone.active) clone.destroy();
+        if (scene.player && scene.player.stats && scene.player.stats.hp > 0) {
+          scene.player.stats.hp = Math.max(0, scene.player.stats.hp - dmg);
+          if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+            MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 20, 'ECHO -' + dmg, '#ff2200');
+          }
+        }
+      }
+    });
+  }
+};
+// === WALL BOUNCE TECHNICAL ===
+// Player bouncing off ring wall gets a brief invincibility + counter window
+MMA.Combat.triggerWallBounce = MMA.Combat.triggerWallBounce || function(scene) {
+  if (!scene || !scene.player) return;
+  var p = scene.player;
+  p._wallBounceUntil = Date.now() + 400;
+  p._wallBounceCounterUntil = Date.now() + 600;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, p.x, p.y - 30, 'WALL BOUNCE!', '#ffaa00');
+  }
+};
+
+MMA.Combat.isWallBounceActive = MMA.Combat.isWallBounceActive || function(scene) {
+  var p = scene && scene.player;
+  return !!(p && p._wallBounceUntil && Date.now() < p._wallBounceUntil);
+};
+
+MMA.Combat.isWallBounceCounter = MMA.Combat.isWallBounceCounter || function(scene) {
+  var p = scene && scene.player;
+  return !!(p && p._wallBounceCounterUntil && Date.now() < p._wallBounceCounterUntil);
+};
+
+// === DO-OR-DIE ROOM ===
+// Special high-risk high-reward room: all enemies deal 2x damage but drop 3x gold/XP
+MMA.Combat.DO_OR_DIE_MULT = { enemyDamage: 2.0, goldReward: 3.0, xpReward: 3.0 };
+
+MMA.Combat.isDoOrDieRoom = MMA.Combat.isDoOrDieRoom || function(scene) {
+  return !!(scene && scene._doOrDieRoom);
+};
+
+MMA.Combat.activateDoOrDie = MMA.Combat.activateDoOrDie || function(scene) {
+  if (!scene) return;
+  scene._doOrDieRoom = true;
+  if (window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+    MMA.UI.queueAchievementToast(scene, 'DO OR DIE ROOM', '☠️');
+  }
+};
+
+MMA.Combat.getDoOrDieEnemyDamageMult = MMA.Combat.getDoOrDieEnemyDamageMult || function(scene) {
+  return MMA.Combat.isDoOrDieRoom(scene) ? MMA.Combat.DO_OR_DIE_MULT.enemyDamage : 1.0;
+};
+
+MMA.Combat.getDoOrDieRewardMult = MMA.Combat.getDoOrDieRewardMult || function(scene) {
+  if (!MMA.Combat.isDoOrDieRoom(scene)) return { gold: 1.0, xp: 1.0 };
+  return { gold: MMA.Combat.DO_OR_DIE_MULT.goldReward, xp: MMA.Combat.DO_OR_DIE_MULT.xpReward };
+};
+
+// === CROWD JUDGE SCORING ===
+// Judges track performance; score influences post-fight bonuses
+MMA.Combat._judgeScore = 0;
+
+MMA.Combat.addJudgeScore = MMA.Combat.addJudgeScore || function(points) {
+  MMA.Combat._judgeScore = Math.min(100, (MMA.Combat._judgeScore || 0) + (points || 0));
+};
+
+MMA.Combat.resetJudgeScore = MMA.Combat.resetJudgeScore || function() {
+  MMA.Combat._judgeScore = 0;
+};
+
+MMA.Combat.getJudgeVerdict = MMA.Combat.getJudgeVerdict || function() {
+  var s = MMA.Combat._judgeScore || 0;
+  if (s >= 90) return { label: 'DOMINANT', goldMult: 1.5, xpMult: 1.3 };
+  if (s >= 70) return { label: 'DECISIVE', goldMult: 1.25, xpMult: 1.15 };
+  if (s >= 50) return { label: 'SPLIT', goldMult: 1.1, xpMult: 1.0 };
+  return { label: 'CLOSE', goldMult: 1.0, xpMult: 1.0 };
+};
+// === BATTLE MOMENTUM SHIFT ===
+// When player takes 3 hits in a row, enemy gains momentum (speed/dmg buff)
+// When player lands 3 in a row, player gains momentum
+MMA.Combat._playerHitStreak = 0;
+MMA.Combat._enemyHitStreak = 0;
+
+MMA.Combat.recordPlayerHit = MMA.Combat.recordPlayerHit || function(scene) {
+  MMA.Combat._playerHitStreak = 0;
+  MMA.Combat._enemyHitStreak = (MMA.Combat._enemyHitStreak || 0) + 1;
+  if (MMA.Combat._enemyHitStreak >= 3) {
+    MMA.Combat._enemyHitStreak = 0;
+    MMA.Combat._enemyMomentumUntil = Date.now() + 4000;
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function' && scene && scene.enemies) {
+      var e = scene.enemies[0];
+      if (e) MMA.UI.showDamageText(scene, e.x, e.y - 30, '⚡ MOMENTUM', '#ff4400');
+    }
+  }
+};
+
+MMA.Combat.recordPlayerLand = MMA.Combat.recordPlayerLand || function(scene) {
+  MMA.Combat._enemyHitStreak = 0;
+  MMA.Combat._playerHitStreak = (MMA.Combat._playerHitStreak || 0) + 1;
+  if (MMA.Combat._playerHitStreak >= 3) {
+    MMA.Combat._playerHitStreak = 0;
+    MMA.Combat._playerMomentumUntil = Date.now() + 4000;
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function' && scene && scene.player) {
+      var p = scene.player;
+      MMA.UI.showDamageText(scene, p.x, p.y - 40, '🔥 ON FIRE!', '#FFD700');
+    }
+  }
+};
+
+MMA.Combat.getPlayerMomentumMult = MMA.Combat.getPlayerMomentumMult || function() {
+  return (MMA.Combat._playerMomentumUntil && Date.now() < MMA.Combat._playerMomentumUntil) ? 1.2 : 1.0;
+};
+
+MMA.Combat.getEnemyMomentumMult = MMA.Combat.getEnemyMomentumMult || function() {
+  return (MMA.Combat._enemyMomentumUntil && Date.now() < MMA.Combat._enemyMomentumUntil) ? 1.2 : 1.0;
+};
+
+// === GUARD BREAK SYSTEM ===
+// Repeated attacks on same spot break enemy guard; next hit deals 2x
+MMA.Combat._guardHits = {};
+
+MMA.Combat.recordGuardHit = MMA.Combat.recordGuardHit || function(enemy, moveKey) {
+  if (!enemy || !enemy._id) return;
+  var key = enemy._id + ':' + moveKey;
+  MMA.Combat._guardHits[key] = (MMA.Combat._guardHits[key] || 0) + 1;
+  if (MMA.Combat._guardHits[key] >= 3) {
+    MMA.Combat._guardHits[key] = 0;
+    enemy._guardBroken = true;
+    enemy._guardBrokenUntil = Date.now() + 2000;
+  }
+};
+
+MMA.Combat.getGuardBreakMult = MMA.Combat.getGuardBreakMult || function(enemy) {
+  if (enemy && enemy._guardBroken && enemy._guardBrokenUntil && Date.now() < enemy._guardBrokenUntil) {
+    return 2.0;
+  }
+  if (enemy) enemy._guardBroken = false;
+  return 1.0;
+};
+
+// === STAMINA RECOVERY BURST ===
+// Standing still for 2s triggers a stamina recovery burst
+MMA.Combat.updateStaminaRecovery = MMA.Combat.updateStaminaRecovery || function(scene) {
+  var p = scene && scene.player;
+  if (!p || !p.stats) return;
+  var now = Date.now();
+  var vx = p.body ? Math.abs(p.body.velocity.x) : 0;
+  var vy = p.body ? Math.abs(p.body.velocity.y) : 0;
+  var moving = vx > 5 || vy > 5;
+  if (moving) {
+    p._stillSince = null;
+  } else {
+    if (!p._stillSince) p._stillSince = now;
+    var stillMs = now - p._stillSince;
+    if (stillMs >= 2000 && p.stats.stamina < (p.stats.maxStamina || 100)) {
+      var recover = Math.min(5, (p.stats.maxStamina || 100) - p.stats.stamina);
+      p.stats.stamina += recover;
+      if (recover > 0 && stillMs % 1000 < 100 && window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+        MMA.UI.showDamageText(scene, p.x, p.y - 25, '+STA', '#00aaff');
+      }
+    }
+  }
+};
+// === TECHNIQUE CONDITIONING SYSTEM ===
+// Each move fatigues when overused in a single fight; resets on zone clear
+MMA.Combat._moveFatigue = {};
+
+MMA.Combat.recordMoveUsedInFight = MMA.Combat.recordMoveUsedInFight || function(moveKey) {
+  MMA.Combat._moveFatigue[moveKey] = (MMA.Combat._moveFatigue[moveKey] || 0) + 1;
+};
+
+MMA.Combat.getConditioningMult = MMA.Combat.getConditioningMult || function(moveKey) {
+  var uses = MMA.Combat._moveFatigue[moveKey] || 0;
+  if (uses <= 3) return 1.0;
+  if (uses <= 6) return 0.90;
+  if (uses <= 10) return 0.80;
+  return 0.70; // severely fatigued
+};
+
+MMA.Combat.getConditioningLabel = MMA.Combat.getConditioningLabel || function(moveKey) {
+  var uses = MMA.Combat._moveFatigue[moveKey] || 0;
+  if (uses <= 3) return null;
+  if (uses <= 6) return 'TIRED';
+  if (uses <= 10) return 'FATIGUED';
+  return 'EXHAUSTED';
+};
+
+MMA.Combat.resetMoveFatigue = MMA.Combat.resetMoveFatigue || function() {
+  MMA.Combat._moveFatigue = {};
+};
+
+// === FIGHTING STYLE RIVALRY ===
+// Using a "rival" style against certain enemies grants them bonuses (BJJ beats Wrestling, Muay Thai beats Boxing, etc.)
+MMA.Combat.STYLE_RIVALRIES = {
+  // attacker style -> defender style that gets bonus
+  strike:  'grapple',   // grapplers counter strikers
+  grapple: 'kick',      // kickers keep grapplers at bay
+  kick:    'strike',    // strikers walk through kicks
+  special: null
+};
+
+MMA.Combat.getRivalryPenalty = MMA.Combat.getRivalryPenalty || function(scene, moveType) {
+  if (!scene) return 1.0;
+  var enemies = scene.enemies || [];
+  var alive = enemies.filter(function(e) { return e && e.active && e.hp > 0; });
+  if (!alive.length) return 1.0;
+  var enemy = alive[0];
+  var enemyStyle = enemy.style || enemy.type;
+  // Rough style mapping
+  var styleMap = { boxer: 'strike', brawler: 'strike', kicker: 'kick', wrestler: 'grapple', feintMaster: 'special', drunkMonk: 'special' };
+  var enemyStyleType = styleMap[enemyStyle] || 'strike';
+  // Check if player's move type is the rival of enemy style
+  var rivalOf = MMA.Combat.STYLE_RIVALRIES[moveType];
+  if (rivalOf === enemyStyleType) {
+    return 0.85; // Player in disadvantaged style vs this enemy
+  }
+  return 1.0;
+};
+
+// === CORNER DOMINATION SYSTEM ===
+// Backing enemy into corner: +15% player damage, -10% enemy defense
+MMA.Combat.getCornerDominationBonus = MMA.Combat.getCornerDominationBonus || function(scene, enemy) {
+  if (!scene || !enemy) return { damageMult: 1.0, enemyDefMult: 1.0 };
+  var CANVAS_W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var CANVAS_H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 700;
+  var MARGIN = 70;
+  var cornered = (
+    (enemy.x < MARGIN || enemy.x > CANVAS_W - MARGIN) &&
+    (enemy.y < MARGIN + 80 || enemy.y > CANVAS_H - MARGIN)
+  );
+  if (!cornered) {
+    enemy._cornerDominating = false;
+    return { damageMult: 1.0, enemyDefMult: 1.0 };
+  }
+  enemy._cornerDominating = true;
+  return { damageMult: 1.15, enemyDefMult: 0.90, label: '📐 CORNERED' };
+};
+// === TECHNIQUE BLOODLINE INHERITANCE ===
+// After completing a full run (NG+), unlock permanent passive bonuses carried into next run
+MMA.Combat.getBloodlineBonus = MMA.Combat.getBloodlineBonus || function(moveKey) {
+  try {
+    var ng = parseInt(localStorage.getItem('mma_ng_plus') || '0');
+    if (ng <= 0) return 1.0;
+    var inherited = JSON.parse(localStorage.getItem('mma_bloodline') || '{}');
+    return inherited[moveKey] ? (1.0 + Math.min(ng * 0.05, 0.25)) : 1.0; // +5% per NG, max +25%
+  } catch(e) { return 1.0; }
+};
+
+MMA.Combat.recordBloodlineMove = MMA.Combat.recordBloodlineMove || function(moveKey) {
+  try {
+    var inherited = JSON.parse(localStorage.getItem('mma_bloodline') || '{}');
+    inherited[moveKey] = (inherited[moveKey] || 0) + 1;
+    localStorage.setItem('mma_bloodline', JSON.stringify(inherited));
+  } catch(e) {}
+};
+
+MMA.Combat.triggerNGPlus = MMA.Combat.triggerNGPlus || function(scene) {
+  try {
+    var ng = parseInt(localStorage.getItem('mma_ng_plus') || '0') + 1;
+    localStorage.setItem('mma_ng_plus', ng);
+    // Inherit top 3 most used moves as bloodline
+    var rust = JSON.parse(localStorage.getItem('mma_technique_rust') || '{}');
+    var sorted = Object.keys(rust).sort(function(a,b) { return (rust[b].uses||0)-(rust[a].uses||0); });
+    var inherited = JSON.parse(localStorage.getItem('mma_bloodline') || '{}');
+    sorted.slice(0,3).forEach(function(k) { inherited[k] = (inherited[k]||0) + 1; });
+    localStorage.setItem('mma_bloodline', JSON.stringify(inherited));
+    if (window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+      MMA.UI.queueAchievementToast(scene, 'NG+ ' + ng + ' — BLOODLINE INHERITED', '🧬');
+    }
+  } catch(e) {}
+};
+
+// === PRE-FIGHT BETTING SYSTEM ===
+// Player can wager gold before a fight; win pays 2x, lose forfeits wager
+MMA.Combat._currentBet = 0;
+
+MMA.Combat.placeBet = MMA.Combat.placeBet || function(scene, amount) {
+  var p = scene && scene.player;
+  if (!p || !p.stats) return false;
+  var gold = p.stats.gold || 0;
+  if (amount > gold) return false;
+  p.stats.gold -= amount;
+  MMA.Combat._currentBet = amount;
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+    MMA.UI.showDamageText(scene, p.x, p.y - 40, '🎰 BET: ' + amount + 'g', '#FFD700');
+  }
+  return true;
+};
+
+MMA.Combat.resolveBet = MMA.Combat.resolveBet || function(scene, won) {
+  var p = scene && scene.player;
+  if (!p || !p.stats || !MMA.Combat._currentBet) return;
+  if (won) {
+    var payout = MMA.Combat._currentBet * 2;
+    p.stats.gold = (p.stats.gold || 0) + payout;
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, p.x, p.y - 50, '💰 WON: +' + payout + 'g', '#00ff88');
+    }
+  } else {
+    if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function') {
+      MMA.UI.showDamageText(scene, p.x, p.y - 50, '💸 LOST BET: -' + MMA.Combat._currentBet + 'g', '#ff4400');
+    }
+  }
+  MMA.Combat._currentBet = 0;
+};
+
+// === WEATHER HAZARD ROOMS ===
+// Rain/ice/heat affect movement and dodge
+MMA.Combat.WEATHER_HAZARDS = {
+  rain:  { dodgeMult: 0.80, label: '🌧️ Wet Floor', color: '#4488ff' },
+  ice:   { dodgeMult: 0.65, speedMult: 0.85, label: '🧊 Icy Floor', color: '#aaddff' },
+  heat:  { staminaDrain: 1.5, label: '🌡️ Extreme Heat', color: '#ff8800' },
+  clear: { dodgeMult: 1.0, label: null }
+};
+
+MMA.Combat.getWeatherHazardDodgeMult = MMA.Combat.getWeatherHazardDodgeMult || function(scene) {
+  var weather = scene && scene._roomWeather;
+  if (!weather) return 1.0;
+  var h = MMA.Combat.WEATHER_HAZARDS[weather];
+  return (h && h.dodgeMult) ? h.dodgeMult : 1.0;
+};
+
+MMA.Combat.getWeatherHazardSpeedMult = MMA.Combat.getWeatherHazardSpeedMult || function(scene) {
+  var weather = scene && scene._roomWeather;
+  if (!weather) return 1.0;
+  var h = MMA.Combat.WEATHER_HAZARDS[weather];
+  return (h && h.speedMult) ? h.speedMult : 1.0;
+};
+
+MMA.Combat.applyWeatherHazard = MMA.Combat.applyWeatherHazard || function(scene, weatherType) {
+  scene._roomWeather = weatherType;
+  var h = MMA.Combat.WEATHER_HAZARDS[weatherType];
+  if (h && h.label && window.MMA && MMA.UI && typeof MMA.UI.queueAchievementToast === 'function') {
+    MMA.UI.queueAchievementToast(scene, h.label, '⚠️');
+  }
+};
+// === OPPONENT FEAR MEMORY ===
+// Enemies track which damage types hurt them most; after 3 hits develop flinch tell (+10% crit)
+MMA.Combat.FEAR_MEMORY = MMA.Combat.FEAR_MEMORY || {};
+
+MMA.Combat.recordFearHit = MMA.Combat.recordFearHit || function(enemy, moveKey) {
+  if (!enemy || !enemy.id) return;
+  var id = enemy.id || enemy.type && enemy.type.key || 'enemy';
+  if (!MMA.Combat.FEAR_MEMORY[id]) MMA.Combat.FEAR_MEMORY[id] = {};
+  MMA.Combat.FEAR_MEMORY[id][moveKey] = (MMA.Combat.FEAR_MEMORY[id][moveKey] || 0) + 1;
+};
+
+MMA.Combat.getFearCritBonus = MMA.Combat.getFearCritBonus || function(enemy, moveKey) {
+  if (!enemy) return 1;
+  var id = enemy.id || (enemy.type && enemy.type.key) || 'enemy';
+  var mem = MMA.Combat.FEAR_MEMORY[id];
+  if (!mem || (mem[moveKey] || 0) < 3) return 1;
+  return 1.10; // +10% crit multiplier after 3+ hits of same type
+};
+
+MMA.Combat.hasFearTell = MMA.Combat.hasFearTell || function(enemy, moveKey) {
+  if (!enemy) return false;
+  var id = enemy.id || (enemy.type && enemy.type.key) || 'enemy';
+  var mem = MMA.Combat.FEAR_MEMORY[id];
+  return mem && (mem[moveKey] || 0) >= 3;
+};
+
+// === CROWD NOISE ACCURACY MODIFIER ===
+// +50 hype = -8% enemy accuracy; silence = +5% enemy focus
+MMA.Combat.getCrowdNoiseAccuracyMod = MMA.Combat.getCrowdNoiseAccuracyMod || function(scene) {
+  var hype = 0;
+  if (window.MMA && MMA.UI && typeof MMA.UI.getHype === 'function') {
+    hype = MMA.UI.getHype(scene) || 0;
+  } else if (scene && typeof scene._hype === 'number') {
+    hype = scene._hype;
+  }
+  if (hype >= 50) return 0.92;  // -8% enemy accuracy
+  if (hype <= 5)  return 1.05;  // +5% enemy focus (silence = lethal)
+  return 1.0;
+};
+
+// === RING POSITION WARFARE ===
+// Floor position bonuses: center=balanced, corner=+10% dmg, ropes=+15% grapple escape
+MMA.Combat.RING_POSITIONS = {
+  center: { label: 'CENTER', damageMult: 1.0,  grappleEscapeMult: 1.0,  desc: 'Balanced' },
+  corner: { label: 'CORNER', damageMult: 1.10, grappleEscapeMult: 0.85, desc: '+10% DMG' },
+  ropes:  { label: 'ROPES',  damageMult: 0.95, grappleEscapeMult: 1.15, desc: '+15% Escape' }
+};
+
+MMA.Combat.getRingPosition = MMA.Combat.getRingPosition || function(scene) {
+  if (!scene || !scene.player) return 'center';
+  var p = scene.player;
+  var CANVAS_W = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_W) ? CONFIG.CANVAS_W : 500;
+  var CANVAS_H = (typeof CONFIG !== 'undefined' && CONFIG.CANVAS_H) ? CONFIG.CANVAS_H : 700;
+  var margin = 80;
+  var inCorner = (p.x < margin || p.x > CANVAS_W - margin) && (p.y < margin || p.y > CANVAS_H - margin);
+  var onRopes  = (p.x < margin || p.x > CANVAS_W - margin) || (p.y < margin || p.y > CANVAS_H - margin);
+  if (inCorner) return 'corner';
+  if (onRopes)  return 'ropes';
+  return 'center';
+};
+
+MMA.Combat.getRingPositionDamageMult = MMA.Combat.getRingPositionDamageMult || function(scene) {
+  var pos = MMA.Combat.getRingPosition(scene);
+  return (MMA.Combat.RING_POSITIONS[pos] || MMA.Combat.RING_POSITIONS.center).damageMult;
+};
+
+MMA.Combat.getRingPositionGrappleMult = MMA.Combat.getRingPositionGrappleMult || function(scene) {
+  var pos = MMA.Combat.getRingPosition(scene);
+  return (MMA.Combat.RING_POSITIONS[pos] || MMA.Combat.RING_POSITIONS.center).grappleEscapeMult;
+};
+
+// === MUTATION SYSTEM ===
+// 5% chance a repeated move mutates — altered dmg/stamina/koPower for current fight only
+MMA.Combat.MUTATION_CHANCE = 0.05;
+MMA.Combat._activeMutations = {};
+
+MMA.Combat.tryMutateMove = MMA.Combat.tryMutateMove || function(scene, moveKey, useCount) {
+  if (useCount < 3) return null; // Only after 3+ uses in same fight
+  if (Math.random() > MMA.Combat.MUTATION_CHANCE) return null;
+  if (MMA.Combat._activeMutations[moveKey]) return MMA.Combat._activeMutations[moveKey]; // already mutated
+
+  var mutations = [
+    { type: 'power',   damageMult: 1.30, staminaMult: 1.20, label: '💥 MUTATED: POWER', color: '#ff4400' },
+    { type: 'swift',   damageMult: 0.85, staminaMult: 0.60, label: '⚡ MUTATED: SWIFT',  color: '#44aaff' },
+    { type: 'drain',   damageMult: 1.10, staminaDrain: 15,  label: '🩸 MUTATED: DRAIN',  color: '#aa00ff' },
+    { type: 'ko',      damageMult: 1.05, koPowerMult: 1.50, label: '💀 MUTATED: KO',     color: '#ff0000' }
+  ];
+  var mut = mutations[Math.floor(Math.random() * mutations.length)];
+  MMA.Combat._activeMutations[moveKey] = mut;
+
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function' && scene && scene.player) {
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 55, mut.label, mut.color);
+  }
+  return mut;
+};
+
+MMA.Combat.getMutationDamageMult = MMA.Combat.getMutationDamageMult || function(moveKey) {
+  var mut = MMA.Combat._activeMutations[moveKey];
+  return (mut && mut.damageMult) ? mut.damageMult : 1;
+};
+
+MMA.Combat.clearMutations = MMA.Combat.clearMutations || function() {
+  MMA.Combat._activeMutations = {};
+};
+
+// === HANDLE INPUT REFACTOR ===
+// Splits the 151-line handleInput into focused sub-functions for maintainability.
+// Does NOT change behavior — purely structural decomposition.
+
+MMA.Combat._applyMovement = MMA.Combat._applyMovement || function(scene, keys, player) {
+  if (!player || !player.setVelocity) return;
+  var speed = (player.stats && player.stats.speed) || 120;
+  // Apply arena speed mult if set
+  if (player._arenaSpeedMult) speed *= player._arenaSpeedMult;
+  // Apply trophy speed penalty if any
+  if (window.MMA && MMA.Items && typeof MMA.Items.getTrophySpeedPenalty === 'function') {
+    speed *= MMA.Items.getTrophySpeedPenalty();
+  }
+  var vx = 0, vy = 0;
+  if (keys.left  && keys.left.isDown)  vx = -speed;
+  if (keys.right && keys.right.isDown) vx =  speed;
+  if (keys.up    && keys.up.isDown)    vy = -speed;
+  if (keys.down  && keys.down.isDown)  vy =  speed;
+  // Also check cursor keys if available
+  if (scene.cursors) {
+    if (scene.cursors.left.isDown)  vx = -speed;
+    if (scene.cursors.right.isDown) vx =  speed;
+    if (scene.cursors.up.isDown)    vy = -speed;
+    if (scene.cursors.down.isDown)  vy =  speed;
+  }
+  player.setVelocity(vx, vy);
+};
+
+MMA.Combat._routeActionKey = MMA.Combat._routeActionKey || function(scene, actionName) {
+  if (!actionName || scene.gameOver) return;
+  var inGround = scene.groundState && scene.groundState.active;
+  if (inGround) {
+    // Ground state routing
+    var groundMap = {
+      jab: 'gnp', heavy: 'gnp', hook: 'gnp', uppercut: 'gnp',
+      headKick: 'gnp', bodyShot: 'gnp', lowKick: 'gnp',
+      cross: 'elbow', grapple: 'submission', takedown: 'submission',
+      guillotine: 'submission', special: 'improve', standup: 'standup'
+    };
+    var groundAction = groundMap[actionName] || actionName;
+    if (typeof MMA.Combat.executeGroundMove === 'function') {
+      MMA.Combat.executeGroundMove(scene, groundAction);
+    }
+  } else {
+    // Standing routing
+    if (typeof MMA.Combat.executeAttack === 'function') {
+      MMA.Combat.executeAttack(scene, actionName);
+    }
+  }
+};
+
+MMA.Combat._dispatchNetworkSync = MMA.Combat._dispatchNetworkSync || function(scene, actionName) {
+  if (!scene || !scene.networkMode) return;
+  if (window.MMA && MMA.Network && typeof MMA.Network.sendAction === 'function') {
+    MMA.Network.sendAction(scene, actionName);
+  }
+};

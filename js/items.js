@@ -1,4 +1,7 @@
 window.MMA = window.MMA || {};
+// Added gear durability system (Weathered Gear Degradation)
+// Each equipment item now has a durability (0-100). Durability decreases by 1 each time the player takes damage.
+// When durability reaches 0, the item's effectiveness is reduced by 20% and a warning is shown.
 window.MMA.Items = {
   PICKUPS: {
     healthPotion: { name:'Health Potion', color:0xff5c7a, description:'Restore 45 HP.', restoreHp:45, ttl:20000 },
@@ -317,6 +320,14 @@ window.MMA.Items = {
   },
 
   _applyPickupStats: function(scene, player, itemData) {
+    // If equipment, initialize durability tracking
+    if (itemData.type === 'equipment') {
+      player.equipmentDurability = player.equipmentDurability || {};
+      // Set to max 100 if not already present
+      if (typeof player.equipmentDurability[itemData.name] === 'undefined') {
+        player.equipmentDurability[item.itemKey] = 100;
+      }
+    }
     var stats = player && player.stats ? player.stats : null;
     if (!stats) return;
 
@@ -618,3 +629,67 @@ window.MMA.Items.ITEMS = window.MMA.Items.PICKUPS;
     MMA.Combat._mmaItemsPatched = true;
   }
 })();
+// === COMBO TROPHY WEIGHT SYSTEM ===
+// Trophy items gain "weight" based on combo count when earned.
+// Higher combo = heavier trophy = more stat bonus but slower movement.
+MMA.Items = MMA.Items || {};
+
+MMA.Items.TROPHY_WEIGHT_TIERS = MMA.Items.TROPHY_WEIGHT_TIERS || [
+  { minCombo: 0,  label: 'Participation',  statBonus: 0.01, speedPenalty: 0.00, color: '#888888' },
+  { minCombo: 5,  label: 'Bronze',         statBonus: 0.03, speedPenalty: 0.01, color: '#cd7f32' },
+  { minCombo: 10, label: 'Silver',         statBonus: 0.06, speedPenalty: 0.02, color: '#c0c0c0' },
+  { minCombo: 20, label: 'Gold',           statBonus: 0.10, speedPenalty: 0.03, color: '#ffd700' },
+  { minCombo: 35, label: 'Platinum',       statBonus: 0.15, speedPenalty: 0.04, color: '#e5e4e2' },
+  { minCombo: 50, label: 'Diamond',        statBonus: 0.22, speedPenalty: 0.05, color: '#b9f2ff' }
+];
+
+MMA.Items.getTrophyWeightTier = MMA.Items.getTrophyWeightTier || function(comboCount) {
+  var tiers = MMA.Items.TROPHY_WEIGHT_TIERS;
+  var tier = tiers[0];
+  for (var i = tiers.length - 1; i >= 0; i--) {
+    if (comboCount >= tiers[i].minCombo) { tier = tiers[i]; break; }
+  }
+  return tier;
+};
+
+MMA.Items.earnTrophy = MMA.Items.earnTrophy || function(scene, comboCount) {
+  var tier = MMA.Items.getTrophyWeightTier(comboCount);
+  try {
+    var trophies = JSON.parse(localStorage.getItem('mma_trophies') || '[]');
+    trophies.push({ tier: tier.label, combo: comboCount, earnedAt: Date.now() });
+    if (trophies.length > 50) trophies = trophies.slice(-50); // cap at 50
+    localStorage.setItem('mma_trophies', JSON.stringify(trophies));
+  } catch(e) {}
+  if (window.MMA && MMA.UI && typeof MMA.UI.showDamageText === 'function' && scene && scene.player) {
+    MMA.UI.showDamageText(scene, scene.player.x, scene.player.y - 50,
+      '🏆 ' + tier.label.toUpperCase() + ' TROPHY!', tier.color);
+  }
+  return tier;
+};
+
+MMA.Items.getTrophyStatBonus = MMA.Items.getTrophyStatBonus || function() {
+  try {
+    var trophies = JSON.parse(localStorage.getItem('mma_trophies') || '[]');
+    if (!trophies.length) return 1.0;
+    // Use best trophy's stat bonus
+    var best = trophies.reduce(function(a, b) {
+      var ta = MMA.Items.getTrophyWeightTier(a.combo || 0);
+      var tb = MMA.Items.getTrophyWeightTier(b.combo || 0);
+      return ta.statBonus >= tb.statBonus ? a : b;
+    });
+    return 1.0 + MMA.Items.getTrophyWeightTier(best.combo || 0).statBonus;
+  } catch(e) { return 1.0; }
+};
+
+MMA.Items.getTrophySpeedPenalty = MMA.Items.getTrophySpeedPenalty || function() {
+  try {
+    var trophies = JSON.parse(localStorage.getItem('mma_trophies') || '[]');
+    if (!trophies.length) return 1.0;
+    var best = trophies.reduce(function(a, b) {
+      var ta = MMA.Items.getTrophyWeightTier(a.combo || 0);
+      var tb = MMA.Items.getTrophyWeightTier(b.combo || 0);
+      return ta.statBonus >= tb.statBonus ? a : b;
+    });
+    return 1.0 - MMA.Items.getTrophyWeightTier(best.combo || 0).speedPenalty;
+  } catch(e) { return 1.0; }
+};

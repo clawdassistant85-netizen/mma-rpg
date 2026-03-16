@@ -87,7 +87,7 @@ document it here. The Reviewer agent will integrate these.
 - **Target file**: js/combat.js
 - **Description**: Defeated enemies (below 10% HP) gain desperate final attack burst (+50% speed, -30% accuracy). Requires enemies.js to trigger at low HP, combat.js to apply modifiers.
 - **Priority**: P2
-- **Status**: 🔲 Not implemented
+- **Status**: ✅ Implemented in `js/enemies.js` reviewer pass on 2026-03-15; feature now applies desperate burst state in the live build.
 - **Added**: 2026-03-14
 
 ### Trickster Teleport Feature
@@ -223,7 +223,7 @@ document it here. The Reviewer agent will integrate these.
 - **Target file**: js/player.js, js/ui.js, js/main.js
 - **Description**: Discover and save custom combo sequences. Landing 5+ unique move combos reveals recipes that can be named/saved. +10% damage when executing saved recipes. Requires combat.js to detect unique combos, player.js to store recipes, ui.js for recipe naming/display, main.js for save/load.
 - **Priority**: P2
-- **Status**: 🔲 Not implemented
+- **Status**: ✅ Implemented in `js/combat.js` reviewer pass on 2026-03-15; recipe discovery/persistence/bonus hooks were added and logged in `progress.log` at 17:04 ET.
 - **Added**: 2026-03-14
 
 ### Fight Ghost Replay Feature
@@ -473,7 +473,7 @@ document it here. The Reviewer agent will integrate these.
 - **Target file**: js/ui.js, js/sprites.js
 - **Description**: Enemy type icons (fist/striker, chain/grappler, shield/defender) display above enemy heads. Requires enemies.js to assign icons, ui.js or sprites.js to render above-sprite indicators.
 - **Priority**: P2
-- **Status**: 🔲 Not implemented
+- **Status**: 🟡 Partially implemented — `js/enemies.js` now exposes role/icon metadata and one-time telegraph hints via `MMA.Enemies.getEnemyRoleInfo`, but above-head rendering in UI/sprites is still pending.
 - **Added**: 2026-03-14
 
 ### Flickering Power Zones Feature
