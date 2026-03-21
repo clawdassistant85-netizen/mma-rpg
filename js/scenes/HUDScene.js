@@ -29,12 +29,12 @@ var HUDScene = new Phaser.Class({
       fontSize: '11px', fontFamily: 'Arial', color: '#6688ff'
     }).setDepth(10).setScrollFactor(0);
     // Controls hint
-    this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H - 20,
+    this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H - 28,
       'WASD: Move | J: Jab | K: Cross | L: Take | U: Hook | N: LowKick | O: Uppercut | P: Body',
-      { fontSize:'9px', color:'#888888' }).setOrigin(0.5, 1);
-    this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H - 8,
+      { fontSize:'10px', color:'#888888' }).setOrigin(0.5, 1);
+    this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H - 14,
       'SPACE: Head Kick | G: Guillotine',
-      { fontSize:'9px', color:'#888888' }).setOrigin(0.5, 1);
+      { fontSize:'10px', color:'#888888' }).setOrigin(0.5, 1);
     // Message text (center screen)
     this.msgText = this.add.text(CONFIG.CANVAS_W/2, CONFIG.CANVAS_H/2, '', {
       fontSize:'32px', color:'#ffffff', stroke:'#000000', strokeThickness:4

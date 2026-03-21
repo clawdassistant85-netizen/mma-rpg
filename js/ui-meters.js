@@ -313,7 +313,7 @@ MMA.UI.initVarietyMeterDOM = function() {
   var container = document.getElementById('game-container') || document.body;
   var meter = document.createElement('div');
   meter.id = 'variety-meter';
-  meter.style.cssText = 'position:absolute;bottom:62px;left:4px;width:60px;z-index:50;';
+  meter.style.cssText = 'position:absolute;bottom:60px;left:4px;width:60px;z-index:50;';
   var label = document.createElement('div');
   label.style.cssText = 'font-size:6px;color:#888;font-family:Arial;text-align:center;margin-bottom:1px;';
   label.textContent = 'VARIETY';
@@ -345,7 +345,7 @@ MMA.UI.initPressureMeterDOM = function() {
   var container = document.getElementById('game-container') || document.body;
   var meter = document.createElement('div');
   meter.id = 'pressure-meter';
-  meter.style.cssText = 'position:absolute;bottom:70px;left:4px;width:60px;z-index:50;';
+  meter.style.cssText = 'position:absolute;bottom:84px;left:4px;width:60px;z-index:50;';
   var label = document.createElement('div');
   label.id = 'pressure-meter-label';
   label.style.cssText = 'font-size:6px;color:#ff4400;font-family:Arial;text-align:center;margin-bottom:1px;';
@@ -419,7 +419,7 @@ MMA.UIMeter.initWeatherHUD = MMA.UIMeter.initWeatherHUD || function() {
   if (el) return;
   el = document.createElement('div');
   el.id = 'weather-hud';
-  el.style.cssText = 'position:absolute;top:8px;right:8px;font-size:9px;color:#FFD700;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:4px;z-index:60;pointer-events:none;';
+  el.style.cssText = 'position:absolute;top:42px;right:8px;font-size:9px;color:#FFD700;background:rgba(0,0,0,0.5);padding:2px 6px;border-radius:4px;z-index:60;pointer-events:none;';
   var label = (window.MMA && MMA.CombatMoves && typeof MMA.CombatMoves.getWeatherLabel === 'function')
     ? MMA.CombatMoves.getWeatherLabel() : '';
   el.textContent = label;
@@ -459,7 +459,7 @@ MMA.UIMeter.initGearDurabilityBar = MMA.UIMeter.initGearDurabilityBar || functio
   if (el) return;
   var wrap = document.createElement('div');
   wrap.id = 'gear-dur-wrap';
-  wrap.style.cssText = 'position:absolute;bottom:52px;left:8px;width:80px;z-index:60;pointer-events:none;';
+  wrap.style.cssText = 'position:absolute;bottom:36px;left:8px;width:80px;z-index:60;pointer-events:none;';
   var label = document.createElement('div');
   label.style.cssText = 'font-size:7px;color:#888;margin-bottom:1px;';
   label.textContent = 'GEAR';
